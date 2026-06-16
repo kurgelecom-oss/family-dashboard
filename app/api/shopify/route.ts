@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
 
-const SHOP        = process.env.SHOPIFY_STORE ?? "0eu5zs-gj.myshopify.com";
+const SHOP        = process.env["SHOPIFY_STORE"] ?? "0eu5zs-gj.myshopify.com";
 const TOKEN_URL   = `https://${SHOP}/admin/oauth/access_token`;
 const GRAPHQL_URL = `https://${SHOP}/admin/api/2025-01/graphql.json`;
 
 async function getAccessToken(): Promise<string> {
-  // Read at call-time so Next.js build analysis cannot inline as undefined
   const clientId     = process.env["SHOPIFY_CLIENT_ID"];
   const clientSecret = process.env["SHOPIFY_CLIENT_SECRET"];
   if (!clientId || !clientSecret) {
     throw new Error(
-      `Missing env vars — SHOPIFY_CLIENT_ID: ${clientId ? "set" : "MISSING"}, SHOPIFY_CLIENT_SECRET: ${clientSecret ? "set" : "MISSING"}`
+      `Missing env vars — SHOPIFY_CLIENT_ID: ${clientId ? "set" : "MISSING"}, ` +
+      `SHOPIFY_CLIENT_SECRET: ${clientSecret ? "set" : "MISSING"}`
     );
   }
   const res = await fetch(TOKEN_URL, {
@@ -26,6 +26,57 @@ async function getAccessToken(): Promise<string> {
   if (!res.ok) throw new Error(`Token request failed: ${res.status} ${await res.text()}`);
   const data = (await res.json()) as { access_token: string };
   return data.access_token;
+}
+
+async function shopifyGql<T>(token: string, query: string): Promise<T> {
+  const res = await fetch(GRAPHQL_URL, {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Shopify-Access-Token": token,
+    },
+    body: JSON.stringify({ query }),
+  });
+  if (!res.ok) throw new Error(`GraphQL failed: ${res.status} ${await res.text()}`);
+  const json = (await res.json()) as { data: T; errors?: unknown };
+  if (json.errors) throw new Error(`GraphQL errors: ${JSON.stringify(json.errors)}`);
+  return json.data;
+}
+
+/**
+ * Returns the UTC timestamp for midnight on [year, month, day] in [tz].
+ * Uses noon UTC as a stable reference so DST and cross-dateline offsets
+ * don't shift the calendar date under us.
+ */
+function tzMidnight(year: number, month: number, day: number, tz: string): number {
+  const noonUTC = Date.UTC(year, month - 1, day, 12);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(noonUTC));
+  const n = (t: string) =>
+    parseInt(parts.find((p) => p.type === t)!.value.replace(/^24$/, "0"));
+  const localSecs = n("hour") * 3600 + n("minute") * 60 + n("second");
+  const dayDiff   = Math.round(
+    (Date.UTC(n("year"), n("month") - 1, n("day")) - Date.UTC(year, month - 1, day))
+    / 86_400_000
+  );
+  return noonUTC - localSecs * 1000 - dayDiff * 86_400_000;
+}
+
+/** Current date components (year, month 1-12, day, weekday 0=Sun) in [tz]. */
+function localNow(now: Date, tz: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    year: "numeric", month: "numeric", day: "numeric", weekday: "short",
+  }).formatToParts(now);
+  const n  = (t: string) => parseInt(parts.find((p) => p.type === t)!.value);
+  const wd = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"]
+    .indexOf(parts.find((p) => p.type === "weekday")!.value);
+  return { year: n("year"), month: n("month"), day: n("day"), weekday: wd };
 }
 
 interface OrderNode {
@@ -48,72 +99,43 @@ const ORDER_QUERY = (since: string, after: string | null) => `{
   }
 }`;
 
+type OrdersPage = { orders: { nodes: OrderNode[]; pageInfo: { hasNextPage: boolean; endCursor: string } } };
+
 async function fetchAllOrders(token: string, since: string): Promise<OrderNode[]> {
   const orders: OrderNode[] = [];
   let cursor: string | null = null;
-
   for (let page = 0; page < 40; page++) {
-    const res = await fetch(GRAPHQL_URL, {
-      method: "POST",
-      cache: "no-store",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Shopify-Access-Token": token,
-      },
-      body: JSON.stringify({ query: ORDER_QUERY(since, cursor) }),
-    });
-    if (!res.ok) throw new Error(`GraphQL failed: ${res.status} ${await res.text()}`);
-
-    const json = (await res.json()) as {
-      data: {
-        orders: {
-          nodes: OrderNode[];
-          pageInfo: { hasNextPage: boolean; endCursor: string };
-        };
-      };
-      errors?: unknown;
-    };
-
-    if (json.errors) throw new Error(`GraphQL errors: ${JSON.stringify(json.errors)}`);
-
-    const { nodes, pageInfo } = json.data.orders;
-    orders.push(...nodes);
-    if (!pageInfo.hasNextPage) break;
-    cursor = pageInfo.endCursor;
+    const data: OrdersPage = await shopifyGql<OrdersPage>(token, ORDER_QUERY(since, cursor));
+    orders.push(...data.orders.nodes);
+    if (!data.orders.pageInfo.hasNextPage) break;
+    cursor = data.orders.pageInfo.endCursor;
   }
-
   return orders;
-}
-
-function startOfDay(d: Date): number {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-}
-
-function startOfWeekMonday(d: Date): number {
-  const dow = d.getDay();
-  const r = new Date(d);
-  r.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1));
-  return new Date(r.getFullYear(), r.getMonth(), r.getDate()).getTime();
 }
 
 export async function GET() {
   try {
     const token = await getAccessToken();
 
-    const now       = new Date();
-    const yearStart = `${now.getFullYear()}-01-01`;
+    // Fetch store timezone so date boundaries match Shopify Analytics exactly
+    const { shop: { ianaTimezone: tz } } = await shopifyGql<{
+      shop: { ianaTimezone: string };
+    }>(token, `{ shop { ianaTimezone } }`);
 
-    const orders = await fetchAllOrders(token, yearStart);
+    const now                        = new Date();
+    const { year, month, day, weekday } = localNow(now, tz);
 
-    const todayMs = startOfDay(now);
-    const weekMs  = startOfWeekMonday(now);
-    const monthMs = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    // Year start in store timezone → ISO timestamp for GraphQL filter
+    const yearStartISO = new Date(tzMidnight(year, 1, 1, tz)).toISOString();
 
-    let todayOrders  = 0;
-    let todayRevenue = 0;
-    let weekRevenue  = 0;
-    let monthRevenue = 0;
-    let yearRevenue  = 0;
+    const orders = await fetchAllOrders(token, yearStartISO);
+
+    const todayMs        = tzMidnight(year, month, day, tz);
+    const daysFromMonday = weekday === 0 ? 6 : weekday - 1;
+    const weekMs         = todayMs - daysFromMonday * 86_400_000;
+    const monthMs        = tzMidnight(year, month, 1, tz);
+
+    let todayOrders = 0, todayRevenue = 0, weekRevenue = 0, monthRevenue = 0, yearRevenue = 0;
 
     for (const o of orders) {
       const t     = new Date(o.createdAt).getTime();
