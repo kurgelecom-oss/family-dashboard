@@ -1,15 +1,9 @@
 "use client";
+import { useState, useEffect } from "react";
 
-const days = [
-  { name: "Mon", num: 9 },
-  { name: "Tue", num: 10 },
-  { name: "Wed", num: 11 },
-  { name: "Thu", num: 12 },
-  { name: "Fri", num: 13 },
-  { name: "Sat", num: 14 },
-  { name: "Sun", num: 15 },
-];
+const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+// Hardcoded events — replaced by MS Graph API in a future session
 const events = [
   { member: "Taylan", color: "var(--cyan)", items: [
     { day: "Mon", text: "Client call — 9:00 AM" },
@@ -32,20 +26,63 @@ const events = [
   ]},
 ];
 
+function getWeekDays() {
+  const now = new Date();
+  const dow = now.getDay(); // 0=Sun, 1=Mon...
+  const diffToMonday = dow === 0 ? -6 : 1 - dow;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMonday);
+  return DAY_NAMES.map((name, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return { name, date: d };
+  });
+}
+
 export default function PanelCalendar() {
+  const [days, setDays] = useState<{ name: string; date: Date }[]>([]);
+  const [todayDay, setTodayDay] = useState(-1);
+  const [todayMonth, setTodayMonth] = useState(-1);
+  const [weekLabel, setWeekLabel] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    const weekDays = getWeekDays();
+    const now = new Date();
+    setDays(weekDays);
+    setTodayDay(now.getDate());
+    setTodayMonth(now.getMonth());
+
+    const mon = weekDays[0].date;
+    const sun = weekDays[6].date;
+    const label = mon.getMonth() === sun.getMonth()
+      ? `${mon.getDate()}–${sun.getDate()} ${sun.toLocaleDateString("en-AU", { month: "short" })}`
+      : `${mon.getDate()} ${mon.toLocaleDateString("en-AU", { month: "short" })} – ${sun.getDate()} ${sun.toLocaleDateString("en-AU", { month: "short" })}`;
+    setWeekLabel(label);
+    setMounted(true);
+  }, []);
+
   return (
     <div className="panel col-5">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div className="panel-title">Family Calendar · This Week</div>
-        <span className="badge badge-cyan">9–15 June</span>
+        <span className="badge badge-cyan">{mounted ? weekLabel : "—"}</span>
       </div>
 
       {/* Day strip */}
       <div className="day-strip">
-        {days.map((d) => (
-          <div key={d.name} className={`day-cell${d.num === 14 ? " today" : ""}`}>
-            <div className="day-name">{d.name}</div>
-            <div className="day-num">{d.num}</div>
+        {mounted ? days.map((d) => {
+          const isToday = d.date.getDate() === todayDay && d.date.getMonth() === todayMonth;
+          return (
+            <div key={d.name} className={`day-cell${isToday ? " today" : ""}`}>
+              <div className="day-name">{d.name}</div>
+              <div className="day-num">{d.date.getDate()}</div>
+            </div>
+          );
+        }) : DAY_NAMES.map((name) => (
+          <div key={name} className="day-cell">
+            <div className="day-name">{name}</div>
+            <div className="day-num">—</div>
           </div>
         ))}
       </div>
