@@ -1,26 +1,40 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { supabase, getTodayDate } from "../lib/supabase";
+import { supabase, getTodayDate, getWeekStart, getTodayDayName } from "../lib/supabase";
 
-const HABITS = [
-  { id: "wake",      block: "pre",    label: "Feet on floor by 6:45am — no phone",  points: 0, icon: "🌅" },
-  { id: "fajr",      block: "pre",    label: "Fajr Namaz done",                      points: 0, icon: "🕌" },
-  { id: "bed",       block: "pre",    label: "Bed made + dressed",                   points: 0, icon: "🛏️" },
-  { id: "movement",  block: "pre",    label: "Morning movement — 20 min outside",    points: 0, icon: "⚽" },
-  { id: "breakfast", block: "pre",    label: "Breakfast done — no screens",          points: 0, icon: "🍳" },
-  { id: "quran",     block: "pre",    label: "Qur'an recitation — 20 min",           points: 0, icon: "📖" },
-  { id: "goals",     block: "pre",    label: "Daily goals written",                  points: 2, icon: "✍️" },
-  { id: "school",    block: "school", label: "Homeschool session completed — 4 hrs", points: 3, icon: "📚" },
-  { id: "readtheory",block: "school", label: "ReadTheory done",                      points: 1, icon: "📝" },
-  { id: "khan",      block: "school", label: "Khan Academy done",                    points: 1, icon: "🎓" },
-  { id: "journal",   block: "school", label: "Daily learning journal entry written", points: 1, icon: "📒" },
-  { id: "btn",       block: "arvo",   label: "BTN episode + Cornell notes done",     points: 1, icon: "📰" },
-  { id: "namaz",     block: "arvo",   label: "Duhr + Asr + Maghrib + Isha Namaz",   points: 1, icon: "🕌" },
-  { id: "room",      block: "arvo",   label: "Room tidy",                            points: 0, icon: "🧹" },
-  { id: "shower",    block: "arvo",   label: "Shower done",                          points: 0, icon: "🚿" },
-  { id: "teeth",     block: "arvo",   label: "Teeth brushed",                        points: 0, icon: "🪥" },
-  { id: "reading",   block: "arvo",   label: "Reading in bed — 15+ min",             points: 1, icon: "🌙" },
-];
+// Points per habit — used for weekly sum
+const HABIT_POINTS: Record<string, number> = {
+  wake: 0, fajr: 0, bed: 0, movement: 0, breakfast: 0, quran: 0,
+  goals: 2, school: 3, readtheory: 1, khan: 1, journal: 1,
+  soccer: 2, btn: 1, namaz: 1, room: 0, shower: 0, teeth: 0, reading: 1,
+};
+
+// Days soccer training applies
+const SOCCER_DAYS = ["Monday", "Wednesday"];
+
+function buildHabits(dayName: string) {
+  const hasSoccer = SOCCER_DAYS.includes(dayName);
+  return [
+    { id: "wake",      block: "pre",    label: "Feet on floor by 6:45am — no phone",  points: 0, icon: "🌅" },
+    { id: "fajr",      block: "pre",    label: "Fajr Namaz done",                      points: 0, icon: "🕌" },
+    { id: "bed",       block: "pre",    label: "Bed made + dressed",                   points: 0, icon: "🛏️" },
+    { id: "movement",  block: "pre",    label: "Morning movement — 20 min outside",    points: 0, icon: "⚽" },
+    { id: "breakfast", block: "pre",    label: "Breakfast done — no screens",          points: 0, icon: "🍳" },
+    { id: "quran",     block: "pre",    label: "Qur'an recitation — 20 min",           points: 0, icon: "📖" },
+    { id: "goals",     block: "pre",    label: "Daily goals written",                  points: 2, icon: "✍️" },
+    { id: "school",    block: "school", label: "Homeschool session completed — 4 hrs", points: 3, icon: "📚" },
+    { id: "readtheory",block: "school", label: "ReadTheory done",                      points: 1, icon: "📝" },
+    { id: "khan",      block: "school", label: "Khan Academy done",                    points: 1, icon: "🎓" },
+    { id: "journal",   block: "school", label: "Daily learning journal entry written", points: 1, icon: "📒" },
+    ...(hasSoccer ? [{ id: "soccer", block: "arvo", label: "Soccer training — attend + full effort", points: 2, icon: "⚽" }] : []),
+    { id: "btn",       block: "arvo",   label: "BTN episode + Cornell notes done",     points: 1, icon: "📰" },
+    { id: "namaz",     block: "arvo",   label: "Duhr + Asr + Maghrib + Isha Namaz",   points: 1, icon: "🕌" },
+    { id: "room",      block: "arvo",   label: "Room tidy",                            points: 0, icon: "🧹" },
+    { id: "shower",    block: "arvo",   label: "Shower done",                          points: 0, icon: "🚿" },
+    { id: "teeth",     block: "arvo",   label: "Teeth brushed",                        points: 0, icon: "🪥" },
+    { id: "reading",   block: "arvo",   label: "Reading in bed — 15+ min",             points: 1, icon: "🌙" },
+  ];
+}
 
 const BLOCKS = [
   { id: "pre",    label: "🌅 Pre-Homeschool",      subtitle: "Before 8:30am",    color: "#f59e0b" },
@@ -35,25 +49,89 @@ const THRESHOLDS = [
   { min: 0,  label: "Reset Week ❌",   desc: "No PS5 · No iPad · Full catch-up weekend",           color: "#e74c3c" },
 ];
 
-const WEEKLY_MAX = 47;
-
 function getThreshold(pts: number) {
   return THRESHOLDS.find(t => pts >= t.min) || THRESHOLDS[THRESHOLDS.length - 1];
 }
 
-function getHabitState(habit: typeof HABITS[0], blockHabits: typeof HABITS, completed: Record<string, boolean>): "done" | "available" | "locked" {
+function getHabitState(habit: ReturnType<typeof buildHabits>[0], blockHabits: ReturnType<typeof buildHabits>, completed: Record<string, boolean>): "done" | "available" | "locked" {
   if (completed[habit.id]) return "done";
   const idx = blockHabits.findIndex(h => h.id === habit.id);
   const incompleteBefore = blockHabits.slice(0, idx).filter(h => !completed[h.id]).length;
   return incompleteBefore < 2 ? "available" : "locked";
 }
 
+// Calculate real streak: consecutive days (going back from yesterday) where
+// at least 5 habits were completed (a "meaningful" day).
+async function calculateStreak(): Promise<number> {
+  // Fetch last 60 days of completions
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 60);
+  const cutoffStr = cutoff.toISOString().split("T")[0];
+
+  const { data, error } = await supabase
+    .from("habit_completions")
+    .select("habit_id, completed_date")
+    .gte("completed_date", cutoffStr)
+    .order("completed_date", { ascending: false });
+
+  if (error || !data) return 0;
+
+  // Group by date
+  const byDate: Record<string, number> = {};
+  data.forEach((r: { habit_id: string; completed_date: string }) => {
+    byDate[r.completed_date] = (byDate[r.completed_date] || 0) + 1;
+  });
+
+  // Walk back from yesterday, count consecutive days with >=5 completions
+  let streak = 0;
+  const check = new Date();
+  // Start from today — if today has >=5, count it; else start from yesterday
+  for (let i = 0; i <= 60; i++) {
+    const d = new Date(check);
+    d.setDate(check.getDate() - i);
+    const ds = d.toISOString().split("T")[0];
+    if ((byDate[ds] || 0) >= 5) {
+      streak++;
+    } else if (i === 0) {
+      // Today not yet done — skip today, start counting from yesterday
+      continue;
+    } else {
+      break; // Streak broken
+    }
+  }
+  return streak;
+}
+
 export default function AnsarPage() {
+  const [dayName, setDayName] = useState("");
+  const [habits, setHabits] = useState<ReturnType<typeof buildHabits>>([]);
   const [completed, setCompleted] = useState<Record<string, boolean>>({});
   const [mounted, setMounted] = useState(false);
   const [time, setTime] = useState("");
   const [saving, setSaving] = useState<string | null>(null);
   const [online, setOnline] = useState(true);
+  const [weeklyPts, setWeeklyPts] = useState<number | null>(null);
+  const [streak, setStreak] = useState<number | null>(null);
+
+  const loadWeeklyData = useCallback(async () => {
+    const weekStart = getWeekStart();
+    const today = getTodayDate();
+
+    const { data, error } = await supabase
+      .from("habit_completions")
+      .select("habit_id, completed_date")
+      .gte("completed_date", weekStart)
+      .lte("completed_date", today);
+
+    if (!error && data) {
+      // Sum points using HABIT_POINTS map
+      let total = 0;
+      data.forEach((r: { habit_id: string; completed_date: string }) => {
+        total += HABIT_POINTS[r.habit_id] || 0;
+      });
+      setWeeklyPts(total);
+    }
+  }, []);
 
   const loadFromSupabase = useCallback(async () => {
     const { data, error } = await supabase
@@ -62,13 +140,11 @@ export default function AnsarPage() {
       .eq("completed_date", getTodayDate());
     if (!error && data) {
       const map: Record<string, boolean> = {};
-      data.forEach(r => { map[r.habit_id] = true; });
+      data.forEach((r: { habit_id: string }) => { map[r.habit_id] = true; });
       setCompleted(map);
-      // Also cache locally
       localStorage.setItem(`ansar-habits-${getTodayDate()}`, JSON.stringify(map));
       setOnline(true);
     } else {
-      // Fallback to localStorage
       const saved = localStorage.getItem(`ansar-habits-${getTodayDate()}`);
       if (saved) setCompleted(JSON.parse(saved));
       setOnline(false);
@@ -76,41 +152,54 @@ export default function AnsarPage() {
   }, []);
 
   useEffect(() => {
+    const dn = getTodayDayName();
+    setDayName(dn);
+    setHabits(buildHabits(dn));
     setMounted(true);
     loadFromSupabase();
+    loadWeeklyData();
+    calculateStreak().then(setStreak);
+
     const tick = setInterval(() => {
       setTime(new Date().toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" }));
     }, 1000);
     setTime(new Date().toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" }));
-    return () => clearInterval(tick);
-  }, [loadFromSupabase]);
+
+    // Poll every 30s for weekly refresh
+    const poll = setInterval(() => {
+      loadFromSupabase();
+      loadWeeklyData();
+    }, 30000);
+
+    return () => { clearInterval(tick); clearInterval(poll); };
+  }, [loadFromSupabase, loadWeeklyData]);
 
   async function toggle(id: string, state: string) {
     if (state !== "available") return;
     setSaving(id);
-    // Optimistic update
     setCompleted(prev => {
       const next = { ...prev, [id]: true };
       localStorage.setItem(`ansar-habits-${getTodayDate()}`, JSON.stringify(next));
       return next;
     });
-    // Write to Supabase
     const { error } = await supabase
       .from("habit_completions")
       .upsert({ habit_id: id, completed_date: getTodayDate() }, { onConflict: "habit_id,completed_date" });
     if (error) {
-      console.error("Supabase error:", error);
       setOnline(false);
     } else {
       setOnline(true);
+      // Refresh weekly after completion
+      loadWeeklyData();
     }
     setSaving(null);
   }
 
-  const todayPts = HABITS.filter(h => completed[h.id]).reduce((a, h) => a + h.points, 0);
-  const todayDone = HABITS.filter(h => completed[h.id]).length;
-  const overallPct = Math.round((todayDone / HABITS.length) * 100);
-  const threshold = getThreshold(todayPts);
+  const todayPts = habits.filter(h => completed[h.id]).reduce((a, h) => a + h.points, 0);
+  const todayDone = habits.filter(h => completed[h.id]).length;
+  const overallPct = habits.length > 0 ? Math.round((todayDone / habits.length) * 100) : 0;
+  const weekThreshold = getThreshold(weeklyPts ?? 0);
+  const WEEKLY_MAX = SOCCER_DAYS.includes(dayName) ? 51 : 47; // 2 soccer days × 2pts extra
 
   return (
     <div style={{ minHeight: "100vh", background: "#0d0f14", color: "#f0f2f8", fontFamily: "'Inter', sans-serif" }}>
@@ -146,29 +235,37 @@ export default function AnsarPage() {
         </div>
       </header>
 
-      <div style={{ padding: "12px 12px 40px", maxWidth: 680, margin: "0 auto" }}>
+      <div style={{ maxWidth: 480, margin: "0 auto", padding: "16px 14px 40px" }}>
 
-        {/* TOP STATS */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
-          {[
-            { label: "Points Today", value: mounted ? `${todayPts} pts` : "—", color: "#f59e0b" },
-            { label: "Habits Done", value: mounted ? `${todayDone}/${HABITS.length}` : "—", color: "#fff" },
-            { label: "Daily Progress", value: mounted ? `${overallPct}%` : "—", color: threshold.color },
-          ].map(s => (
-            <div key={s.label} style={{ background: "#13161e", border: "1px solid #232736", borderRadius: 8, padding: "12px 14px" }}>
-              <div style={{ fontSize: 26, fontWeight: 800, color: s.color, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{s.value}</div>
-              <div style={{ fontSize: 10, color: "#5a6080", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 4 }}>{s.label}</div>
+        {/* TOP STATS ROW */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
+          {/* Today points */}
+          <div style={{ background: "#13161e", border: "1px solid #232736", borderRadius: 8, padding: "12px 14px" }}>
+            <div style={{ fontSize: 28, fontWeight: 800, color: "#f59e0b", lineHeight: 1 }}>{mounted ? todayPts : "—"}</div>
+            <div style={{ fontSize: 10, color: "#5a6080", marginTop: 3, textTransform: "uppercase", letterSpacing: "0.07em" }}>Points Today</div>
+          </div>
+          {/* Weekly points */}
+          <div style={{ background: "#13161e", border: "1px solid #232736", borderRadius: 8, padding: "12px 14px" }}>
+            <div style={{ fontSize: 28, fontWeight: 800, color: "#2ecc71", lineHeight: 1 }}>{mounted && weeklyPts !== null ? weeklyPts : "—"}</div>
+            <div style={{ fontSize: 10, color: "#5a6080", marginTop: 3, textTransform: "uppercase", letterSpacing: "0.07em" }}>Week Total</div>
+          </div>
+          {/* Streak */}
+          <div style={{ background: "#13161e", border: "1px solid #232736", borderRadius: 8, padding: "12px 14px" }}>
+            <div style={{ fontSize: 28, fontWeight: 800, color: "#a78bfa", lineHeight: 1, display: "flex", alignItems: "center", gap: 4 }}>
+              {mounted && streak !== null ? streak : "—"}
+              {mounted && streak !== null && streak > 0 && <span style={{ fontSize: 18 }}>🔥</span>}
             </div>
-          ))}
+            <div style={{ fontSize: 10, color: "#5a6080", marginTop: 3, textTransform: "uppercase", letterSpacing: "0.07em" }}>Day Streak</div>
+          </div>
         </div>
 
-        {/* PROGRESS BAR */}
-        <div style={{ background: "#13161e", border: "1px solid #232736", borderRadius: 8, padding: "12px 14px", marginBottom: 10 }}>
+        {/* OVERALL PROGRESS BAR */}
+        <div style={{ background: "#13161e", border: "1px solid #232736", borderRadius: 8, padding: "10px 14px", marginBottom: 10 }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "#8b92b4" }}>Today's Progress</span>
-            <span style={{ fontSize: 11, color: "#5a6080" }}>{mounted ? todayDone : 0} of {HABITS.length} habits complete</span>
+            <span style={{ fontSize: 11, color: "#8b92b4", fontWeight: 600 }}>Today&apos;s Progress</span>
+            <span style={{ fontSize: 11, color: "#f0f2f8", fontWeight: 700 }}>{mounted ? todayDone : 0} of {habits.length} habits complete</span>
           </div>
-          <div style={{ background: "#1a1d2e", borderRadius: 4, height: 8, overflow: "hidden" }}>
+          <div style={{ height: 8, background: "#1a1d2e", borderRadius: 4, overflow: "hidden" }}>
             <div style={{
               height: "100%", borderRadius: 4, transition: "width 0.4s ease",
               width: mounted ? `${overallPct}%` : "0%",
@@ -177,26 +274,38 @@ export default function AnsarPage() {
           </div>
         </div>
 
+        {/* SOCCER TRAINING BADGE — only show on Mon/Wed */}
+        {mounted && SOCCER_DAYS.includes(dayName) && (
+          <div style={{
+            background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)",
+            borderRadius: 6, padding: "7px 12px", marginBottom: 10,
+            fontSize: 11, color: "#f59e0b", fontWeight: 600, display: "flex", alignItems: "center", gap: 6,
+          }}>
+            ⚽ Soccer training day — check afternoon block for bonus habit (+2 pts)
+          </div>
+        )}
+
         {/* WEEKLY STATUS */}
         <div style={{
-          background: "#13161e", border: `1px solid ${threshold.color}40`,
+          background: "#13161e", border: `1px solid ${weekThreshold.color}40`,
           borderRadius: 8, padding: "12px 14px", marginBottom: 16,
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
           <div>
-            <div style={{ fontSize: 10, color: "#5a6080", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>This week you're on track for</div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: threshold.color }}>{threshold.label}</div>
-            <div style={{ fontSize: 11, color: "#8b92b4", marginTop: 3 }}>{threshold.desc}</div>
+            <div style={{ fontSize: 10, color: "#5a6080", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>This week you&apos;re on track for</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: weekThreshold.color }}>{weekThreshold.label}</div>
+            <div style={{ fontSize: 11, color: "#8b92b4", marginTop: 3 }}>{weekThreshold.desc}</div>
           </div>
           <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 16 }}>
-            <div style={{ fontSize: 32, fontWeight: 800, color: threshold.color, lineHeight: 1 }}>{mounted ? todayPts : 0}</div>
+            <div style={{ fontSize: 32, fontWeight: 800, color: weekThreshold.color, lineHeight: 1 }}>{mounted && weeklyPts !== null ? weeklyPts : "—"}</div>
             <div style={{ fontSize: 10, color: "#5a6080" }}>/ {WEEKLY_MAX} pts max</div>
           </div>
         </div>
 
         {/* HABIT BLOCKS */}
         {BLOCKS.map(block => {
-          const blockHabits = HABITS.filter(h => h.block === block.id);
+          const blockHabits = habits.filter(h => h.block === block.id);
+          if (blockHabits.length === 0) return null;
           const blockDone = blockHabits.filter(h => completed[h.id]).length;
           const blockPts = blockHabits.filter(h => completed[h.id]).reduce((a, h) => a + h.points, 0);
           const blockPct = Math.round((blockDone / blockHabits.length) * 100);
@@ -291,8 +400,9 @@ export default function AnsarPage() {
           <div style={{ padding: "12px 14px" }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#f0f2f8", marginBottom: 10 }}>🏆 Weekly Reward Tiers</div>
             {THRESHOLDS.map((t, i) => {
-              const isActive = mounted && todayPts >= t.min && (i === 0 || todayPts < THRESHOLDS[i - 1].min);
-              const isAchieved = mounted && todayPts >= t.min;
+              const weekPts = weeklyPts ?? 0;
+              const isActive = mounted && weekPts >= t.min && (i === 0 || weekPts < THRESHOLDS[i - 1].min);
+              const isAchieved = mounted && weekPts >= t.min;
               return (
                 <div key={t.min} style={{
                   display: "flex", alignItems: "center", gap: 12,
