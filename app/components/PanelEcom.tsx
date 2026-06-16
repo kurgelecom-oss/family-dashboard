@@ -50,9 +50,17 @@ export default function PanelEcom() {
             {hasError && <span style={{ color: "var(--red)", marginLeft: 6 }}>· auth error</span>}
           </div>
         </div>
-        <span className={`badge ${loading ? "badge-cyan" : hasError ? "badge-red" : "badge-green"}`}>
-          {loading ? "Loading…" : hasError ? "⚠ Shopify error" : "● Live"}
-        </span>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+          <span className={`badge ${loading ? "badge-cyan" : hasError ? "badge-red" : "badge-green"}`}>
+            {loading ? "Loading…" : hasError ? "⚠ Shopify error" : "● Live"}
+          </span>
+          <a href="https://product-pl-tracker.netlify.app/" target="_blank" rel="noopener noreferrer" style={{
+            fontSize: 10, color: "#f59e0b", textDecoration: "none",
+            fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
+            background: "rgba(245,158,11,0.1)", padding: "3px 8px", borderRadius: 4,
+            border: "1px solid rgba(245,158,11,0.2)",
+          }}>P&amp;L Tracker →</a>
+        </div>
       </div>
 
       {/* TODAY: live from Shopify */}
@@ -72,8 +80,8 @@ export default function PanelEcom() {
       {/* P&L METRICS — Google Sheets wired in next session */}
       <div style={{ flex: 1 }}>
         {[
-          { label: "COGS",         val: "—", sub: "via P&L tracker",  color: "var(--text-secondary)" },
-          { label: "Ad Spend",     val: "—", sub: "via P&L tracker",  color: "var(--text-secondary)" },
+          { label: "COGS",         val: "—", sub: "via P&L tracker · configure Google Sheets to connect",  color: "var(--text-secondary)" },
+          { label: "Ad Spend",     val: "—", sub: "via P&L tracker · configure Google Sheets to connect",  color: "var(--text-secondary)" },
           { label: "Gross Profit", val: "—", sub: "Sales − COGS",     color: "var(--text-muted)" },
           { label: "Net Profit",   val: "—", sub: "GP − Ad Spend",    color: "var(--text-muted)" },
           { label: "GP%",          val: "—", sub: "",                 color: "var(--text-muted)" },
