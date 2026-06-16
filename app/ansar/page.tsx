@@ -235,7 +235,7 @@ export default function AnsarPage() {
         </div>
       </header>
 
-      <div style={{ maxWidth: 480, margin: "0 auto", padding: "16px 14px 40px" }}>
+      <div style={{ maxWidth: 860, margin: "0 auto", padding: "16px 20px 40px" }}>
 
         {/* TOP STATS ROW */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
