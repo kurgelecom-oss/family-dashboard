@@ -5,14 +5,22 @@ const TOKEN_URL   = `https://${SHOP}/admin/oauth/access_token`;
 const GRAPHQL_URL = `https://${SHOP}/admin/api/2025-01/graphql.json`;
 
 async function getAccessToken(): Promise<string> {
+  // Read at call-time so Next.js build analysis cannot inline as undefined
+  const clientId     = process.env["SHOPIFY_CLIENT_ID"];
+  const clientSecret = process.env["SHOPIFY_CLIENT_SECRET"];
+  if (!clientId || !clientSecret) {
+    throw new Error(
+      `Missing env vars — SHOPIFY_CLIENT_ID: ${clientId ? "set" : "MISSING"}, SHOPIFY_CLIENT_SECRET: ${clientSecret ? "set" : "MISSING"}`
+    );
+  }
   const res = await fetch(TOKEN_URL, {
     method: "POST",
     cache: "no-store",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       grant_type:    "client_credentials",
-      client_id:     process.env.SHOPIFY_CLIENT_ID!,
-      client_secret: process.env.SHOPIFY_CLIENT_SECRET!,
+      client_id:     clientId,
+      client_secret: clientSecret,
     }),
   });
   if (!res.ok) throw new Error(`Token request failed: ${res.status} ${await res.text()}`);
