@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
 
-const STORE = process.env.SHOPIFY_STORE!;
-const TOKEN = process.env.SHOPIFY_ACCESS_TOKEN!;
+const COMPOSIO_API_KEY  = process.env.COMPOSIO_API_KEY!;
+const SHOPIFY_ACCOUNT   = process.env.SHOPIFY_ACCOUNT_ID ?? "shopify_heedy-busine";
+const COMPOSIO_ENDPOINT = "https://backend.composio.dev/api/v2/actions/SHOPIFY_LIST_ORDER/execute";
 
 function startOfDay(d: Date) {
-  const r = new Date(d);
-  r.setHours(0, 0, 0, 0);
-  return r;
+  const r = new Date(d); r.setHours(0, 0, 0, 0); return r;
 }
-
 function mondayOfWeek(d: Date) {
   const r = new Date(d);
   const dow = r.getDay();
@@ -17,55 +15,68 @@ function mondayOfWeek(d: Date) {
   return r;
 }
 
-async function fetchOrders(sinceIso: string) {
-  const url =
-    `https://${STORE}/admin/api/2024-07/orders.json` +
-    `?status=any&created_at_min=${sinceIso}&limit=250` +
-    `&fields=id,created_at,total_price`;
-  const res = await fetch(url, {
-    headers: { "X-Shopify-Access-Token": TOKEN },
-    next: { revalidate: 60 },
-  });
-  if (!res.ok) {
-    throw new Error(`Shopify ${res.status}: ${await res.text()}`);
-  }
-  const json = await res.json();
-  return json.orders as Array<{ created_at: string; total_price: string }>;
+function extractOrders(res: unknown): Array<{ created_at: string; total_price: string }> {
+  const d = (res as Record<string, unknown>)?.data ?? {};
+  const inner = (d as Record<string, unknown>);
+  if (Array.isArray(inner?.orders)) return inner.orders as never;
+  const d2 = (inner?.data ?? {}) as Record<string, unknown>;
+  if (Array.isArray(d2?.orders)) return d2.orders as never;
+  return [];
 }
 
 export async function GET() {
   try {
     const now = new Date();
-    const yearStart = new Date(now.getFullYear(), 0, 1);
-    const orders = await fetchOrders(yearStart.toISOString());
+    const yearStart = new Date(now.getFullYear(), 0, 1).toISOString();
 
-    const todayStart = startOfDay(now).getTime();
-    const weekStart = mondayOfWeek(now).getTime();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const res = await fetch(COMPOSIO_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "x-api-key": COMPOSIO_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        input: {
+          created_at_min: yearStart,
+          status: "any",
+          limit: 250,
+          fields: "id,created_at,total_price",
+        },
+        connectedAccountId: SHOPIFY_ACCOUNT,
+      }),
+      next: { revalidate: 60 },
+    });
 
-    let todayOrders = 0;
-    let todayRevenue = 0;
-    let weekRevenue = 0;
-    let monthRevenue = 0;
-    let yearRevenue = 0;
+    if (!res.ok) {
+      const text = await res.text();
+      return NextResponse.json({ error: `Composio ${res.status}: ${text}` }, { status: res.status });
+    }
+
+    const json = await res.json();
+    const orders = extractOrders(json);
+
+    const todayMs  = startOfDay(now).getTime();
+    const weekMs   = mondayOfWeek(now).getTime();
+    const monthMs  = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+    let todayOrders = 0, todayRevenue = 0, weekRevenue = 0, monthRevenue = 0, yearRevenue = 0;
 
     for (const o of orders) {
       const t = new Date(o.created_at).getTime();
       const price = parseFloat(o.total_price || "0");
-      yearRevenue += price;
-      if (t >= monthStart) monthRevenue += price;
-      if (t >= weekStart) weekRevenue += price;
-      if (t >= todayStart) { todayRevenue += price; todayOrders++; }
+      yearRevenue  += price;
+      if (t >= monthMs) monthRevenue += price;
+      if (t >= weekMs)  weekRevenue  += price;
+      if (t >= todayMs) { todayRevenue += price; todayOrders++; }
     }
 
-    const round2 = (n: number) => Math.round(n * 100) / 100;
-
+    const r2 = (n: number) => Math.round(n * 100) / 100;
     return NextResponse.json({
       todayOrders,
-      todayRevenue:  round2(todayRevenue),
-      weekRevenue:   round2(weekRevenue),
-      monthRevenue:  round2(monthRevenue),
-      yearRevenue:   round2(yearRevenue),
+      todayRevenue:  r2(todayRevenue),
+      weekRevenue:   r2(weekRevenue),
+      monthRevenue:  r2(monthRevenue),
+      yearRevenue:   r2(yearRevenue),
     });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
