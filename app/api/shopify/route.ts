@@ -1,76 +1,123 @@
 import { NextResponse } from "next/server";
 
-const COMPOSIO_API_KEY  = process.env.COMPOSIO_API_KEY!;
-const SHOPIFY_ACCOUNT   = process.env.SHOPIFY_ACCOUNT_ID ?? "shopify_heedy-busine";
-const COMPOSIO_ENDPOINT = "https://backend.composio.dev/api/v2/actions/SHOPIFY_LIST_ORDER/execute";
+const SHOP        = process.env.SHOPIFY_STORE ?? "0eu5zs-gj.myshopify.com";
+const TOKEN_URL   = `https://${SHOP}/admin/oauth/access_token`;
+const GRAPHQL_URL = `https://${SHOP}/admin/api/2025-01/graphql.json`;
 
-function startOfDay(d: Date) {
-  const r = new Date(d); r.setHours(0, 0, 0, 0); return r;
+async function getAccessToken(): Promise<string> {
+  const res = await fetch(TOKEN_URL, {
+    method: "POST",
+    cache: "no-store",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type:    "client_credentials",
+      client_id:     process.env.SHOPIFY_CLIENT_ID!,
+      client_secret: process.env.SHOPIFY_CLIENT_SECRET!,
+    }),
+  });
+  if (!res.ok) throw new Error(`Token request failed: ${res.status} ${await res.text()}`);
+  const data = (await res.json()) as { access_token: string };
+  return data.access_token;
 }
-function mondayOfWeek(d: Date) {
+
+interface OrderNode {
+  createdAt: string;
+  totalPriceSet: { shopMoney: { amount: string } };
+}
+
+const ORDER_QUERY = (since: string, after: string | null) => `{
+  orders(
+    first: 250
+    query: "created_at:>=${since}"
+    sortKey: CREATED_AT
+    ${after ? `after: "${after}"` : ""}
+  ) {
+    nodes {
+      createdAt
+      totalPriceSet { shopMoney { amount } }
+    }
+    pageInfo { hasNextPage endCursor }
+  }
+}`;
+
+async function fetchAllOrders(token: string, since: string): Promise<OrderNode[]> {
+  const orders: OrderNode[] = [];
+  let cursor: string | null = null;
+
+  for (let page = 0; page < 40; page++) {
+    const res = await fetch(GRAPHQL_URL, {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": token,
+      },
+      body: JSON.stringify({ query: ORDER_QUERY(since, cursor) }),
+    });
+    if (!res.ok) throw new Error(`GraphQL failed: ${res.status} ${await res.text()}`);
+
+    const json = (await res.json()) as {
+      data: {
+        orders: {
+          nodes: OrderNode[];
+          pageInfo: { hasNextPage: boolean; endCursor: string };
+        };
+      };
+      errors?: unknown;
+    };
+
+    if (json.errors) throw new Error(`GraphQL errors: ${JSON.stringify(json.errors)}`);
+
+    const { nodes, pageInfo } = json.data.orders;
+    orders.push(...nodes);
+    if (!pageInfo.hasNextPage) break;
+    cursor = pageInfo.endCursor;
+  }
+
+  return orders;
+}
+
+function startOfDay(d: Date): number {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+function startOfWeekMonday(d: Date): number {
+  const dow = d.getDay();
   const r = new Date(d);
-  const dow = r.getDay();
-  r.setDate(r.getDate() - (dow === 0 ? 6 : dow - 1));
-  r.setHours(0, 0, 0, 0);
-  return r;
-}
-
-function extractOrders(res: unknown): Array<{ created_at: string; total_price: string }> {
-  const d = (res as Record<string, unknown>)?.data ?? {};
-  const inner = (d as Record<string, unknown>);
-  if (Array.isArray(inner?.orders)) return inner.orders as never;
-  const d2 = (inner?.data ?? {}) as Record<string, unknown>;
-  if (Array.isArray(d2?.orders)) return d2.orders as never;
-  return [];
+  r.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1));
+  return new Date(r.getFullYear(), r.getMonth(), r.getDate()).getTime();
 }
 
 export async function GET() {
   try {
-    const now = new Date();
-    const yearStart = new Date(now.getFullYear(), 0, 1).toISOString();
+    const token = await getAccessToken();
 
-    const res = await fetch(COMPOSIO_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "x-api-key": COMPOSIO_API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        input: {
-          created_at_min: yearStart,
-          status: "any",
-          limit: 250,
-          fields: "id,created_at,total_price",
-        },
-        connectedAccountId: SHOPIFY_ACCOUNT,
-      }),
-      next: { revalidate: 60 },
-    });
+    const now       = new Date();
+    const yearStart = `${now.getFullYear()}-01-01`;
 
-    if (!res.ok) {
-      const text = await res.text();
-      return NextResponse.json({ error: `Composio ${res.status}: ${text}` }, { status: res.status });
-    }
+    const orders = await fetchAllOrders(token, yearStart);
 
-    const json = await res.json();
-    const orders = extractOrders(json);
+    const todayMs = startOfDay(now);
+    const weekMs  = startOfWeekMonday(now);
+    const monthMs = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
 
-    const todayMs  = startOfDay(now).getTime();
-    const weekMs   = mondayOfWeek(now).getTime();
-    const monthMs  = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-
-    let todayOrders = 0, todayRevenue = 0, weekRevenue = 0, monthRevenue = 0, yearRevenue = 0;
+    let todayOrders  = 0;
+    let todayRevenue = 0;
+    let weekRevenue  = 0;
+    let monthRevenue = 0;
+    let yearRevenue  = 0;
 
     for (const o of orders) {
-      const t = new Date(o.created_at).getTime();
-      const price = parseFloat(o.total_price || "0");
-      yearRevenue  += price;
+      const t     = new Date(o.createdAt).getTime();
+      const price = parseFloat(o.totalPriceSet.shopMoney.amount || "0");
+      yearRevenue += price;
       if (t >= monthMs) monthRevenue += price;
       if (t >= weekMs)  weekRevenue  += price;
       if (t >= todayMs) { todayRevenue += price; todayOrders++; }
     }
 
     const r2 = (n: number) => Math.round(n * 100) / 100;
+
     return NextResponse.json({
       todayOrders,
       todayRevenue:  r2(todayRevenue),
