@@ -38,9 +38,14 @@ function fmt(n: number) {
   return `$${n.toLocaleString("en-AU", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
+const TRACTION_END   = new Date("2027-01-01T00:00:00");
+const TRACTION_START = new Date("2026-01-01T00:00:00");
+const TRACTION_WINDOW_MS = TRACTION_END.getTime() - TRACTION_START.getTime();
+
 export default function PanelGoals() {
   const [data, setData] = useState<ShopifyData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [now, setNow] = useState(() => new Date());
 
   const load = useCallback(async () => {
     try {
@@ -60,6 +65,11 @@ export default function PanelGoals() {
     return () => clearInterval(id);
   }, [load]);
 
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
   const trackers = [
     {
       label:    "Annual Income Target",
@@ -76,14 +86,6 @@ export default function PanelGoals() {
       daysLeft: daysLeftInMonth(),
       period:   "days left this month",
       color:    "var(--green)",
-    },
-    {
-      label:    "Weekly Revenue Goal",
-      target:   WEEKLY_TARGET,
-      current:  data?.weekRevenue ?? 0,
-      daysLeft: daysLeftInWeek(),
-      period:   "days left this week",
-      color:    "var(--amber)",
     },
   ];
 
@@ -150,6 +152,55 @@ export default function PanelGoals() {
             </div>
           );
         })}
+
+        {/* Traction Window — third card */}
+        {(() => {
+          const msLeft     = Math.max(TRACTION_END.getTime() - now.getTime(), 0);
+          const daysLeft   = Math.floor(msLeft / 86_400_000);
+          const hoursLeft  = Math.floor((msLeft % 86_400_000) / 3_600_000);
+          const msElapsed  = now.getTime() - TRACTION_START.getTime();
+          const daysElapsed = Math.max(Math.floor(msElapsed / 86_400_000), 0);
+          const pctUsed    = Math.min(Math.round((msElapsed / TRACTION_WINDOW_MS) * 100), 100);
+          const barColor   = pctUsed < 33 ? "var(--green)" : pctUsed < 75 ? "var(--amber)" : "var(--red)";
+          return (
+            <div className="stat-cell" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span className="num-label">Traction Window</span>
+                <span className="badge badge-cyan">Live Countdown</span>
+              </div>
+
+              <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: -4 }}>
+                Time to build income from scratch
+              </div>
+
+              <div className="progress-track">
+                <div className="progress-fill" style={{ width: `${pctUsed}%`, background: barColor }} />
+              </div>
+
+              <div>
+                <div className="stat-num lg" style={{ color: "var(--cyan)" }}>{daysLeft} days</div>
+                <div className="stat-sublabel">{hoursLeft} hrs remaining today</div>
+              </div>
+
+              <div className="divider" />
+
+              <div style={{ marginTop: "auto" }}>
+                <div className="list-item" style={{ padding: "4px 0" }}>
+                  <span className="list-name">Target date</span>
+                  <span className="list-val">31 Dec 2026</span>
+                </div>
+                <div className="list-item" style={{ padding: "4px 0" }}>
+                  <span className="list-name">Days elapsed</span>
+                  <span className="list-val" style={{ color: "var(--text-secondary)" }}>{daysElapsed}</span>
+                </div>
+                <div className="list-item" style={{ padding: "4px 0" }}>
+                  <span className="list-name">% of window used</span>
+                  <span className="list-val" style={{ color: barColor }}>{pctUsed}%</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
