@@ -2,9 +2,9 @@
 import { useState, useEffect, useCallback } from "react";
 
 // ── Goal constants (hardcoded — wire Shopify data later) ──────────────────────
-const DAILY   = { revenue: 500,   orders: 33,   adSpend: 225,  netProfit: 125  };
-const WEEKLY  = { revenue: 3468,  orders: 231,  adSpend: 1561, netProfit: 867  };
-const MONTHLY = { revenue: 15000, orders: 1000, adSpend: 6750, netProfit: 3750 };
+const DAILY   = { revenue: 1980,  orders: 33,   adSpend: 891,  netProfit: 495  };
+const WEEKLY  = { revenue: 13860, orders: 231,  adSpend: 6237, netProfit: 3465 };
+const MONTHLY = { revenue: 60000, orders: 1000, adSpend: 27000, netProfit: 15000 };
 
 const GOAL_CARDS = [
   { label: "Daily Goal",   color: "var(--cyan)",  ...DAILY   },
