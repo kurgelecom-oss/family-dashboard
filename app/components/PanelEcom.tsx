@@ -6,11 +6,10 @@ const MONTHLY_TARGET = 15000;
 const PL_POLL_MS = 5 * 60 * 1000; // 5 minutes
 
 const WORK_COMPONENTS = [
-  { id: "listings", label: "Listings",         icon: "📦" },
-  { id: "orders",   label: "Orders",           icon: "🛒" },
-  { id: "sourcing", label: "Sourcing",         icon: "🔍" },
-  { id: "cs",       label: "Customer Service", icon: "💬" },
-  { id: "ads",      label: "Ads",              icon: "📊" },
+  { id: "research",  label: "Product/Market Research",         icon: "🔍" },
+  { id: "origins",   label: "Origins Mentorship",              icon: "🌱" },
+  { id: "nick",      label: "Nick Calls/Discords",             icon: "📞" },
+  { id: "marketing", label: "Breakthrough Marketing/Slight Edge", icon: "📈" },
 ];
 
 type ShopifyData = {
