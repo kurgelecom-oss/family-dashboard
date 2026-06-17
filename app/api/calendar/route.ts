@@ -54,7 +54,7 @@ async function fetchEvents(accessToken: string, startISO: string, endISO: string
   url.searchParams.set("endDateTime", endISO);
   url.searchParams.set("$select", "id,subject,start,end,isAllDay");
   url.searchParams.set("$orderby", "start/dateTime");
-  url.searchParams.set("$top", "50");
+  url.searchParams.set("$top", "2");
 
   const res = await fetch(url.toString(), {
     cache: "no-store",
@@ -75,7 +75,7 @@ export async function GET() {
   const now = new Date();
   const startISO = now.toISOString();
   const endDate = new Date(now);
-  endDate.setDate(endDate.getDate() + 7);
+  endDate.setDate(endDate.getDate() + 90);
   const endISO = endDate.toISOString();
 
   const events: Array<{

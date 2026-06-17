@@ -1,14 +1,18 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 
-const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
 const COLOR_MAP: Record<string, string> = {
   cyan:  "var(--cyan)",
   green: "var(--green)",
   amber: "var(--amber)",
   red:   "var(--red)",
 };
+
+const ACCOUNTS = [
+  { key: "TAYLAN", label: "Taylan", color: "cyan"  },
+  { key: "NIHAL",  label: "Nihal",  color: "green" },
+  { key: "ANSAR",  label: "Ansar",  color: "amber" },
+];
 
 type CalEvent = {
   id: string;
@@ -28,46 +32,41 @@ type CalResponse = {
   errors?: string[];
 };
 
-function getWeekDays() {
-  const now = new Date();
-  const dow = now.getDay();
-  const diffToMonday = dow === 0 ? -6 : 1 - dow;
-  const monday = new Date(now);
-  monday.setDate(now.getDate() + diffToMonday);
-  return DAY_NAMES.map((name, i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    return { name, date: d };
-  });
-}
+function countdown(iso: string): string {
+  const diffMs = new Date(iso).getTime() - Date.now();
+  if (diffMs <= 0) return "now";
 
-function fmtTime(iso: string) {
-  try {
-    return new Date(iso).toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit", hour12: true });
-  } catch {
-    return "";
+  const mins = Math.floor(diffMs / 60_000);
+  const hours = Math.floor(diffMs / 3_600_000);
+  const days = Math.floor(diffMs / 86_400_000);
+
+  if (mins < 60) return `in ${mins}m`;
+  if (hours < 24) {
+    const remMins = mins % 60;
+    return remMins > 0 ? `in ${hours}h ${remMins}m` : `in ${hours}h`;
   }
-}
 
-function isSameDay(eventISO: string, dayDate: Date) {
-  const ed = new Date(eventISO);
-  return (
-    ed.getFullYear() === dayDate.getFullYear() &&
-    ed.getMonth() === dayDate.getMonth() &&
-    ed.getDate() === dayDate.getDate()
-  );
+  const eventDate = new Date(iso);
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  if (
+    eventDate.getDate() === tomorrow.getDate() &&
+    eventDate.getMonth() === tomorrow.getMonth() &&
+    eventDate.getFullYear() === tomorrow.getFullYear()
+  ) {
+    const t = eventDate.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit", hour12: true });
+    return `tomorrow ${t}`;
+  }
+
+  if (days < 7) return `in ${days} days`;
+  return eventDate.toLocaleDateString("en-AU", { day: "numeric", month: "short" });
 }
 
 export default function PanelCalendar() {
-  const [days, setDays] = useState<{ name: string; date: Date }[]>([]);
-  const [todayDay, setTodayDay] = useState(-1);
-  const [todayMonth, setTodayMonth] = useState(-1);
-  const [weekLabel, setWeekLabel] = useState("");
-  const [mounted, setMounted] = useState(false);
-
   const [events, setEvents] = useState<CalEvent[]>([]);
   const [missing, setMissing] = useState<string[]>([]);
   const [calLoading, setCalLoading] = useState(true);
+  const [, setTick] = useState(0);
 
   const loadCalendar = useCallback(async () => {
     try {
@@ -84,55 +83,20 @@ export default function PanelCalendar() {
   }, []);
 
   useEffect(() => {
-    const weekDays = getWeekDays();
-    const now = new Date();
-    setDays(weekDays);
-    setTodayDay(now.getDate());
-    setTodayMonth(now.getMonth());
-
-    const mon = weekDays[0].date;
-    const sun = weekDays[6].date;
-    const label =
-      mon.getMonth() === sun.getMonth()
-        ? `${mon.getDate()}–${sun.getDate()} ${sun.toLocaleDateString("en-AU", { month: "short" })}`
-        : `${mon.getDate()} ${mon.toLocaleDateString("en-AU", { month: "short" })} – ${sun.getDate()} ${sun.toLocaleDateString("en-AU", { month: "short" })}`;
-    setWeekLabel(label);
-    setMounted(true);
     loadCalendar();
-    const id = setInterval(loadCalendar, 5 * 60 * 1000);
-    return () => clearInterval(id);
+    const fetchId = setInterval(loadCalendar, 60 * 60 * 1000);
+    const tickId  = setInterval(() => setTick(t => t + 1), 60_000);
+    return () => { clearInterval(fetchId); clearInterval(tickId); };
   }, [loadCalendar]);
 
   return (
     <div className="panel col-5">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div className="panel-title">Family Calendar · This Week</div>
-        <span className="badge badge-cyan">{mounted ? weekLabel : "—"}</span>
-      </div>
-
-      {/* Day strip */}
-      <div className="day-strip">
-        {mounted ? days.map((d) => {
-          const isToday = d.date.getDate() === todayDay && d.date.getMonth() === todayMonth;
-          return (
-            <div key={d.name} className={`day-cell${isToday ? " today" : ""}`}>
-              <div className="day-name">{d.name}</div>
-              <div className="day-num">{d.date.getDate()}</div>
-            </div>
-          );
-        }) : DAY_NAMES.map((name) => (
-          <div key={name} className="day-cell">
-            <div className="day-name">{name}</div>
-            <div className="day-num">—</div>
-          </div>
-        ))}
-      </div>
+      <div className="panel-title">Family Calendar · Upcoming</div>
 
       <div className="divider" />
 
-      <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
 
-        {/* Not-configured notice */}
         {missing.length > 0 && !calLoading && (
           <div style={{
             background: "rgba(243,156,18,0.07)", border: "1px solid rgba(243,156,18,0.2)",
@@ -142,87 +106,54 @@ export default function PanelCalendar() {
           </div>
         )}
 
-        {/* Events grouped by day */}
-        {mounted && !calLoading && events.length > 0 && (
-          <div>
-            {days.map(d => {
-              const dayEvents = events.filter(e => isSameDay(e.startISO, d.date));
-              if (dayEvents.length === 0) return null;
-              const isToday = d.date.getDate() === todayDay && d.date.getMonth() === todayMonth;
-              return (
-                <div key={d.name} style={{ marginBottom: 8 }}>
-                  <div style={{
-                    fontSize: 10, fontWeight: 700, textTransform: "uppercase",
-                    letterSpacing: "0.08em",
-                    color: isToday ? "var(--cyan)" : "var(--text-muted)",
-                    marginBottom: 3,
-                  }}>
-                    {d.name} {d.date.getDate()}
-                  </div>
-                  {dayEvents.map(e => (
-                    <div key={e.id} className="list-item" style={{ padding: "5px 0" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
-                        <div style={{
-                          width: 3, minHeight: 28, borderRadius: 2, flexShrink: 0, alignSelf: "stretch",
-                          background: COLOR_MAP[e.color] ?? "var(--text-muted)",
-                        }} />
-                        <div>
-                          <div className="list-name" style={{ fontSize: 12 }}>{e.subject}</div>
-                          <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 1 }}>
-                            {e.isAllDay ? "All day" : fmtTime(e.startISO)}
-                            {" · "}
-                            <span style={{ color: COLOR_MAP[e.color] ?? "var(--text-muted)" }}>
-                              {e.email.split("@")[0]}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Loading */}
         {calLoading && (
           <div style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "center", padding: "20px 0" }}>
             Loading calendar…
           </div>
         )}
 
-        {/* All accounts unconfigured */}
-        {!calLoading && events.length === 0 && missing.length === 3 && (
-          <div style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center", padding: "20px 0", lineHeight: 1.8 }}>
-            Microsoft calendar not connected.<br />
-            Add MS_CAL_CLIENT_ID, MS_CAL_CLIENT_SECRET<br />
-            and MS_CAL_TAYLAN_REFRESH to Netlify env vars.
-          </div>
-        )}
+        {!calLoading && ACCOUNTS.map(acct => {
+          const personEvents = events.filter(e => e.account === acct.key);
+          const notConnected = missing.some(m => m === (acct.key === "TAYLAN" ? "taylan.k8@hotmail.com" : acct.key === "NIHAL" ? "nils_gvi@hotmail.com" : "ansar.k11@hotmail.com"));
+          const color = COLOR_MAP[acct.color] ?? "var(--text-muted)";
 
-        {/* Configured but no events */}
-        {!calLoading && events.length === 0 && missing.length < 3 && (
-          <div style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "center", padding: "20px 0" }}>
-            No events in the next 7 days.
-          </div>
-        )}
-
-        {/* Account legend */}
-        {events.length > 0 && (() => {
-          const seen = new Map<string, { email: string; color: string }>();
-          events.forEach(e => { if (!seen.has(e.account)) seen.set(e.account, { email: e.email, color: e.color }); });
           return (
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: "auto", paddingTop: 4 }}>
-              {Array.from(seen.entries()).map(([key, v]) => (
-                <div key={key} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: COLOR_MAP[v.color] ?? "var(--text-muted)" }} />
-                  <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{v.email.split("@")[0]}</span>
-                </div>
-              ))}
+            <div key={acct.key}>
+              <div style={{
+                fontSize: 10, fontWeight: 700, textTransform: "uppercase",
+                letterSpacing: "0.08em", color, marginBottom: 4,
+              }}>
+                {acct.label}
+              </div>
+
+              {notConnected ? (
+                <div style={{ fontSize: 11, color: "var(--text-muted)", paddingLeft: 4 }}>Not connected</div>
+              ) : personEvents.length === 0 ? (
+                <div style={{ fontSize: 11, color: "var(--text-muted)", paddingLeft: 4 }}>No upcoming events</div>
+              ) : (
+                personEvents.map(e => (
+                  <div key={e.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                      <div style={{ width: 3, height: 28, borderRadius: 2, flexShrink: 0, background: color }} />
+                      <div className="list-name" style={{ fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {e.subject || "(No title)"}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0, marginLeft: 8 }}>
+                      {e.isAllDay ? "all day" : countdown(e.startISO)}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           );
-        })()}
+        })}
+
+        {!calLoading && events.length === 0 && missing.length === 0 && (
+          <div style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "center", padding: "20px 0" }}>
+            No upcoming events.
+          </div>
+        )}
 
       </div>
     </div>
