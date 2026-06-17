@@ -21,6 +21,7 @@ type CalEvent = {
   start: { dateTime: string; timeZone: string };
   end:   { dateTime: string; timeZone: string };
   isAllDay?: boolean;
+  isOrganizer?: boolean;
 };
 
 async function getAccessToken(refreshToken: string): Promise<string> {
@@ -52,9 +53,9 @@ async function fetchEvents(accessToken: string, startISO: string, endISO: string
   const url = new URL("https://graph.microsoft.com/v1.0/me/calendarView");
   url.searchParams.set("startDateTime", startISO);
   url.searchParams.set("endDateTime", endISO);
-  url.searchParams.set("$select", "id,subject,start,end,isAllDay");
+  url.searchParams.set("$select", "id,subject,start,end,isAllDay,isOrganizer");
   url.searchParams.set("$orderby", "start/dateTime");
-  url.searchParams.set("$top", "2");
+  url.searchParams.set("$top", "20");
 
   const res = await fetch(url.toString(), {
     cache: "no-store",
@@ -103,7 +104,7 @@ export async function GET() {
     try {
       const accessToken = await getAccessToken(refreshToken);
       const raw = await fetchEvents(accessToken, startISO, endISO);
-      raw.forEach(e => {
+      raw.filter(e => e.isOrganizer === true).slice(0, 2).forEach(e => {
         events.push({
           id:       `${account.key}-${e.id}`,
           subject:  e.subject ?? "(No title)",
