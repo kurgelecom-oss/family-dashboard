@@ -27,7 +27,7 @@ export function useShopifyActuals(): UseShopifyActualsResult {
 
   const poll = useCallback(async () => {
     try {
-      const res = await fetch("/api/shopify-actuals");
+      const res = await fetch("/api/test-actuals"); // TODO: revert to /api/shopify-actuals after visual check
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = (await res.json()) as ActualsData & { error?: string };
       if (json.error) throw new Error(json.error);
