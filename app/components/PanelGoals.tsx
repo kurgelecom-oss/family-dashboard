@@ -1,15 +1,16 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
+import { useShopifyActuals } from "../hooks/useShopifyActuals";
 
-// ── Goal constants (hardcoded — wire Shopify data later) ──────────────────────
-const DAILY   = { revenue: 1980,  orders: 33,   adSpend: 891,  netProfit: 495  };
-const WEEKLY  = { revenue: 13860, orders: 231,  adSpend: 6237, netProfit: 3465 };
+// ── Goal constants ─────────────────────────────────────────────────────────────
+const DAILY   = { revenue: 1980,  orders: 33,   adSpend: 891,  netProfit: 495   };
+const WEEKLY  = { revenue: 13860, orders: 231,  adSpend: 6237, netProfit: 3465  };
 const MONTHLY = { revenue: 60000, orders: 1000, adSpend: 27000, netProfit: 15000 };
 
 const GOAL_CARDS = [
-  { label: "Daily Goal",   color: "var(--cyan)",  ...DAILY   },
-  { label: "Weekly Goal",  color: "var(--green)", ...WEEKLY  },
-  { label: "Monthly Goal", color: "var(--amber)", ...MONTHLY },
+  { label: "Daily Goal",   color: "var(--cyan)",  actualsKey: "daily"   as const, ...DAILY   },
+  { label: "Weekly Goal",  color: "var(--green)", actualsKey: "weekly"  as const, ...WEEKLY  },
+  { label: "Monthly Goal", color: "var(--amber)", actualsKey: "monthly" as const, ...MONTHLY },
 ];
 
 // ── Traction Window ───────────────────────────────────────────────────────────
@@ -17,39 +18,13 @@ const TRACTION_END      = new Date("2027-01-01T00:00:00");
 const TRACTION_START    = new Date("2026-01-01T00:00:00");
 const TRACTION_WINDOW_MS = TRACTION_END.getTime() - TRACTION_START.getTime();
 
-type ShopifyData = {
-  weekRevenue: number;
-  monthRevenue: number;
-  yearRevenue: number;
-  error?: string;
-};
-
 function fmtExact(n: number) {
   return `$${n.toLocaleString("en-AU", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
 export default function PanelGoals() {
-  const [data, setData] = useState<ShopifyData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const actuals = useShopifyActuals();
   const [now, setNow] = useState(() => new Date());
-
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch("/api/shopify");
-      const json = await res.json();
-      setData(json);
-    } catch {
-      setData({ weekRevenue: 0, monthRevenue: 0, yearRevenue: 0, error: "fetch failed" });
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-    const id = setInterval(load, 60000);
-    return () => clearInterval(id);
-  }, [load]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -60,56 +35,86 @@ export default function PanelGoals() {
     <div className="panel col-7">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div className="panel-title">Nihal · Ecom Goals</div>
-        <span className={`badge ${loading ? "badge-cyan" : data?.error ? "badge-red" : "badge-green"}`}>
-          {loading ? "Loading…" : data?.error ? "⚠ error" : "● Live · Shopify"}
+        <span className={`badge ${actuals.loading ? "badge-cyan" : actuals.error ? "badge-red" : "badge-green"}`}>
+          {actuals.loading ? "Loading…" : actuals.error ? "⚠ error" : "● Live · Shopify"}
         </span>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, flex: 1, minHeight: 0 }}>
 
         {/* ── Goal cards: Daily / Weekly / Monthly ── */}
-        {GOAL_CARDS.map((g) => (
-          <div className="stat-cell" key={g.label} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span className="num-label">{g.label}</span>
-              <span className="badge badge-amber">Needs pace</span>
-            </div>
+        {GOAL_CARDS.map((g) => {
+          const actual = actuals[g.actualsKey];
+          const pct    = Math.min(Math.round((actual.revenue / g.revenue) * 100), 100);
 
-            <div>
-              <div className="stat-num lg" style={{ color: g.color }}>
-                {fmtExact(g.revenue)}
-              </div>
-              <div className="stat-sublabel">Revenue needed</div>
-            </div>
+          const badgeLabel =
+            actual.revenue >= g.revenue        ? "ON TRACK"   :
+            actual.revenue >= g.revenue * 0.75 ? "NEEDS PACE" : "BEHIND";
+          const badgeClass =
+            actual.revenue >= g.revenue        ? "badge-green" :
+            actual.revenue >= g.revenue * 0.75 ? "badge-amber" : "badge-red";
 
-            <div className="divider" />
+          const ordersRemaining = Math.max(g.orders - actual.orders, 0);
 
-            <div>
-              <div className="progress-row">
-                <span className="num-label">Progress</span>
-                <span className="num-label">0%</span>
+          return (
+            <div className="stat-cell" key={g.label} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span className="num-label">{g.label}</span>
+                <span className={`badge ${badgeClass}`}>{badgeLabel}</span>
               </div>
-              <div className="progress-track">
-                <div className="progress-fill" style={{ width: "0%", background: g.color }} />
+
+              <div>
+                <div className="stat-num lg" style={{ color: g.color }}>
+                  {fmtExact(g.revenue)}
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                  {fmtExact(actual.revenue)} earned
+                </div>
+                <div className="stat-sublabel">Revenue needed</div>
+              </div>
+
+              <div className="divider" />
+
+              <div>
+                <div className="progress-row">
+                  <span className="num-label">Progress</span>
+                  <span className="num-label">{pct}%</span>
+                </div>
+                <div className="progress-track">
+                  <div
+                    className="progress-fill"
+                    style={{
+                      width: `${pct}%`,
+                      background: g.color,
+                      opacity: actuals.loading ? 0.4 : 1,
+                      transition: "opacity 0.6s ease, width 0.4s ease",
+                    }}
+                  />
+                </div>
+                {actuals.error && (
+                  <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 3 }}>
+                    · live data unavailable
+                  </div>
+                )}
+              </div>
+
+              <div style={{ marginTop: "auto" }}>
+                <div className="list-item" style={{ padding: "4px 0" }}>
+                  <span className="list-name">Orders remaining</span>
+                  <span className="list-val">{ordersRemaining}</span>
+                </div>
+                <div className="list-item" style={{ padding: "4px 0" }}>
+                  <span className="list-name">Ad spend</span>
+                  <span className="list-val">{fmtExact(g.adSpend)}</span>
+                </div>
+                <div className="list-item" style={{ padding: "4px 0" }}>
+                  <span className="list-name">Net profit</span>
+                  <span className="list-val" style={{ color: "var(--green)" }}>{fmtExact(g.netProfit)}</span>
+                </div>
               </div>
             </div>
-
-            <div style={{ marginTop: "auto" }}>
-              <div className="list-item" style={{ padding: "4px 0" }}>
-                <span className="list-name">Orders needed</span>
-                <span className="list-val">{g.orders}</span>
-              </div>
-              <div className="list-item" style={{ padding: "4px 0" }}>
-                <span className="list-name">Ad spend</span>
-                <span className="list-val">{fmtExact(g.adSpend)}</span>
-              </div>
-              <div className="list-item" style={{ padding: "4px 0" }}>
-                <span className="list-name">Net profit</span>
-                <span className="list-val" style={{ color: "var(--green)" }}>{fmtExact(g.netProfit)}</span>
-              </div>
-            </div>
-          </div>
-        ))}
+          );
+        })}
 
         {/* ── Traction Window — 4th card (unchanged) ── */}
         {(() => {
