@@ -148,6 +148,7 @@ export async function GET() {
       monthly: { revenue: r2(monthlyRevenue), orders: monthlyOrders },
     });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error("[shopify-actuals]", err);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
