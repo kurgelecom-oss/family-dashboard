@@ -157,7 +157,11 @@ export default function PanelGoals() {
         {(() => {
           const msLeft     = Math.max(TRACTION_END.getTime() - now.getTime(), 0);
           const daysLeft   = Math.floor(msLeft / 86_400_000);
-          const hoursLeft  = Math.floor((msLeft % 86_400_000) / 3_600_000);
+          const midnight   = new Date(now); midnight.setHours(24, 0, 0, 0);
+          const secsToday  = Math.max(Math.floor((midnight.getTime() - now.getTime()) / 1000), 0);
+          const hh = String(Math.floor(secsToday / 3600)).padStart(2, "0");
+          const mm = String(Math.floor((secsToday % 3600) / 60)).padStart(2, "0");
+          const ss = String(secsToday % 60).padStart(2, "0");
           const msElapsed  = now.getTime() - TRACTION_START.getTime();
           const daysElapsed = Math.max(Math.floor(msElapsed / 86_400_000), 0);
           const pctUsed    = Math.min(Math.round((msElapsed / TRACTION_WINDOW_MS) * 100), 100);
@@ -179,7 +183,19 @@ export default function PanelGoals() {
 
               <div>
                 <div className="stat-num lg" style={{ color: "var(--cyan)" }}>{daysLeft} days</div>
-                <div className="stat-sublabel">{hoursLeft} hrs remaining today</div>
+                <div style={{
+                  fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+                  fontVariantNumeric: "tabular-nums",
+                  fontSize: "1.35rem",
+                  fontWeight: 600,
+                  color: "var(--cyan)",
+                  letterSpacing: "0.05em",
+                  lineHeight: 1.2,
+                  marginTop: 2,
+                }}>
+                  {hh} : {mm} : {ss}
+                </div>
+                <div className="stat-sublabel" style={{ marginTop: 2 }}>remaining today</div>
               </div>
 
               <div className="divider" />
