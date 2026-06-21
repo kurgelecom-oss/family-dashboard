@@ -1,15 +1,77 @@
 import { NextResponse } from "next/server";
 import { supabase, getWeekStart } from "../../../lib/supabase";
 
-const CATS = ["housing", "food", "transport", "utilities", "software", "ecommerce", "annual"] as const;
-type CatKey = typeof CATS[number];
+const PANEL_KEYS = ["housing", "food", "transport", "utilities", "software", "ecommerce", "annual"] as const;
+type PanelKey = typeof PANEL_KEYS[number];
 
-function sumByCategory(rows: { category: string; amount: number }[]): Record<CatKey, number> {
-  const out = Object.fromEntries(CATS.map((c) => [c, 0])) as Record<CatKey, number>;
-  for (const r of rows) {
-    if (r.category in out) out[r.category as CatKey] += r.amount;
+// Maps the category text stored in weekly_transactions to a panel key.
+// Returns null for categories that don't belong in any panel slot (e.g. "Other").
+function mapToPanel(raw: string): PanelKey | null {
+  switch (raw.toLowerCase().trim()) {
+    case "housing":
+    case "rent":
+    case "mortgage":
+      return "housing";
+
+    case "food":
+    case "groceries":
+    case "grocery":
+    case "eating out":
+    case "dining":
+    case "restaurant":
+      return "food";
+
+    case "transport":
+    case "transportation":
+    case "travel":
+      return "transport";
+
+    case "utilities":
+    case "utility":
+      return "utilities";
+
+    case "software":
+    case "subscriptions":
+    case "subscription":
+      return "software";
+
+    case "ecommerce":
+    case "shopping":
+      return "ecommerce";
+
+    case "annual":
+    case "annual subs":
+    case "health":
+      return "annual";
+
+    default:
+      return null;
   }
-  return out;
+}
+
+function emptyPanel(): Record<PanelKey, number> {
+  return Object.fromEntries(PANEL_KEYS.map((k) => [k, 0])) as Record<PanelKey, number>;
+}
+
+function aggregate(rows: { category: string; amount: number }[]): {
+  categories: Record<PanelKey, number>;
+  income: number;
+} {
+  const categories = emptyPanel();
+  let income = 0;
+  for (const { category, amount } of rows) {
+    if (amount > 0) {
+      income += amount;
+    } else {
+      const key = mapToPanel(category);
+      if (key) categories[key] += Math.abs(amount);
+    }
+  }
+  // Round every bucket to 2dp
+  for (const k of PANEL_KEYS) {
+    categories[k] = Math.round(categories[k] * 100) / 100;
+  }
+  return { categories, income: Math.round(income * 100) / 100 };
 }
 
 export async function GET() {
@@ -19,29 +81,25 @@ export async function GET() {
   prevDate.setDate(prevDate.getDate() - 7);
   const prevWeekStart = prevDate.toISOString().split("T")[0];
 
-  const [
-    { data: currentEntries },
-    { data: prevEntries },
-    { data: incomeTxns },
-    { data: lastRow },
-  ] = await Promise.all([
-    supabase.from("budget_entries").select("category, amount").eq("week_start", weekStart),
-    supabase.from("budget_entries").select("category, amount").eq("week_start", prevWeekStart),
-    supabase.from("weekly_transactions").select("amount").eq("week_start", weekStart).gt("amount", 0),
+  const [{ data: currentRows }, { data: prevRows }, { data: lastRow }] = await Promise.all([
+    supabase.from("weekly_transactions").select("category, amount").eq("week_start", weekStart),
+    supabase.from("weekly_transactions").select("category, amount").eq("week_start", prevWeekStart),
     supabase
-      .from("budget_entries")
+      .from("weekly_transactions")
       .select("created_at")
+      .eq("week_start", weekStart)
       .order("created_at", { ascending: false })
       .limit(1),
   ]);
 
-  const income = (incomeTxns ?? []).reduce((s, t: { amount: number }) => s + t.amount, 0);
+  const { categories, income } = aggregate(currentRows ?? []);
+  const { categories: prevWeek } = aggregate(prevRows ?? []);
 
   return NextResponse.json({
     week_start: weekStart,
-    categories: sumByCategory(currentEntries ?? []),
-    prevWeek: sumByCategory(prevEntries ?? []),
-    income: Math.round(income * 100) / 100,
+    categories,
+    prevWeek,
+    income,
     last_updated: (lastRow ?? [])[0]?.created_at ?? null,
   });
 }
