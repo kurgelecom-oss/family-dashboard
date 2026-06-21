@@ -2,20 +2,18 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase, getWeekStart } from "../lib/supabase";
 
-// ── Manual-entry system (existing) ──────────────────────────────────────────
-
 const MANUAL_CATEGORIES = [
-  { id: "housing",   label: "Housing",    sub: "Rent + Water",              target: 675.46 },
-  { id: "food",      label: "Food",        sub: "Groceries + Eating",        target: 277.15 },
-  { id: "transport", label: "Transport",   sub: "Fuel + Insurance + Rego",   target: 194.49 },
-  { id: "utilities", label: "Utilities",   sub: "Electricity + Gas + Phone", target: 118.62 },
-  { id: "software",  label: "Software",    sub: "Subscriptions",             target: 105.68 },
-  { id: "ecommerce", label: "Ecommerce",   sub: "2 stores",                  target: 53.30  },
-  { id: "annual",    label: "Annual Subs", sub: "Amortised",                 target: 42.76  },
+  { id: "housing",       label: "Housing",       sub: "Rent + Water",            target: 675.46 },
+  { id: "transport",     label: "Transport",      sub: "Fuel + Insurance + Rego", target: 194.49 },
+  { id: "groceries",     label: "Groceries",      sub: "Coles + Woolies",         target: 277.15 },
+  { id: "eating_out",    label: "Eating Out",     sub: "Cafes + Delivery",        target: 100.00 },
+  { id: "subscriptions", label: "Subscriptions",  sub: "Monthly subs",            target: 105.68 },
+  { id: "ecom",          label: "Ecom",           sub: "Business expenses",       target: 150.00 },
 ];
-const WEEKLY_TOTAL_TARGET = 1509.11;
+const WEEKLY_TOTAL_TARGET = 1502.78;
 
 type Entry = { id: string; category: string; amount: number; created_at: string };
+type BalanceEntry = { id: string; week_start: string; balance: number; notes: string | null; created_at: string };
 
 interface UploadResult {
   imported: number;
@@ -42,15 +40,19 @@ export default function BudgetPage() {
   const weekStart = getWeekStart();
   const [weekLabel, setWeekLabel] = useState("");
 
+  // ── CSV upload ────────────────────────────────────────────────────────────
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const [uploadError, setUploadError] = useState("");
 
-  const [ingBalance, setIngBalance] = useState("");
-  const [ingSaved, setIngSaved] = useState<number | null>(null);
+  // ── ING Account Balance ───────────────────────────────────────────────────
+  const [ingAmount, setIngAmount] = useState("");
+  const [ingNotes, setIngNotes] = useState("");
   const [ingSaving, setIngSaving] = useState(false);
+  const [ingHistory, setIngHistory] = useState<BalanceEntry[]>([]);
 
+  // ── Manual entries ────────────────────────────────────────────────────────
   const [entries, setEntries] = useState<Entry[]>([]);
   const [actuals, setActuals] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -70,26 +72,30 @@ export default function BudgetPage() {
     setWeekLabel(label);
   }, [weekStart]);
 
-  useEffect(() => {
-    supabase
+  const loadIngHistory = useCallback(async () => {
+    const { data } = await supabase
       .from("weekly_balance")
-      .select("balance")
-      .eq("week_start", weekStart)
-      .maybeSingle()
-      .then(({ data }) => { if (data) setIngSaved(Number(data.balance)); });
-  }, [weekStart]);
+      .select("id, week_start, balance, notes, created_at")
+      .order("created_at", { ascending: false })
+      .limit(4);
+    if (data) setIngHistory(data as BalanceEntry[]);
+  }, []);
+
+  useEffect(() => { loadIngHistory(); }, [loadIngHistory]);
 
   async function saveIngBalance() {
-    const parsed = parseFloat(ingBalance.replace(/[$,]/g, ""));
-    if (!ingBalance || isNaN(parsed)) return;
+    const parsed = parseFloat(ingAmount.replace(/[$,]/g, ""));
+    if (!ingAmount || isNaN(parsed)) return;
     setIngSaving(true);
-    await supabase.from("weekly_balance").upsert(
-      { week_start: weekStart, balance: parsed },
-      { onConflict: "week_start" }
-    );
-    setIngSaved(parsed);
-    setIngBalance("");
+    await supabase.from("weekly_balance").insert({
+      week_start: weekStart,
+      balance: parsed,
+      notes: ingNotes.trim() || null,
+    });
+    setIngAmount("");
+    setIngNotes("");
     setIngSaving(false);
+    loadIngHistory();
   }
 
   const loadEntries = useCallback(async () => {
@@ -155,6 +161,15 @@ export default function BudgetPage() {
 
   const totalSpent = MANUAL_CATEGORIES.reduce((a, c) => a + (actuals[c.id] ?? 0), 0);
   const remaining = WEEKLY_TOTAL_TARGET - totalSpent;
+
+  function fmtBalanceDate(isoDate: string): string {
+    const d = new Date(isoDate + "T00:00:00");
+    return d.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
+  }
+
+  function fmtCreatedAt(iso: string): string {
+    return new Date(iso).toLocaleDateString("en-AU", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: "#0d0f14", color: "#f0f2f8", fontFamily: "'Inter', sans-serif" }}>
@@ -254,32 +269,37 @@ export default function BudgetPage() {
           )}
         </div>
 
-        {/* ── ING BALANCE ────────────────────────────────────────── */}
+        {/* ── ING ACCOUNT BALANCE ────────────────────────────────── */}
         <div style={card}>
-          <div style={sectionTitle}>ING Balance</div>
-          {ingSaved != null && (
-            <div style={{ fontSize: 24, fontWeight: 800, color: "#00c9ff", lineHeight: 1, marginBottom: 10 }}>
-              ${ingSaved.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              <span style={{ fontSize: 10, color: "#5a6080", fontWeight: 400, marginLeft: 8 }}>saved this week</span>
-            </div>
-          )}
-          <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-            <div style={{ flex: 1 }}>
-              <div style={labelStyle}>Current balance ($)</div>
+          <div style={sectionTitle}>ING Account Balance</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 8, alignItems: "end", marginBottom: 12 }}>
+            <div>
+              <div style={labelStyle}>Balance ($)</div>
               <input
                 type="number"
                 step="0.01"
                 min="0"
                 placeholder="e.g. 4250.00"
-                value={ingBalance}
-                onChange={e => setIngBalance(e.target.value)}
+                value={ingAmount}
+                onChange={e => setIngAmount(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") saveIngBalance(); }}
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <div style={labelStyle}>Notes (optional)</div>
+              <input
+                type="text"
+                placeholder="e.g. post rent"
+                value={ingNotes}
+                onChange={e => setIngNotes(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") saveIngBalance(); }}
                 style={inputStyle}
               />
             </div>
             <button
               onClick={saveIngBalance}
-              disabled={ingSaving || !ingBalance}
+              disabled={ingSaving || !ingAmount}
               style={{
                 padding: "8px 20px", borderRadius: 5, border: "none",
                 background: ingSaving ? "#2d3244" : "#00c9ff",
@@ -292,6 +312,31 @@ export default function BudgetPage() {
               {ingSaving ? "Saving…" : "Save"}
             </button>
           </div>
+
+          {ingHistory.length > 0 && (
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left", color: "#5a6080", fontWeight: 600, paddingBottom: 6, letterSpacing: "0.06em", fontSize: 10 }}>DATE</th>
+                  <th style={{ textAlign: "left", color: "#5a6080", fontWeight: 600, paddingBottom: 6, letterSpacing: "0.06em", fontSize: 10 }}>WEEK OF</th>
+                  <th style={{ textAlign: "right", color: "#5a6080", fontWeight: 600, paddingBottom: 6, letterSpacing: "0.06em", fontSize: 10 }}>BALANCE</th>
+                  <th style={{ textAlign: "left", color: "#5a6080", fontWeight: 600, paddingBottom: 6, letterSpacing: "0.06em", fontSize: 10, paddingLeft: 12 }}>NOTES</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ingHistory.map((row) => (
+                  <tr key={row.id} style={{ borderTop: "1px solid #1a1d2e" }}>
+                    <td style={{ padding: "6px 0", color: "#8b92b4" }}>{fmtCreatedAt(row.created_at)}</td>
+                    <td style={{ padding: "6px 0", color: "#8b92b4" }}>{fmtBalanceDate(row.week_start)}</td>
+                    <td style={{ padding: "6px 0", textAlign: "right", color: "#00c9ff", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                      ${Number(row.balance).toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ padding: "6px 0", paddingLeft: 12, color: "#5a6080" }}>{row.notes ?? ""}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
         {/* ── MANUAL TOTALS ──────────────────────────────────────── */}

@@ -2,23 +2,22 @@
 import { useState, useEffect, useCallback } from "react";
 
 const CATEGORIES = [
-  { id: "housing",   label: "Housing",    sub: "Rent + Water",              target: 675.46 },
-  { id: "food",      label: "Food",        sub: "Groceries + Eating",        target: 277.15 },
-  { id: "transport", label: "Transport",   sub: "Fuel + Insurance + Rego",   target: 194.49 },
-  { id: "utilities", label: "Utilities",   sub: "Electricity + Gas + Phone", target: 118.62 },
-  { id: "software",  label: "Software",    sub: "Subscriptions",             target: 105.68 },
-  { id: "ecommerce", label: "Ecommerce",   sub: "2 stores",                  target: 53.30  },
-  { id: "annual",    label: "Annual Subs", sub: "Amortised",                 target: 42.76  },
+  { id: "housing",       label: "Housing",       sub: "Rent + Water",            target: 675.46 },
+  { id: "transport",     label: "Transport",      sub: "Fuel + Insurance + Rego", target: 194.49 },
+  { id: "groceries",     label: "Groceries",      sub: "Coles + Woolies",         target: 277.15 },
+  { id: "eating_out",    label: "Eating Out",     sub: "Cafes + Delivery",        target: 100.00 },
+  { id: "subscriptions", label: "Subscriptions",  sub: "Monthly subs",            target: 105.68 },
+  { id: "ecom",          label: "Ecom",           sub: "Business expenses",       target: 150.00 },
 ];
 
-const WEEKLY_TOTAL_TARGET = 1509.11;
+const WEEKLY_TOTAL_TARGET = 1502.78;
 
 interface SummaryData {
   week_start: string;
   categories: Record<string, number>;
   prevWeek: Record<string, number>;
   income: number;
-  weekly_balance: number | null;
+  balance: { value: number; week_start: string } | null;
   last_updated: string | null;
 }
 
@@ -109,21 +108,11 @@ export default function PanelBudget() {
         </div>
       </div>
 
-      {/* Income + ING balance — only shown when data has been uploaded */}
-      {!loading && ((data?.income ?? 0) > 0 || data?.weekly_balance != null) && (
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--text-muted)", marginTop: 4 }}>
-          {(data?.income ?? 0) > 0 && (
-            <span>
-              <span style={{ color: "var(--green)", fontWeight: 700 }}>${data!.income.toFixed(0)}</span>
-              {" "}income · Shopify separate
-            </span>
-          )}
-          {data?.weekly_balance != null && (
-            <span>
-              ING{" "}
-              <span style={{ color: "var(--cyan)", fontWeight: 700 }}>${data!.weekly_balance.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </span>
-          )}
+      {/* Income note */}
+      {!loading && (data?.income ?? 0) > 0 && (
+        <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 4 }}>
+          <span style={{ color: "var(--green)", fontWeight: 700 }}>${data!.income.toFixed(0)}</span>
+          {" "}income this week · Shopify tracked separately
         </div>
       )}
 
@@ -193,6 +182,23 @@ export default function PanelBudget() {
             </div>
           );
         })}
+
+        {/* ING Balance row — no target, no progress bar */}
+        {mounted && data?.balance != null && (
+          <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
+            <div className="progress-row">
+              <span className="list-name">
+                ING Balance
+                <span style={{ fontSize: 10, color: "var(--text-muted)", marginLeft: 4 }}>
+                  as of {formatWeekLabel(data.balance.week_start)}
+                </span>
+              </span>
+              <span className="list-val" style={{ color: "var(--cyan)", fontSize: 12 }}>
+                ${data.balance.value.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Last updated footer */}
