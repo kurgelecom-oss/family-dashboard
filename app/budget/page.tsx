@@ -47,6 +47,10 @@ export default function BudgetPage() {
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const [uploadError, setUploadError] = useState("");
 
+  const [ingBalance, setIngBalance] = useState("");
+  const [ingSaved, setIngSaved] = useState<number | null>(null);
+  const [ingSaving, setIngSaving] = useState(false);
+
   const [entries, setEntries] = useState<Entry[]>([]);
   const [actuals, setActuals] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -65,6 +69,28 @@ export default function BudgetPage() {
         : `${mon.getDate()} ${mon.toLocaleDateString("en-AU", { month: "short" })} – ${sun.getDate()} ${sun.toLocaleDateString("en-AU", { month: "short", year: "numeric" })}`;
     setWeekLabel(label);
   }, [weekStart]);
+
+  useEffect(() => {
+    supabase
+      .from("weekly_balance")
+      .select("balance")
+      .eq("week_start", weekStart)
+      .maybeSingle()
+      .then(({ data }) => { if (data) setIngSaved(Number(data.balance)); });
+  }, [weekStart]);
+
+  async function saveIngBalance() {
+    const parsed = parseFloat(ingBalance.replace(/[$,]/g, ""));
+    if (!ingBalance || isNaN(parsed)) return;
+    setIngSaving(true);
+    await supabase.from("weekly_balance").upsert(
+      { week_start: weekStart, balance: parsed },
+      { onConflict: "week_start" }
+    );
+    setIngSaved(parsed);
+    setIngBalance("");
+    setIngSaving(false);
+  }
 
   const loadEntries = useCallback(async () => {
     const { data, error } = await supabase
@@ -226,6 +252,46 @@ export default function BudgetPage() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* ── ING BALANCE ────────────────────────────────────────── */}
+        <div style={card}>
+          <div style={sectionTitle}>ING Balance</div>
+          {ingSaved != null && (
+            <div style={{ fontSize: 24, fontWeight: 800, color: "#00c9ff", lineHeight: 1, marginBottom: 10 }}>
+              ${ingSaved.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <span style={{ fontSize: 10, color: "#5a6080", fontWeight: 400, marginLeft: 8 }}>saved this week</span>
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+            <div style={{ flex: 1 }}>
+              <div style={labelStyle}>Current balance ($)</div>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="e.g. 4250.00"
+                value={ingBalance}
+                onChange={e => setIngBalance(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") saveIngBalance(); }}
+                style={inputStyle}
+              />
+            </div>
+            <button
+              onClick={saveIngBalance}
+              disabled={ingSaving || !ingBalance}
+              style={{
+                padding: "8px 20px", borderRadius: 5, border: "none",
+                background: ingSaving ? "#2d3244" : "#00c9ff",
+                color: ingSaving ? "#5a6080" : "#000",
+                fontWeight: 700, fontSize: 13,
+                cursor: ingSaving ? "default" : "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {ingSaving ? "Saving…" : "Save"}
+            </button>
+          </div>
         </div>
 
         {/* ── MANUAL TOTALS ──────────────────────────────────────── */}

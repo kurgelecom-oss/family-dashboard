@@ -18,6 +18,7 @@ interface SummaryData {
   categories: Record<string, number>;
   prevWeek: Record<string, number>;
   income: number;
+  weekly_balance: number | null;
   last_updated: string | null;
 }
 
@@ -108,11 +109,21 @@ export default function PanelBudget() {
         </div>
       </div>
 
-      {/* Income note — only shown when data has been uploaded */}
-      {!loading && (data?.income ?? 0) > 0 && (
-        <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 4 }}>
-          <span style={{ color: "var(--green)", fontWeight: 700 }}>${data!.income.toFixed(0)}</span>
-          {" "}income this week · Shopify tracked separately
+      {/* Income + ING balance — only shown when data has been uploaded */}
+      {!loading && ((data?.income ?? 0) > 0 || data?.weekly_balance != null) && (
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--text-muted)", marginTop: 4 }}>
+          {(data?.income ?? 0) > 0 && (
+            <span>
+              <span style={{ color: "var(--green)", fontWeight: 700 }}>${data!.income.toFixed(0)}</span>
+              {" "}income · Shopify separate
+            </span>
+          )}
+          {data?.weekly_balance != null && (
+            <span>
+              ING{" "}
+              <span style={{ color: "var(--cyan)", fontWeight: 700 }}>${data!.weekly_balance.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </span>
+          )}
         </div>
       )}
 

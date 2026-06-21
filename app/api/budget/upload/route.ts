@@ -1,50 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "../../../lib/supabase";
 
-const CATEGORIES = ["Groceries", "Eating Out", "Transport", "Utilities", "Shopping", "Health", "Other"] as const;
-type Category = typeof CATEGORIES[number];
+type Category = "housing" | "transport" | "groceries" | "eating_out" | "subscriptions" | "ecom" | "other";
 
-const KEYWORD_MAP: Record<Category, string[]> = {
-  Groceries: [
-    "woolworths", "coles", "aldi", "iga", "costco", "harris farm", "foodland",
-    "supermarket", "grocery", "spar", "fresh market",
-  ],
-  "Eating Out": [
-    "mcdonald", "kfc", "hungry jacks", "subway", "domino", "pizza",
-    "starbucks", "gloria jean", "cafe", "coffee", "restaurant", "kebab",
-    "sushi", "oporto", "guzman", "nando", "uber eats", "deliveroo",
-    "doordash", "menulog", "hey you", "diner", "bistro", "takeaway",
-  ],
-  Transport: [
-    "bp ", "shell", "ampol", "caltex", "7-eleven", "petrol", "fuel",
-    "opal card", "myki", "translink", "ptc", "tfnsw",
-    "uber", "ola ", "didi", "lyft", "taxi", "13cabs",
-    "parking", "wilsons parking", "secure parking", "toll",
-    "jetstar", "qantas", "virgin australia", "tigerair", "rex airline",
-  ],
-  Utilities: [
-    "origin energy", "agl ", "energy australia", "electricity", "jemena",
-    "telstra", "optus", "vodafone", "tpg", "iinet", "aussie broadband",
-    "internode", "internet", "nbn",
-    "sydney water", "water corp", "yarra valley water", "sa water",
-    "council", "rates",
-  ],
-  Shopping: [
-    "amazon", "ebay", "kmart", "target", "big w", "myer", "david jones",
-    "cotton on", "h&m", "zara", "uniqlo", "ikea", "harvey norman",
-    "jb hi-fi", "officeworks", "apple store", "samsung", "the iconic",
-    "asos", "shein", "booktopia",
-  ],
-  Health: [
-    "chemist", "pharmacy", "priceline", "amcal", "terry white",
-    "doctor", "gp ", "medical centre", "medical center", "dental", "dentist",
-    "hospital", "medicare", "healthscope",
-    "medibank", "bupa", "ahm ", "nib ", "hcf ",
-    "gym", "anytime fitness", "planet fitness", "f45", "crossfit",
-    "physio", "optometrist", "pathology", "radiology",
-  ],
-  Other: [],
-};
+function categorize(description: string): Category {
+  const d = description.toUpperCase();
+
+  if (d.includes("AGL") || d.includes("YARRA VALLEY") || d.includes("JK ESTATE") || d.includes("WATER"))
+    return "housing";
+
+  if (d.includes("7-ELEVEN") || d.includes("7 ELEVEN") || d.includes("EG FUELCO") ||
+      d.includes("LINKT") || d.includes("AAMI") || d.includes("VICROADS") || d.includes("SUPERCHEAP AUTO"))
+    return "transport";
+
+  if (d.includes("COLES") || d.includes("WOOLWORTHS") || d.includes("MILKRUN"))
+    return "groceries";
+
+  if (d.includes("MCDONALD") || d.includes("DOORDASH") || d.includes("PIZZA") ||
+      d.includes("SUEY") || d.includes("STALACTIT") || d.includes("BRUNETTI") ||
+      d.includes("HIGHER GROUND") || d.includes("LE PETIT CHATEAU") || d.includes("CAFE") ||
+      d.includes("RESTAURANT") || d.includes("CANONI") || d.includes("DAWSON ST") ||
+      d.includes("DCO") || d.includes("ZLR") || d.includes("MANINI") || d.includes("HAIGH"))
+    return "eating_out";
+
+  if (d.includes("APPLE") || d.includes("PLAYSTATION") || d.includes("STAN") ||
+      d.includes("MAKE.COM") || d.includes("RAYCAST") || d.includes("INCOGNITON") ||
+      d.includes("NOTION") || d.includes("YOUTUBE") || d.includes("MICROSOFT") ||
+      d.includes("ANTHROPIC") || d.includes("NETLIFY") || d.includes("CANVA") ||
+      d.includes("GOOGLE") || d.includes("PRIME VIDEO") || d.includes("HUSHED") || d.includes("MPP"))
+    return "subscriptions";
+
+  if (d.includes("SHOPIFY") || d.includes("HIGGSFIELD") || d.includes("ECOM ELIXIR") ||
+      d.includes("PADDLE") || d.includes("LAUNCHGOOD") || d.includes("HASENE") || d.includes("IBC ISLAMIC"))
+    return "ecom";
+
+  return "other";
+}
 
 function parseCSVLine(line: string): string[] {
   const fields: string[] = [];
@@ -99,15 +90,6 @@ function getMondayOfDate(isoDate: string): string {
   return date.toISOString().split("T")[0];
 }
 
-function categorize(description: string): Category {
-  const lower = description.toLowerCase();
-  for (const [cat, keywords] of Object.entries(KEYWORD_MAP) as [Category, string[]][]) {
-    if (cat === "Other") continue;
-    if (keywords.some((k) => lower.includes(k))) return cat;
-  }
-  return "Other";
-}
-
 function parseAmount(raw: string): number | null {
   const cleaned = raw.replace(/[$,\s]/g, "");
   if (!cleaned) return null;
@@ -138,7 +120,6 @@ export async function POST(request: NextRequest) {
   const text = await file.text();
   const lines = text.split(/\r?\n/);
 
-  // Find header row (first row containing both "date" and "description")
   let headerRow: string[] = [];
   let headerLineIdx = -1;
   for (let i = 0; i < lines.length; i++) {
@@ -150,16 +131,13 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  if (headerLineIdx === -1) {
+  if (headerLineIdx === -1)
     return NextResponse.json({ error: "Could not detect CSV format — no header row found" }, { status: 400 });
-  }
 
   const bank = detectBank(headerRow);
-  if (!bank) {
+  if (!bank)
     return NextResponse.json({ error: "Unknown bank format. Expected CBA, ING, or Amex CSV headers" }, { status: 400 });
-  }
 
-  // Build column index map
   const colIdx: Record<string, number> = {};
   headerRow.forEach((h, i) => {
     const key = h.toLowerCase().trim();
@@ -186,21 +164,16 @@ export async function POST(request: NextRequest) {
     if (!isoDate) continue;
 
     let amount: number | null = null;
-
     if (bank === "AMEX") {
       const parsed = parseAmount(cols[colIdx.amount] ?? "");
       if (parsed === null) continue;
-      amount = -parsed; // Amex positive = charge (expense), negative = credit (income)
+      amount = -parsed;
     } else {
       const debit = parseAmount(cols[colIdx.debit] ?? "");
       const credit = parseAmount(cols[colIdx.credit] ?? "");
-      if (debit !== null && Math.abs(debit) > 0) {
-        amount = -Math.abs(debit);
-      } else if (credit !== null && Math.abs(credit) > 0) {
-        amount = Math.abs(credit);
-      } else {
-        continue;
-      }
+      if (debit !== null && Math.abs(debit) > 0) amount = -Math.abs(debit);
+      else if (credit !== null && Math.abs(credit) > 0) amount = Math.abs(credit);
+      else continue;
     }
 
     transactions.push({
@@ -209,50 +182,17 @@ export async function POST(request: NextRequest) {
       bank,
       description,
       amount,
-      category: amount < 0 ? categorize(description) : "Other",
+      category: amount < 0 ? categorize(description) : "other",
     });
   }
 
-  if (transactions.length === 0) {
+  if (transactions.length === 0)
     return NextResponse.json({ error: "No valid transactions found in CSV" }, { status: 400 });
-  }
 
-  // Insert in batches of 100
   for (let i = 0; i < transactions.length; i += 100) {
     const { error } = await supabase.from("weekly_transactions").insert(transactions.slice(i, i + 100));
-    if (error) {
+    if (error)
       return NextResponse.json({ error: `Insert failed: ${error.message}` }, { status: 500 });
-    }
-  }
-
-  // Recompute weekly_summary for all affected weeks
-  const affectedWeeks = [...new Set(transactions.map((t) => t.week_start))];
-  for (const weekStart of affectedWeeks) {
-    const { data: rows } = await supabase
-      .from("weekly_transactions")
-      .select("category, amount")
-      .eq("week_start", weekStart);
-
-    if (!rows) continue;
-
-    const totals: Record<string, { total: number; count: number }> = {};
-    for (const row of rows) {
-      if (row.amount >= 0) continue;
-      if (!totals[row.category]) totals[row.category] = { total: 0, count: 0 };
-      totals[row.category].total += Math.abs(row.amount);
-      totals[row.category].count += 1;
-    }
-
-    const summaryRows = Object.entries(totals).map(([category, { total, count }]) => ({
-      week_start: weekStart,
-      category,
-      total_amount: Math.round(total * 100) / 100,
-      transaction_count: count,
-    }));
-
-    if (summaryRows.length > 0) {
-      await supabase.from("weekly_summary").upsert(summaryRows, { onConflict: "week_start,category" });
-    }
   }
 
   const categoryCounts: Record<string, number> = {};
@@ -264,5 +204,12 @@ export async function POST(request: NextRequest) {
     categoryCounts[t.category] = (categoryCounts[t.category] ?? 0) + 1;
   }
 
-  return NextResponse.json({ imported: transactions.length, bank, weeksAffected: affectedWeeks, expenseCount, incomeCount, categoryCounts });
+  return NextResponse.json({
+    imported: transactions.length,
+    bank,
+    weeksAffected: [...new Set(transactions.map((t) => t.week_start))],
+    expenseCount,
+    incomeCount,
+    categoryCounts,
+  });
 }

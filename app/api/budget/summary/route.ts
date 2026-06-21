@@ -81,7 +81,7 @@ export async function GET() {
   prevDate.setDate(prevDate.getDate() - 7);
   const prevWeekStart = prevDate.toISOString().split("T")[0];
 
-  const [{ data: currentRows }, { data: prevRows }, { data: lastRow }] = await Promise.all([
+  const [{ data: currentRows }, { data: prevRows }, { data: lastRow }, { data: balanceRow }] = await Promise.all([
     supabase.from("weekly_transactions").select("category, amount").eq("week_start", weekStart),
     supabase.from("weekly_transactions").select("category, amount").eq("week_start", prevWeekStart),
     supabase
@@ -90,6 +90,7 @@ export async function GET() {
       .eq("week_start", weekStart)
       .order("created_at", { ascending: false })
       .limit(1),
+    supabase.from("weekly_balance").select("balance").eq("week_start", weekStart).maybeSingle(),
   ]);
 
   const { categories, income } = aggregate(currentRows ?? []);
@@ -100,6 +101,7 @@ export async function GET() {
     categories,
     prevWeek,
     income,
+    weekly_balance: balanceRow?.balance ?? null,
     last_updated: (lastRow ?? [])[0]?.created_at ?? null,
   });
 }
