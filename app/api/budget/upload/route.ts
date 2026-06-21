@@ -62,10 +62,13 @@ function parseCSVLine(line: string): string[] {
   return fields;
 }
 
-type Bank = "CBA" | "ING" | "AMEX";
+type Bank = "CBA" | "ING" | "AMEX" | "CBA_SINGLE";
 
 function detectBank(headers: string[]): Bank | null {
   const h = headers.map((x) => x.toLowerCase().replace(/[^a-z]/g, ""));
+  const raw = headers.map((x) => x.toLowerCase().trim());
+  // CBA_SINGLE: "Date, Amount, Appears On Your Statement As" — single signed amount column
+  if (raw.some((x) => x.includes("appears on your statement as"))) return "CBA_SINGLE";
   if (h.includes("amount") && !h.includes("debit") && !h.includes("credit")) return "AMEX";
   if (h.includes("debit") && h.includes("credit")) {
     const debitIdx = headers.findIndex((x) => x.toLowerCase().includes("debit"));
@@ -129,7 +132,7 @@ export async function POST(request: NextRequest) {
   let headerLineIdx = -1;
   for (let i = 0; i < lines.length; i++) {
     const lower = lines[i].toLowerCase();
-    if (lower.includes("date") && lower.includes("description")) {
+    if (lower.includes("date") && (lower.includes("description") || lower.includes("appears on your statement as"))) {
       headerRow = parseCSVLine(lines[i]);
       headerLineIdx = i;
       break;
@@ -141,13 +144,14 @@ export async function POST(request: NextRequest) {
 
   const bank = detectBank(headerRow);
   if (!bank)
-    return NextResponse.json({ error: "Unknown bank format. Expected CBA, ING, or Amex CSV headers" }, { status: 400 });
+    return NextResponse.json({ error: "Unknown bank format. Expected CBA, ING, CBA (single-amount), or Amex CSV headers" }, { status: 400 });
 
   const colIdx: Record<string, number> = {};
   headerRow.forEach((h, i) => {
     const key = h.toLowerCase().trim();
     if (key === "date") colIdx.date = i;
     else if (key === "description") colIdx.description = i;
+    else if (key === "appears on your statement as") colIdx.description = i;
     else if (key === "debit") colIdx.debit = i;
     else if (key === "credit") colIdx.credit = i;
     else if (key === "amount") colIdx.amount = i;
@@ -173,6 +177,10 @@ export async function POST(request: NextRequest) {
       const parsed = parseAmount(cols[colIdx.amount] ?? "");
       if (parsed === null) continue;
       amount = -parsed;
+    } else if (bank === "CBA_SINGLE") {
+      const parsed = parseAmount(cols[colIdx.amount] ?? "");
+      if (parsed === null || parsed === 0) continue;
+      amount = parsed; // already signed: negative = expense, positive = income
     } else {
       const debit = parseAmount(cols[colIdx.debit] ?? "");
       const credit = parseAmount(cols[colIdx.credit] ?? "");
