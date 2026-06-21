@@ -32,26 +32,6 @@ type CalResponse = {
   errors?: string[];
 };
 
-function isSameDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth()    === b.getMonth()    &&
-    a.getDate()     === b.getDate()
-  );
-}
-
-function getWeekDays(ref: Date): Date[] {
-  const wd     = ref.getDay();
-  const monday = new Date(ref);
-  monday.setDate(ref.getDate() - (wd === 0 ? 6 : wd - 1));
-  monday.setHours(0, 0, 0, 0);
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    return d;
-  });
-}
-
 function countdown(iso: string): string {
   const diffMs = new Date(iso).getTime() - Date.now();
   if (diffMs <= 0) return "now";
@@ -86,7 +66,6 @@ export default function PanelCalendar() {
   const [events,     setEvents]     = useState<CalEvent[]>([]);
   const [missing,    setMissing]    = useState<string[]>([]);
   const [calLoading, setCalLoading] = useState(true);
-  const [now,        setNow]        = useState(() => new Date());
 
   const loadCalendar = useCallback(async () => {
     try {
@@ -105,12 +84,8 @@ export default function PanelCalendar() {
   useEffect(() => {
     loadCalendar();
     const fetchId = setInterval(loadCalendar, 60 * 60 * 1000);
-    const tickId  = setInterval(() => setNow(new Date()), 60_000);
-    return () => { clearInterval(fetchId); clearInterval(tickId); };
+    return () => { clearInterval(fetchId); };
   }, [loadCalendar]);
-
-  const weekDays   = getWeekDays(now);
-  const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
 
   return (
     <div className="panel col-5" style={{ display: "flex", flexDirection: "column" }}>
@@ -185,78 +160,6 @@ export default function PanelCalendar() {
 
       </div>
 
-      {/* ── Week at a glance ── */}
-      {!calLoading && (
-        <>
-          <div className="divider" style={{ marginTop: 8 }} />
-
-          <div style={{ paddingTop: 6 }}>
-            <div style={{
-              fontSize: 9, fontWeight: 700, textTransform: "uppercase",
-              letterSpacing: "0.1em", color: "var(--text-muted)", marginBottom: 8,
-            }}>
-              This week
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2 }}>
-              {weekDays.map((day, i) => {
-                const isToday  = isSameDay(day, now);
-                const dayStart = day.getTime();
-                const dayEnd   = dayStart + 86_400_000;
-
-                return (
-                  <div key={i} style={{ textAlign: "center" }}>
-                    {/* Day letter */}
-                    <div style={{
-                      fontSize: 9,
-                      color: isToday ? "var(--cyan)" : "var(--text-muted)",
-                      fontWeight: isToday ? 700 : 400,
-                      marginBottom: 3,
-                    }}>
-                      {DAY_LABELS[i]}
-                    </div>
-
-                    {/* Date number — circled if today */}
-                    <div style={{
-                      width: 22, height: 22, borderRadius: "50%", margin: "0 auto",
-                      background: isToday ? "var(--cyan)" : "transparent",
-                      color: isToday ? "#0b0f14" : "var(--text-secondary)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 10, fontWeight: isToday ? 700 : 400,
-                    }}>
-                      {day.getDate()}
-                    </div>
-
-                    {/* Colored dots — one per person with an event that day */}
-                    <div style={{ display: "flex", justifyContent: "center", gap: 2, marginTop: 4, minHeight: 6 }}>
-                      {ACCOUNTS.map(acct => {
-                        const hasEvent = events.some(e => {
-                          const t = new Date(e.startISO).getTime();
-                          return e.account === acct.key && (
-                            e.isAllDay
-                              ? isSameDay(new Date(e.startISO), day)
-                              : t >= dayStart && t < dayEnd
-                          );
-                        });
-                        return hasEvent ? (
-                          <div
-                            key={acct.key}
-                            style={{
-                              width: 5, height: 5, borderRadius: "50%",
-                              background: COLOR_MAP[acct.color],
-                              flexShrink: 0,
-                            }}
-                          />
-                        ) : null;
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 }
