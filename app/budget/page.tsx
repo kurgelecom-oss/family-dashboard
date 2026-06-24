@@ -17,7 +17,8 @@ type BalanceEntry = { id: string; week_start: string; balance: number; notes: st
 
 interface UploadResult {
   inserted: number;
-  skipped: number;
+  skipped_duplicates: number;
+  skipped_outside_week: number;
   total_parsed: number;
   bank: string;
   weeksAffected: string[];
@@ -251,14 +252,15 @@ export default function BudgetPage() {
               borderRadius: 5,
             }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#2ecc71", marginBottom: 4 }}>
-                {uploadResult.inserted} new transactions added from {uploadResult.bank}
+                {uploadResult.bank.toUpperCase()} — {uploadResult.total_parsed} rows parsed
               </div>
-              {uploadResult.skipped > 0 && (
-                <div style={{ fontSize: 11, color: "#f59e0b", marginBottom: 4 }}>
-                  {uploadResult.skipped} duplicate{uploadResult.skipped !== 1 ? "s" : ""} skipped
-                  {" "}({uploadResult.total_parsed} parsed total)
-                </div>
-              )}
+              <div style={{ fontSize: 12, color: "#f0f2f8", marginBottom: 8, fontVariantNumeric: "tabular-nums" }}>
+                {[
+                  `${uploadResult.inserted} added`,
+                  uploadResult.skipped_duplicates > 0 && `${uploadResult.skipped_duplicates} duplicate${uploadResult.skipped_duplicates !== 1 ? "s" : ""}`,
+                  uploadResult.skipped_outside_week > 0 && `${uploadResult.skipped_outside_week} outside this week`,
+                ].filter(Boolean).join(" · ")}
+              </div>
               <div style={{ fontSize: 11, color: "#5a6080", marginBottom: 8 }}>
                 {uploadResult.expenseCount} expenses · {uploadResult.incomeCount} income rows ·{" "}
                 {uploadResult.weeksAffected.length} week{uploadResult.weeksAffected.length !== 1 ? "s" : ""} updated

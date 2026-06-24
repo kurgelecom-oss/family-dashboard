@@ -63,7 +63,7 @@ function parseCSVLine(line: string): string[] {
   return fields;
 }
 
-type Bank = "CBA" | "ING" | "AMEX" | "CBA_SINGLE";
+type Bank = "CBA" | "ING" | "AMEX" | "CBA_SINGLE" | "CBA_HEADERLESS";
 
 function detectBank(headers: string[]): Bank | null {
   const h = headers.map((x) => x.toLowerCase().replace(/[^a-z]/g, ""));
@@ -106,10 +106,26 @@ function parseAmount(raw: string): number | null {
   return isNaN(n) ? null : n;
 }
 
+function getCurrentWeekStartAEST(): string {
+  const parts = new Intl.DateTimeFormat("en-AU", {
+    timeZone: "Australia/Melbourne",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const y = parts.find((p) => p.type === "year")!.value;
+  const m = parts.find((p) => p.type === "month")!.value;
+  const d = parts.find((p) => p.type === "day")!.value;
+  return getMondayOfDate(`${y}-${m}-${d}`);
+}
+
+// CBA headerless: skip internal/salary movements and all credits
+const CBA_HEADERLESS_SKIP = ["TRANSFER TO ING", "DIRECT CREDIT", "MONTHLY FEE"];
+
 interface Transaction {
   upload_date: string;
   week_start: string;
-  bank: Bank;
+  bank: string;
   description: string;
   amount: number;
   category: Category;
@@ -130,6 +146,7 @@ export async function POST(request: NextRequest) {
   const text = await file.text();
   const lines = text.split(/\r?\n/);
 
+  // Step 1: try header-based detection (ING, Amex, CBA_SINGLE)
   let headerRow: string[] = [];
   let headerLineIdx = -1;
   for (let i = 0; i < lines.length; i++) {
@@ -141,64 +158,110 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  if (headerLineIdx === -1)
-    return NextResponse.json({ error: "Could not detect CSV format — no header row found" }, { status: 400 });
-
-  const bank = detectBank(headerRow);
-  if (!bank)
-    return NextResponse.json({ error: "Unknown bank format. Expected CBA, ING, CBA (single-amount), or Amex CSV headers" }, { status: 400 });
-
+  let bank: Bank | null = null;
+  let isCbaHeaderless = false;
+  let dataStartIdx = 0;
   const colIdx: Record<string, number> = {};
-  headerRow.forEach((h, i) => {
-    const key = h.toLowerCase().trim();
-    if (key === "date") colIdx.date = i;
-    else if (key === "description") colIdx.description = i;
-    else if (key === "appears on your statement as") colIdx.description = i;
-    else if (key === "debit") colIdx.debit = i;
-    else if (key === "credit") colIdx.credit = i;
-    else if (key === "amount") colIdx.amount = i;
-  });
 
+  if (headerLineIdx !== -1) {
+    // Header-based format
+    bank = detectBank(headerRow);
+    if (!bank)
+      return NextResponse.json({ error: "Unknown bank format. Expected CBA, ING, CBA (single-amount), or Amex CSV headers" }, { status: 400 });
+    dataStartIdx = headerLineIdx + 1;
+    headerRow.forEach((h, i) => {
+      const key = h.toLowerCase().trim();
+      if (key === "date") colIdx.date = i;
+      else if (key === "description") colIdx.description = i;
+      else if (key === "appears on your statement as") colIdx.description = i;
+      else if (key === "debit") colIdx.debit = i;
+      else if (key === "credit") colIdx.credit = i;
+      else if (key === "amount") colIdx.amount = i;
+    });
+  } else {
+    // Headerless sniff: col 0 of first non-empty row must be a DD/MM/YYYY date → CBA export
+    let firstDataLine = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].trim()) { firstDataLine = i; break; }
+    }
+    if (firstDataLine === -1)
+      return NextResponse.json({ error: "Empty file" }, { status: 400 });
+    const sampleCols = parseCSVLine(lines[firstDataLine]);
+    if (!parseDateToISO(sampleCols[0] ?? ""))
+      return NextResponse.json({ error: "Could not detect CSV format — no recognised headers and first column is not a date" }, { status: 400 });
+    bank = "CBA_HEADERLESS";
+    isCbaHeaderless = true;
+    dataStartIdx = firstDataLine;
+  }
+
+  const currentWeekStart = getCurrentWeekStartAEST();
   const today = new Date().toISOString().split("T")[0];
-  const transactions: Transaction[] = [];
+  const thisWeekTransactions: Transaction[] = [];
+  let total_parsed = 0;
+  let skipped_outside_week = 0;
 
-  for (let i = headerLineIdx + 1; i < lines.length; i++) {
+  for (let i = dataStartIdx; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
     const cols = parseCSVLine(line);
 
-    const dateStr = cols[colIdx.date] ?? "";
-    const description = (cols[colIdx.description] ?? "").replace(/^"(.*)"$/, "$1").trim();
-    if (!dateStr || !description) continue;
-
-    const isoDate = parseDateToISO(dateStr);
-    if (!isoDate) continue;
-
+    let dateStr: string;
+    let description: string;
     let amount: number | null = null;
-    if (bank === "AMEX") {
-      const parsed = parseAmount(cols[colIdx.amount] ?? "");
-      if (parsed === null) continue;
-      amount = -parsed;
-    } else if (bank === "CBA_SINGLE") {
-      const parsed = parseAmount(cols[colIdx.amount] ?? "");
-      if (parsed === null || parsed === 0) continue;
-      amount = parsed; // already signed: negative = expense, positive = income
+
+    if (isCbaHeaderless) {
+      // Format A (4 cols): date, amount, description, balance — col 3 is running balance, ignored
+      // Format B (3 cols): date, amount, description
+      dateStr = cols[0] ?? "";
+      description = (cols[2] ?? "").trim();
+      const rawAmount = parseAmount(cols[1] ?? "");
+      // Only debits (negative amounts) are expenses; skip credits, zero, and internal movements
+      if (!dateStr || !description || rawAmount === null || rawAmount >= 0) continue;
+      const upper = description.toUpperCase();
+      if (CBA_HEADERLESS_SKIP.some((s) => upper.includes(s))) continue;
+      amount = rawAmount;
     } else {
-      const debit = parseAmount(cols[colIdx.debit] ?? "");
-      const credit = parseAmount(cols[colIdx.credit] ?? "");
-      if (debit !== null && Math.abs(debit) > 0) amount = -Math.abs(debit);
-      else if (credit !== null && Math.abs(credit) > 0) amount = Math.abs(credit);
-      else continue;
+      dateStr = cols[colIdx.date] ?? "";
+      description = (cols[colIdx.description] ?? "").replace(/^"(.*)"$/, "$1").trim();
+      if (!dateStr || !description) continue;
+
+      if (bank === "AMEX") {
+        const parsed = parseAmount(cols[colIdx.amount] ?? "");
+        if (parsed === null) continue;
+        amount = -parsed;
+      } else if (bank === "CBA_SINGLE") {
+        const parsed = parseAmount(cols[colIdx.amount] ?? "");
+        if (parsed === null || parsed === 0) continue;
+        amount = parsed;
+      } else {
+        const debit = parseAmount(cols[colIdx.debit] ?? "");
+        const credit = parseAmount(cols[colIdx.credit] ?? "");
+        if (debit !== null && Math.abs(debit) > 0) amount = -Math.abs(debit);
+        else if (credit !== null && Math.abs(credit) > 0) amount = Math.abs(credit);
+        else continue;
+      }
     }
 
+    const isoDate = parseDateToISO(dateStr);
+    if (!isoDate || amount === null) continue;
+
+    total_parsed++;
+
+    const weekStart = getMondayOfDate(isoDate);
+    if (weekStart !== currentWeekStart) {
+      skipped_outside_week++;
+      continue;
+    }
+
+    const storedBank = isCbaHeaderless ? "cba" : (bank as string);
     const transaction_hash = createHash("sha256")
-      .update(`${isoDate}|${description}|${amount}|${bank}`)
+      .update(`${isoDate}|${description}|${amount}|${storedBank}`)
       .digest("hex");
 
-    transactions.push({
+    thisWeekTransactions.push({
       upload_date: today,
-      week_start: getMondayOfDate(isoDate),
-      bank,
+      week_start: weekStart,
+      bank: storedBank,
       description,
       amount,
       category: amount < 0 ? categorize(description) : "other",
@@ -206,19 +269,22 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  if (transactions.length === 0)
+  if (total_parsed === 0)
     return NextResponse.json({ error: "No valid transactions found in CSV" }, { status: 400 });
 
-  // Dedup: fetch which hashes already exist in the DB
-  const allHashes = transactions.map((t) => t.transaction_hash);
-  const { data: existingRows } = await supabase
-    .from("weekly_transactions")
-    .select("transaction_hash")
-    .in("transaction_hash", allHashes);
+  // Dedup: check which this-week hashes already exist in DB
+  const allHashes = thisWeekTransactions.map((t) => t.transaction_hash);
+  const existingHashes = new Set<string>();
+  if (allHashes.length > 0) {
+    const { data: existingRows } = await supabase
+      .from("weekly_transactions")
+      .select("transaction_hash")
+      .in("transaction_hash", allHashes);
+    (existingRows ?? []).forEach((r) => existingHashes.add(r.transaction_hash as string));
+  }
 
-  const existingHashes = new Set((existingRows ?? []).map((r) => r.transaction_hash as string));
-  const newTransactions = transactions.filter((t) => !existingHashes.has(t.transaction_hash));
-  const skipped = transactions.length - newTransactions.length;
+  const newTransactions = thisWeekTransactions.filter((t) => !existingHashes.has(t.transaction_hash));
+  const skipped_duplicates = thisWeekTransactions.length - newTransactions.length;
 
   for (let i = 0; i < newTransactions.length; i += 100) {
     const { error } = await supabase.from("weekly_transactions").insert(newTransactions.slice(i, i + 100));
@@ -235,11 +301,14 @@ export async function POST(request: NextRequest) {
     categoryCounts[t.category] = (categoryCounts[t.category] ?? 0) + 1;
   }
 
+  const displayBank = isCbaHeaderless ? "cba" : (bank as string);
+
   return NextResponse.json({
     inserted: newTransactions.length,
-    skipped,
-    total_parsed: transactions.length,
-    bank,
+    skipped_duplicates,
+    skipped_outside_week,
+    total_parsed,
+    bank: displayBank,
     weeksAffected: [...new Set(newTransactions.map((t) => t.week_start))],
     expenseCount,
     incomeCount,
