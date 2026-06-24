@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { supabase } from "../../../lib/supabase";
 
 type Category = "housing" | "transport" | "groceries" | "eating_out" | "subscriptions" | "ecom" | "other";
@@ -112,6 +113,7 @@ interface Transaction {
   description: string;
   amount: number;
   category: Category;
+  transaction_hash: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -189,6 +191,10 @@ export async function POST(request: NextRequest) {
       else continue;
     }
 
+    const transaction_hash = createHash("sha256")
+      .update(`${isoDate}|${description}|${amount}|${bank}`)
+      .digest("hex");
+
     transactions.push({
       upload_date: today,
       week_start: getMondayOfDate(isoDate),
@@ -196,14 +202,26 @@ export async function POST(request: NextRequest) {
       description,
       amount,
       category: amount < 0 ? categorize(description) : "other",
+      transaction_hash,
     });
   }
 
   if (transactions.length === 0)
     return NextResponse.json({ error: "No valid transactions found in CSV" }, { status: 400 });
 
-  for (let i = 0; i < transactions.length; i += 100) {
-    const { error } = await supabase.from("weekly_transactions").insert(transactions.slice(i, i + 100));
+  // Dedup: fetch which hashes already exist in the DB
+  const allHashes = transactions.map((t) => t.transaction_hash);
+  const { data: existingRows } = await supabase
+    .from("weekly_transactions")
+    .select("transaction_hash")
+    .in("transaction_hash", allHashes);
+
+  const existingHashes = new Set((existingRows ?? []).map((r) => r.transaction_hash as string));
+  const newTransactions = transactions.filter((t) => !existingHashes.has(t.transaction_hash));
+  const skipped = transactions.length - newTransactions.length;
+
+  for (let i = 0; i < newTransactions.length; i += 100) {
+    const { error } = await supabase.from("weekly_transactions").insert(newTransactions.slice(i, i + 100));
     if (error)
       return NextResponse.json({ error: `Insert failed: ${error.message}` }, { status: 500 });
   }
@@ -211,16 +229,18 @@ export async function POST(request: NextRequest) {
   const categoryCounts: Record<string, number> = {};
   let incomeCount = 0;
   let expenseCount = 0;
-  for (const t of transactions) {
+  for (const t of newTransactions) {
     if (t.amount >= 0) { incomeCount++; continue; }
     expenseCount++;
     categoryCounts[t.category] = (categoryCounts[t.category] ?? 0) + 1;
   }
 
   return NextResponse.json({
-    imported: transactions.length,
+    inserted: newTransactions.length,
+    skipped,
+    total_parsed: transactions.length,
     bank,
-    weeksAffected: [...new Set(transactions.map((t) => t.week_start))],
+    weeksAffected: [...new Set(newTransactions.map((t) => t.week_start))],
     expenseCount,
     incomeCount,
     categoryCounts,

@@ -16,7 +16,9 @@ type Entry = { id: string; category: string; amount: number; created_at: string 
 type BalanceEntry = { id: string; week_start: string; balance: number; notes: string | null; created_at: string };
 
 interface UploadResult {
-  imported: number;
+  inserted: number;
+  skipped: number;
+  total_parsed: number;
   bank: string;
   weeksAffected: string[];
   expenseCount: number;
@@ -248,9 +250,15 @@ export default function BudgetPage() {
               background: "rgba(46,204,113,0.08)", border: "1px solid rgba(46,204,113,0.25)",
               borderRadius: 5,
             }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#2ecc71", marginBottom: 6 }}>
-                Imported {uploadResult.imported} transactions from {uploadResult.bank}
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#2ecc71", marginBottom: 4 }}>
+                {uploadResult.inserted} new transactions added from {uploadResult.bank}
               </div>
+              {uploadResult.skipped > 0 && (
+                <div style={{ fontSize: 11, color: "#f59e0b", marginBottom: 4 }}>
+                  {uploadResult.skipped} duplicate{uploadResult.skipped !== 1 ? "s" : ""} skipped
+                  {" "}({uploadResult.total_parsed} parsed total)
+                </div>
+              )}
               <div style={{ fontSize: 11, color: "#5a6080", marginBottom: 8 }}>
                 {uploadResult.expenseCount} expenses · {uploadResult.incomeCount} income rows ·{" "}
                 {uploadResult.weeksAffected.length} week{uploadResult.weeksAffected.length !== 1 ? "s" : ""} updated
