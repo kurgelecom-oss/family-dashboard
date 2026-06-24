@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { supabase, getWeekStart } from "../lib/supabase";
+import { supabase, getLastWeekStart } from "../lib/supabase";
 
 const MANUAL_CATEGORIES = [
   { id: "housing",       label: "Housing",       sub: "Rent + Water",            target: 675.46 },
@@ -40,7 +40,7 @@ const labelStyle: React.CSSProperties = {
 };
 
 export default function BudgetPage() {
-  const weekStart = getWeekStart();
+  const weekStart = getLastWeekStart();
   const [weekLabel, setWeekLabel] = useState("");
 
   // ── CSV upload ────────────────────────────────────────────────────────────
@@ -187,7 +187,7 @@ export default function BudgetPage() {
             Home Budget <span style={{ color: "#f59e0b" }}>· Weekly Spend</span>
           </div>
           <div style={{ fontSize: 10, color: "#5a6080", textTransform: "uppercase", letterSpacing: "0.1em", marginTop: 2 }}>
-            Week of {weekLabel}
+            Last week · {weekLabel}
           </div>
         </div>
         <a href="/" style={{
@@ -203,9 +203,10 @@ export default function BudgetPage() {
         <div style={card}>
           <div style={sectionTitle}>Import Bank CSV</div>
           <div style={{ fontSize: 11, color: "#5a6080", marginBottom: 12 }}>
-            Supports <strong style={{ color: "#8b92b4" }}>CBA</strong>,{" "}
+            Upload last week&apos;s bank CSV exports —{" "}
+            <strong style={{ color: "#8b92b4" }}>CBA</strong>,{" "}
             <strong style={{ color: "#8b92b4" }}>ING</strong>, and{" "}
-            <strong style={{ color: "#8b92b4" }}>Amex</strong> CSV exports.
+            <strong style={{ color: "#8b92b4" }}>Amex</strong> supported.
             Transactions are auto-categorised and populate the dashboard panel.
           </div>
 

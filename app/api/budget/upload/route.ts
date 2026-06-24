@@ -106,7 +106,7 @@ function parseAmount(raw: string): number | null {
   return isNaN(n) ? null : n;
 }
 
-function getCurrentWeekStartAEST(): string {
+function getLastWeekStartAEST(): string {
   const parts = new Intl.DateTimeFormat("en-AU", {
     timeZone: "Australia/Melbourne",
     year: "numeric",
@@ -116,7 +116,10 @@ function getCurrentWeekStartAEST(): string {
   const y = parts.find((p) => p.type === "year")!.value;
   const m = parts.find((p) => p.type === "month")!.value;
   const d = parts.find((p) => p.type === "day")!.value;
-  return getMondayOfDate(`${y}-${m}-${d}`);
+  const thisMonday = getMondayOfDate(`${y}-${m}-${d}`);
+  const [ly, lm, ld] = thisMonday.split("-").map(Number);
+  const lastMonday = new Date(ly, lm - 1, ld - 7);
+  return lastMonday.toISOString().split("T")[0];
 }
 
 // CBA headerless: skip internal/salary movements and all credits
@@ -194,7 +197,7 @@ export async function POST(request: NextRequest) {
     dataStartIdx = firstDataLine;
   }
 
-  const currentWeekStart = getCurrentWeekStartAEST();
+  const currentWeekStart = getLastWeekStartAEST();
   const today = new Date().toISOString().split("T")[0];
   const thisWeekTransactions: Transaction[] = [];
   let total_parsed = 0;

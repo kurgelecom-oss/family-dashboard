@@ -19,6 +19,16 @@ export function getWeekStart() {
   return monday.toISOString().split("T")[0]
 }
 
+// Returns Monday of the PREVIOUS week (Sydney time)
+export function getLastWeekStart() {
+  const now = new Date()
+  const day = now.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  const monday = new Date(now)
+  monday.setDate(now.getDate() + diff - 7)
+  return monday.toISOString().split("T")[0]
+}
+
 // Returns today's day name
 export function getTodayDayName() {
   return new Date().toLocaleDateString("en-AU", { weekday: "long" })
