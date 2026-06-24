@@ -113,13 +113,20 @@ function getLastWeekStartAEST(): string {
     month: "2-digit",
     day: "2-digit",
   }).formatToParts(new Date());
-  const y = parts.find((p) => p.type === "year")!.value;
-  const m = parts.find((p) => p.type === "month")!.value;
-  const d = parts.find((p) => p.type === "day")!.value;
-  const thisMonday = getMondayOfDate(`${y}-${m}-${d}`);
-  const [ly, lm, ld] = thisMonday.split("-").map(Number);
-  const lastMonday = new Date(ly, lm - 1, ld - 7);
-  return lastMonday.toISOString().split("T")[0];
+  const y  = Number(parts.find((p) => p.type === "year")!.value);
+  const mo = Number(parts.find((p) => p.type === "month")!.value);
+  const d  = Number(parts.find((p) => p.type === "day")!.value);
+
+  const aestDate = new Date(y, mo - 1, d);
+  const dow  = aestDate.getDay();
+  const diff = dow === 0 ? -6 : 1 - dow;
+
+  // Use local date accessors — NOT toISOString() — to avoid the UTC midnight shift
+  const lastMon = new Date(y, mo - 1, d + diff - 7);
+  const ly = lastMon.getFullYear();
+  const lm = String(lastMon.getMonth() + 1).padStart(2, "0");
+  const ld = String(lastMon.getDate()).padStart(2, "0");
+  return `${ly}-${lm}-${ld}`;
 }
 
 // CBA headerless: debit-side movements to skip (credits handled separately)
@@ -198,6 +205,10 @@ export async function POST(request: NextRequest) {
   }
 
   const currentWeekStart = getLastWeekStartAEST();
+  const [ws_y, ws_m, ws_d] = currentWeekStart.split("-").map(Number);
+  const weekEndDate = new Date(ws_y, ws_m - 1, ws_d + 6);
+  const currentWeekEnd = `${weekEndDate.getFullYear()}-${String(weekEndDate.getMonth() + 1).padStart(2, "0")}-${String(weekEndDate.getDate()).padStart(2, "0")}`;
+  console.log(`[upload] week window: ${currentWeekStart} (Mon) → ${currentWeekEnd} (Sun)`);
   const today = new Date().toISOString().split("T")[0];
   const thisWeekTransactions: Transaction[] = [];
   let total_parsed = 0;
