@@ -298,7 +298,7 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  if (total_parsed === 0)
+  if (thisWeekTransactions.length === 0 && salaryTotal === 0)
     return NextResponse.json({ error: "No valid transactions found in CSV" }, { status: 400 });
 
   // Dedup: check which this-week hashes already exist in DB
@@ -331,11 +331,13 @@ export async function POST(request: NextRequest) {
   }
 
   // Upsert CUSTM salary into weekly_income if found
+  let income_inserted = 0;
   if (salaryTotal > 0) {
-    await supabase.from("weekly_income").upsert(
+    const { error: incomeError } = await supabase.from("weekly_income").upsert(
       { week_start: currentWeekStart, source: "salary", label: "CUSTM Salary", amount: Math.round(salaryTotal * 100) / 100 },
       { onConflict: "week_start,source" }
     );
+    if (!incomeError) income_inserted = 1;
   }
 
   const displayBank = isCbaHeaderless ? "cba" : (bank as string);
@@ -345,6 +347,7 @@ export async function POST(request: NextRequest) {
     skipped_duplicates,
     skipped_outside_week,
     total_parsed,
+    income_inserted,
     bank: displayBank,
     weeksAffected: [...new Set(newTransactions.map((t) => t.week_start))],
     expenseCount,
