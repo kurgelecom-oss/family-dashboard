@@ -77,7 +77,8 @@ export default function PanelBudget() {
   const cats = data?.categories ?? {};
   const prev = data?.prevWeek ?? {};
 
-  const totalSpent = CATEGORIES.reduce((a, c) => a + (cats[c.id] ?? 0), 0);
+  const otherSpent = cats["other"] ?? 0;
+  const totalSpent = CATEGORIES.reduce((a, c) => a + (cats[c.id] ?? 0), 0) + otherSpent;
   const remaining = WEEKLY_TOTAL_TARGET - totalSpent;
   const overBudget = CATEGORIES.some((c) => (cats[c.id] ?? 0) > c.target);
 
@@ -220,6 +221,21 @@ export default function PanelBudget() {
             </div>
           );
         })}
+
+        {/* Other — catch-all, shown without a target bar */}
+        {otherSpent > 0 && (
+          <div style={{ marginBottom: 8 }}>
+            <div className="progress-row">
+              <span className="list-name">
+                Other
+                <span style={{ fontSize: 10, color: "var(--text-muted)", marginLeft: 4 }}>Misc</span>
+              </span>
+              <span className="list-val" style={{ color: "var(--text-muted)", fontSize: 12 }}>
+                ${otherSpent.toFixed(0)}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* ING Balance row — no target, no progress bar */}
         {mounted && data?.balance != null && (

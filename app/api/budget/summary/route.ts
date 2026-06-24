@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabase, getLastWeekStart } from "../../../lib/supabase";
 
-const PANEL_KEYS = ["housing", "transport", "groceries", "eating_out", "subscriptions", "ecom"] as const;
+const PANEL_KEYS = ["housing", "transport", "groceries", "eating_out", "subscriptions", "ecom", "other"] as const;
 type PanelKey = typeof PANEL_KEYS[number];
 
 function mapToPanel(raw: string): PanelKey | null {

@@ -7,38 +7,43 @@ type Category = "housing" | "transport" | "groceries" | "eating_out" | "subscrip
 function categorize(description: string): Category {
   const d = description.toUpperCase();
 
-  if (d.includes("AGL") || d.includes("YARRA VALLEY") || d.includes("JK ESTATE") ||
-      d.includes("BPAYN") || d.includes("WATER"))
-    return "housing";
+  if (
+    d.includes("AGL") || d.includes("YARRA VALLEY") || d.includes("YARRA WATER") ||
+    d.includes("BPAY") || d.includes("JK ESTATE") || d.includes("REAL ESTATE")
+  ) return "housing";
 
-  if (d.includes("7-ELEVEN") || d.includes("EG FUELCO") || d.includes("LINKT") ||
-      d.includes("AAMI") || d.includes("VICROADS") || d.includes("SUPERCHEAP AUTO"))
-    return "transport";
+  if (
+    d.includes("7-ELEVEN") || d.includes("EG FUEL") || d.includes("FUELCO") ||
+    d.includes("LINKT") || d.includes("AAMI") || d.includes("VICROADS") ||
+    d.includes("SUPERCHEAP") || d.includes("BP ") || d.includes("SHELL") ||
+    d.includes("CALTEX") || d.includes("AMPOL")
+  ) return "transport";
 
-  if (d.includes("COLES ONLINE") || d.includes("WOOLWORTHS") || d.includes("MILKRUN") ||
-      d.includes("COLES - COBURG"))
-    return "groceries";
+  if (
+    d.includes("COLES") || d.includes("WOOLWORTHS") || d.includes("MILKRUN") ||
+    d.includes("IGA") || d.includes("ALDI")
+  ) return "groceries";
 
-  if (d.includes("MCDONALD") || d.includes("DOORDASH") || d.includes("PIZZA") ||
-      d.includes("SUEY PTY") || d.includes("STALACTIT") || d.includes("BRUNETTI") ||
-      d.includes("HIGHER GROUND") || d.includes("LE PETIT CHATEAU") || d.includes("CANONI") ||
-      d.includes("DAWSON ST") || d.includes("DCO") || d.includes("ZLR") || d.includes("MANINI") ||
-      d.includes("HAIGH") || d.includes("JOE S PANTRY") || d.includes("DALLAS HOT BREAD") ||
-      d.includes("ADOZEN") || d.includes("WINDCAVE"))
-    return "eating_out";
+  if (
+    d.includes("MCDONALD") || d.includes("DOORDASH") || d.includes("UBER EATS") ||
+    d.includes("KEBAB") || d.includes("STALACTIT") || d.includes("PIZZA") ||
+    d.includes("JOE S PANTRY") || d.includes("MENULOG") || d.includes("HUNGRY") ||
+    d.includes("NANDO") || d.includes("KFC") || d.includes("SUEY") || d.includes("SUSHI")
+  ) return "eating_out";
 
-  if (d.includes("APPLE.COM") || d.includes("PLAYSTATION") || d.includes("STAN.COM") ||
-      d.includes("MAKE.COM") || d.includes("RAYCAST") || d.includes("INCOGNITON") ||
-      d.includes("NOTION") || d.includes("YOUTUBE") || d.includes("MICROSOFT") ||
-      d.includes("ANTHROPIC") || d.includes("NETLIFY") || d.includes("CANVA") ||
-      d.includes("GOOGLE") || d.includes("PRIME VIDE") || d.includes("HUSHED") ||
-      d.includes("MPP") || d.includes("PADDLE"))
-    return "subscriptions";
+  if (
+    d.includes("APPLE.COM") || d.includes("ANTHROPIC") || d.includes("OPTUS") ||
+    d.includes("NETFLIX") || d.includes("STAN") || d.includes("YOUTUBE") ||
+    d.includes("MICROSOFT") || d.includes("NOTION") || d.includes("MAKE.COM") ||
+    d.includes("RAYCAST") || d.includes("PLAYSTATION") || d.includes("HUSHED") ||
+    d.includes("CANONI") || d.includes("SPOTIFY") || d.includes("AMAZON PRIME")
+  ) return "subscriptions";
 
-  if (d.includes("SHOPIFY") || d.includes("HIGGSFIELD") || d.includes("ECOM ELIXIR") ||
-      d.includes("LAUNCHGOOD") || d.includes("HASENE") || d.includes("IBC ISLAMIC") ||
-      d.includes("SP HASENE"))
-    return "ecom";
+  if (
+    d.includes("INCOGNITON") || d.includes("HIGGSFIELD") || d.includes("MPP") ||
+    d.includes("LAUNCHGOOD") || d.includes("FIVERR") || d.includes("ALIBABA") ||
+    d.includes("META ADS") || d.includes("FACEBOOK ADS") || d.includes("SHOPIFY")
+  ) return "ecom";
 
   return "other";
 }
@@ -129,8 +134,14 @@ function getLastWeekStartAEST(): string {
   return `${ly}-${lm}-${ld}`;
 }
 
-// CBA headerless: debit-side movements to skip (credits handled separately)
-const CBA_DEBIT_SKIP = ["TRANSFER TO ING", "MONTHLY FEE"];
+// Transactions to skip entirely regardless of bank format (internal transfers, credits, direct debits)
+const EXPENSE_SKIP = [
+  "TRANSFER TO ING",
+  "DIRECT CREDIT",
+  "MONTHLY FEE",
+  "ONLINE PAYMENT",
+  "AMERICAN EXPRESS - DIRECT DEBIT",
+];
 
 interface Transaction {
   upload_date: string;
@@ -247,12 +258,14 @@ export async function POST(request: NextRequest) {
       }
 
       // Debit: skip internal movements
-      if (CBA_DEBIT_SKIP.some((s) => upper.includes(s))) continue;
+      if (EXPENSE_SKIP.some((s) => upper.includes(s))) continue;
       amount = rawAmount;
     } else {
       dateStr = cols[colIdx.date] ?? "";
       description = (cols[colIdx.description] ?? "").replace(/^"(.*)"$/, "$1").trim();
       if (!dateStr || !description) continue;
+
+      if (EXPENSE_SKIP.some((s) => description.toUpperCase().includes(s))) continue;
 
       if (bank === "AMEX") {
         const parsed = parseAmount(cols[colIdx.amount] ?? "");
