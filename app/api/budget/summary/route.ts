@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabase, getWeekStart } from "../../../lib/supabase";
+import { supabase, getLastWeekStart } from "../../../lib/supabase";
 
 const PANEL_KEYS = ["housing", "transport", "groceries", "eating_out", "subscriptions", "ecom"] as const;
 type PanelKey = typeof PANEL_KEYS[number];
@@ -34,7 +34,7 @@ function aggregate(rows: { category: string; amount: number }[]): {
 }
 
 export async function GET() {
-  const weekStart = getWeekStart();
+  const weekStart = getLastWeekStart();
 
   const prevDate = new Date(weekStart);
   prevDate.setDate(prevDate.getDate() - 7);

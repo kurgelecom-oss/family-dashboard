@@ -21,6 +21,14 @@ interface SummaryData {
   last_updated: string | null;
 }
 
+interface NetPosition {
+  total_income: number;
+  total_spend: number;
+  net: number;
+  surplus: boolean;
+  income_breakdown: { source: string; label: string; amount: number }[];
+}
+
 function formatWeekLabel(isoDate: string): string {
   const mon = new Date(isoDate + "T00:00:00");
   const sun = new Date(mon);
@@ -41,13 +49,19 @@ function formatLastUpdated(iso: string): string {
 
 export default function PanelBudget() {
   const [data, setData] = useState<SummaryData | null>(null);
+  const [netPos, setNetPos] = useState<NetPosition | null>(null);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/budget/summary");
-      if (res.ok) setData(await res.json());
+      await fetch("/api/income/sync");
+      const [summaryRes, netRes] = await Promise.all([
+        fetch("/api/budget/summary"),
+        fetch("/api/net-position"),
+      ]);
+      if (summaryRes.ok) setData(await summaryRes.json());
+      if (netRes.ok) setNetPos(await netRes.json());
     } finally {
       setLoading(false);
     }
@@ -108,17 +122,41 @@ export default function PanelBudget() {
         </div>
       </div>
 
-      {/* Income note */}
-      {!loading && (data?.income ?? 0) > 0 && (
-        <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 4 }}>
-          <span style={{ color: "var(--green)", fontWeight: 700 }}>${data!.income.toFixed(0)}</span>
-          {" "}income this week · Shopify tracked separately
-        </div>
-      )}
-
       <div className="divider" />
 
       <div style={{ flex: 1, overflowY: "auto" }}>
+        {/* Income + Net Position */}
+        {mounted && netPos && (
+          <div style={{ marginBottom: 12, paddingBottom: 10, borderBottom: "1px solid var(--border)" }}>
+            {netPos.income_breakdown.map((item) => (
+              <div key={item.source} style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{item.label}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--green)", fontVariantNumeric: "tabular-nums" }}>
+                  +${item.amount.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            ))}
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)" }}>Total In</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--green)", fontVariantNumeric: "tabular-nums" }}>
+                +${netPos.total_income.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 2 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)" }}>Total Spent</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--red)", fontVariantNumeric: "tabular-nums" }}>
+                -${netPos.total_spend.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, paddingTop: 6, borderTop: "1px solid var(--border)" }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>Net</span>
+              <span style={{ fontSize: 15, fontWeight: 800, fontVariantNumeric: "tabular-nums", color: netPos.surplus ? "var(--green)" : "var(--red)" }}>
+                {netPos.surplus ? "+" : "-"}${Math.abs(netPos.net).toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Overall progress bar */}
         <div style={{ marginBottom: 10 }}>
           <div className="progress-row">

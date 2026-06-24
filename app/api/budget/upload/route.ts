@@ -122,8 +122,8 @@ function getLastWeekStartAEST(): string {
   return lastMonday.toISOString().split("T")[0];
 }
 
-// CBA headerless: skip internal/salary movements and all credits
-const CBA_HEADERLESS_SKIP = ["TRANSFER TO ING", "DIRECT CREDIT", "MONTHLY FEE"];
+// CBA headerless: debit-side movements to skip (credits handled separately)
+const CBA_DEBIT_SKIP = ["TRANSFER TO ING", "MONTHLY FEE"];
 
 interface Transaction {
   upload_date: string;
@@ -202,6 +202,8 @@ export async function POST(request: NextRequest) {
   const thisWeekTransactions: Transaction[] = [];
   let total_parsed = 0;
   let skipped_outside_week = 0;
+  // Accumulate CUSTM salary credits to upsert into weekly_income after the loop
+  let salaryTotal = 0;
 
   for (let i = dataStartIdx; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -218,10 +220,23 @@ export async function POST(request: NextRequest) {
       dateStr = cols[0] ?? "";
       description = (cols[2] ?? "").trim();
       const rawAmount = parseAmount(cols[1] ?? "");
-      // Only debits (negative amounts) are expenses; skip credits, zero, and internal movements
-      if (!dateStr || !description || rawAmount === null || rawAmount >= 0) continue;
+      if (!dateStr || !description || rawAmount === null || rawAmount === 0) continue;
+
       const upper = description.toUpperCase();
-      if (CBA_HEADERLESS_SKIP.some((s) => upper.includes(s))) continue;
+
+      if (rawAmount > 0) {
+        // Credit: capture CUSTM salary; ignore all other credits
+        if (upper.includes("DIRECT CREDIT") && upper.includes("CUSTM")) {
+          const isoDate = parseDateToISO(dateStr);
+          if (isoDate && getMondayOfDate(isoDate) === currentWeekStart) {
+            salaryTotal += rawAmount;
+          }
+        }
+        continue; // credits never go into weekly_transactions
+      }
+
+      // Debit: skip internal movements
+      if (CBA_DEBIT_SKIP.some((s) => upper.includes(s))) continue;
       amount = rawAmount;
     } else {
       dateStr = cols[colIdx.date] ?? "";
@@ -302,6 +317,14 @@ export async function POST(request: NextRequest) {
     if (t.amount >= 0) { incomeCount++; continue; }
     expenseCount++;
     categoryCounts[t.category] = (categoryCounts[t.category] ?? 0) + 1;
+  }
+
+  // Upsert CUSTM salary into weekly_income if found
+  if (salaryTotal > 0) {
+    await supabase.from("weekly_income").upsert(
+      { week_start: currentWeekStart, source: "salary", label: "CUSTM Salary", amount: Math.round(salaryTotal * 100) / 100 },
+      { onConflict: "week_start,source" }
+    );
   }
 
   const displayBank = isCbaHeaderless ? "cba" : (bank as string);
