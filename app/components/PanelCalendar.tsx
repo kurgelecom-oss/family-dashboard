@@ -88,13 +88,13 @@ export default function PanelCalendar() {
   }, [loadCalendar]);
 
   return (
-    <div className="panel col-5" style={{ display: "flex", flexDirection: "column" }}>
-      <div className="panel-title">Family Calendar · Upcoming</div>
+    <div className="panel">
+      <div className="panel-title" style={{ flexShrink: 0 }}>Family Calendar · Upcoming</div>
 
-      <div className="divider" />
+      <div className="divider" style={{ flexShrink: 0 }} />
 
-      {/* ── Upcoming events (scrollable) ── */}
-      <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
+      {/* ── Upcoming events — clipped, no scroll ── */}
+      <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column", gap: 8 }}>
 
         {missing.length > 0 && !calLoading && (
           <div style={{
@@ -112,7 +112,7 @@ export default function PanelCalendar() {
         )}
 
         {!calLoading && ACCOUNTS.map(acct => {
-          const personEvents = events.filter(e => e.account === acct.key);
+          const personEvents = events.filter(e => e.account === acct.key).slice(0, 2);
           const notConnected = missing.some(m =>
             m === (acct.key === "TAYLAN" ? "taylan.k8@hotmail.com" :
                    acct.key === "NIHAL"  ? "nils_gvi@hotmail.com"  :
@@ -124,25 +124,25 @@ export default function PanelCalendar() {
             <div key={acct.key}>
               <div style={{
                 fontSize: 10, fontWeight: 700, textTransform: "uppercase",
-                letterSpacing: "0.08em", color, marginBottom: 4,
+                letterSpacing: "0.08em", color, marginBottom: 2,
               }}>
                 {acct.label}
               </div>
 
               {notConnected ? (
-                <div style={{ fontSize: 11, color: "var(--text-muted)", paddingLeft: 4 }}>Not connected</div>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", paddingLeft: 4 }}>Not connected</div>
               ) : personEvents.length === 0 ? (
-                <div style={{ fontSize: 11, color: "var(--text-muted)", paddingLeft: 4 }}>No upcoming events</div>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", paddingLeft: 4 }}>No upcoming events</div>
               ) : (
                 personEvents.map(e => (
-                  <div key={e.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 0" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                      <div style={{ width: 3, height: 28, borderRadius: 2, flexShrink: 0, background: color }} />
-                      <div className="list-name" style={{ fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <div key={e.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "2px 0" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                      <div style={{ width: 3, height: 20, borderRadius: 2, flexShrink: 0, background: color }} />
+                      <div style={{ fontSize: 11, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {e.subject || "(No title)"}
                       </div>
                     </div>
-                    <div style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0, marginLeft: 8 }}>
+                    <div style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0, marginLeft: 6 }}>
                       {e.isAllDay ? "all day" : countdown(e.startISO)}
                     </div>
                   </div>

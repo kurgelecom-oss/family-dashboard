@@ -32,15 +32,15 @@ export default function PanelGoals() {
   }, []);
 
   return (
-    <div className="panel col-7">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <div className="panel">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
         <div className="panel-title">Nihal · Ecom Goals</div>
         <span className={`badge ${actuals.loading ? "badge-cyan" : actuals.error ? "badge-red" : "badge-green"}`}>
           {actuals.loading ? "Loading…" : actuals.error ? "⚠ error" : "● Live · Shopify"}
         </span>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, flex: 1, minHeight: 0 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6, flex: 1, minHeight: 0 }}>
 
         {/* ── Goal cards: Daily / Weekly / Monthly ── */}
         {GOAL_CARDS.map((g) => {
@@ -57,7 +57,7 @@ export default function PanelGoals() {
           const ordersRemaining = Math.max(g.orders - actual.orders, 0);
 
           return (
-            <div className="stat-cell" key={g.label} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div className="stat-cell" key={g.label} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span className="num-label">{g.label}</span>
                 <span className={`badge ${badgeClass}`}>{badgeLabel}</span>
@@ -67,10 +67,9 @@ export default function PanelGoals() {
                 <div className="stat-num lg" style={{ color: g.color }}>
                   {fmtExact(g.revenue)}
                 </div>
-                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 1 }}>
                   {fmtExact(actual.revenue)} earned
                 </div>
-                <div className="stat-sublabel">Revenue needed</div>
               </div>
 
               <div className="divider" />
@@ -91,23 +90,18 @@ export default function PanelGoals() {
                     }}
                   />
                 </div>
-                {actuals.error && (
-                  <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 3 }}>
-                    · live data unavailable
-                  </div>
-                )}
               </div>
 
               <div style={{ marginTop: "auto" }}>
-                <div className="list-item" style={{ padding: "4px 0" }}>
+                <div className="list-item" style={{ padding: "2px 0" }}>
                   <span className="list-name">Orders remaining</span>
                   <span className="list-val">{ordersRemaining}</span>
                 </div>
-                <div className="list-item" style={{ padding: "4px 0" }}>
+                <div className="list-item" style={{ padding: "2px 0" }}>
                   <span className="list-name">Ad spend</span>
                   <span className="list-val">{fmtExact(g.adSpend)}</span>
                 </div>
-                <div className="list-item" style={{ padding: "4px 0" }}>
+                <div className="list-item" style={{ padding: "2px 0" }}>
                   <span className="list-name">Net profit</span>
                   <span className="list-val" style={{ color: "var(--green)" }}>{fmtExact(g.netProfit)}</span>
                 </div>
@@ -130,14 +124,10 @@ export default function PanelGoals() {
           const pctUsed     = Math.min(Math.round((msElapsed / TRACTION_WINDOW_MS) * 100), 100);
           const barColor    = pctUsed < 33 ? "var(--green)" : pctUsed < 75 ? "var(--amber)" : "var(--red)";
           return (
-            <div className="stat-cell" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div className="stat-cell" style={{ display: "flex", flexDirection: "column", gap: 5 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span className="num-label">Traction Window</span>
                 <span className="badge badge-cyan">Live Countdown</span>
-              </div>
-
-              <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: -4 }}>
-                Time to build income from scratch
               </div>
 
               <div className="progress-track">
@@ -149,7 +139,7 @@ export default function PanelGoals() {
                 <div style={{
                   fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
                   fontVariantNumeric: "tabular-nums",
-                  fontSize: "1.35rem",
+                  fontSize: "1.1rem",
                   fontWeight: 600,
                   color: "var(--cyan)",
                   letterSpacing: "0.05em",
@@ -158,21 +148,21 @@ export default function PanelGoals() {
                 }}>
                   {hh} : {mm} : {ss}
                 </div>
-                <div className="stat-sublabel" style={{ marginTop: 2 }}>remaining today</div>
+                <div className="stat-sublabel" style={{ marginTop: 1 }}>remaining today</div>
               </div>
 
               <div className="divider" />
 
               <div style={{ marginTop: "auto" }}>
-                <div className="list-item" style={{ padding: "4px 0" }}>
+                <div className="list-item" style={{ padding: "2px 0" }}>
                   <span className="list-name">Target date</span>
                   <span className="list-val">31 Dec 2026</span>
                 </div>
-                <div className="list-item" style={{ padding: "4px 0" }}>
+                <div className="list-item" style={{ padding: "2px 0" }}>
                   <span className="list-name">Days elapsed</span>
                   <span className="list-val" style={{ color: "var(--text-secondary)" }}>{daysElapsed}</span>
                 </div>
-                <div className="list-item" style={{ padding: "4px 0" }}>
+                <div className="list-item" style={{ padding: "2px 0" }}>
                   <span className="list-name">% of window used</span>
                   <span className="list-val" style={{ color: barColor }}>{pctUsed}%</span>
                 </div>

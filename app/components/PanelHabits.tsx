@@ -109,7 +109,7 @@ export default function PanelHabits() {
   const pct = Math.round((todayDone / BASE_HABITS.length) * 100);
 
   return (
-    <div className="panel col-4">
+    <div className="panel">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
           <div className="panel-title">Ansar · Daily Habits</div>
@@ -126,7 +126,7 @@ export default function PanelHabits() {
       </div>
 
       {/* STATS: today pts / weekly pts / streak */}
-      <div className="stat-grid stat-grid-3" style={{ flex: "0 0 auto" }}>
+      <div className="stat-grid stat-grid-3" style={{ flex: "0 0 auto", gap: 4 }}>
         <div className="stat-cell">
           <div className="stat-num lg cyan">{mounted ? todayPts : "—"}</div>
           <div className="stat-sublabel">Today</div>
@@ -146,7 +146,7 @@ export default function PanelHabits() {
 
       <div className="divider" />
 
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
         {BLOCKS.map(block => {
           const bHabits = BASE_HABITS.filter(h => h.block === block.id);
           const bDone = bHabits.filter(h => completed[h.id]).length;

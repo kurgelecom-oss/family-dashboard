@@ -10,14 +10,18 @@ export default function Dashboard() {
   return (
     <div className="dashboard">
       <Header />
-      <div className="grid">
-        {/* Row 1 */}
-        <PanelHabits />
-        <PanelEcom />
-        <PanelBudget />
-        {/* Row 2 */}
-        <PanelGoals />
-        <PanelCalendar />
+      <div className="dashboard-content">
+        {/* Top row: 55% — Goals + Ecom */}
+        <div className="dashboard-row-top">
+          <PanelGoals />
+          <PanelEcom />
+        </div>
+        {/* Bottom row: 45% — Budget + Calendar + Habits */}
+        <div className="dashboard-row-bottom">
+          <PanelBudget />
+          <PanelCalendar />
+          <PanelHabits />
+        </div>
       </div>
     </div>
   );

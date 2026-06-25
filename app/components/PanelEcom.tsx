@@ -176,7 +176,7 @@ export default function PanelEcom() {
   const plGpPct       = pickPl(pl, "gpPercent", "gp_percent", "gross_margin", "GrossMargin", "gp_margin");
 
   return (
-    <div className="panel col-4" style={{ overflow: "hidden" }}>
+    <div className="panel">
 
       {/* HEADER */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexShrink: 0 }}>
@@ -225,7 +225,7 @@ export default function PanelEcom() {
               onClick={() => { if (!saving) toggleWork(c.id); }}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "5px 8px", marginBottom: 3, borderRadius: 5, cursor: "pointer",
+                padding: "3px 6px", marginBottom: 2, borderRadius: 5, cursor: "pointer",
                 background: done ? "rgba(46,204,113,0.08)" : "var(--bg-panel-inner)",
                 border: `1px solid ${done ? "rgba(46,204,113,0.3)" : "var(--border)"}`,
                 transition: "all 0.15s ease",

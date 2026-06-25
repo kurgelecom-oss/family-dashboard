@@ -83,7 +83,7 @@ export default function PanelBudget() {
   const overBudget = CATEGORIES.some((c) => (cats[c.id] ?? 0) > c.target);
 
   return (
-    <div className="panel col-4">
+    <div className="panel">
 
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -110,7 +110,7 @@ export default function PanelBudget() {
       </div>
 
       {/* Spent / Remaining */}
-      <div className="stat-grid stat-grid-2" style={{ flex: "0 0 auto" }}>
+      <div className="stat-grid stat-grid-2" style={{ flex: "0 0 auto", gap: 4 }}>
         <div className="stat-cell">
           <div className="stat-num lg">${totalSpent.toFixed(0)}</div>
           <div className="stat-sublabel">Spent this week</div>
@@ -125,33 +125,33 @@ export default function PanelBudget() {
 
       <div className="divider" />
 
-      <div style={{ flex: 1, overflowY: "auto" }}>
+      <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
         {/* Income + Net Position */}
         {mounted && netPos && (
-          <div style={{ marginBottom: 12, paddingBottom: 10, borderBottom: "1px solid var(--border)" }}>
+          <div style={{ marginBottom: 5, paddingBottom: 5, borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
             {netPos.income_breakdown.map((item) => (
-              <div key={item.source} style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
-                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{item.label}</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--green)", fontVariantNumeric: "tabular-nums" }}>
+              <div key={item.source} style={{ display: "flex", justifyContent: "space-between", marginBottom: 1 }}>
+                <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{item.label}</span>
+                <span style={{ fontSize: 10, fontWeight: 600, color: "var(--green)", fontVariantNumeric: "tabular-nums" }}>
                   +${item.amount.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
             ))}
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)" }}>Total In</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--green)", fontVariantNumeric: "tabular-nums" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 2 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)" }}>Total In</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "var(--green)", fontVariantNumeric: "tabular-nums" }}>
                 +${netPos.total_income.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 2 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text-muted)" }}>Total Spent</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--red)", fontVariantNumeric: "tabular-nums" }}>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)" }}>Total Spent</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "var(--red)", fontVariantNumeric: "tabular-nums" }}>
                 -${netPos.total_spend.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, paddingTop: 6, borderTop: "1px solid var(--border)" }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>Net</span>
-              <span style={{ fontSize: 15, fontWeight: 800, fontVariantNumeric: "tabular-nums", color: netPos.surplus ? "var(--green)" : "var(--red)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3, paddingTop: 3, borderTop: "1px solid var(--border)" }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--text)" }}>Net</span>
+              <span style={{ fontSize: 12, fontWeight: 800, fontVariantNumeric: "tabular-nums", color: netPos.surplus ? "var(--green)" : "var(--red)" }}>
                 {netPos.surplus ? "+" : "-"}${Math.abs(netPos.net).toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
@@ -159,14 +159,14 @@ export default function PanelBudget() {
         )}
 
         {/* Overall progress bar */}
-        <div style={{ marginBottom: 10 }}>
+        <div style={{ marginBottom: 5, flexShrink: 0 }}>
           <div className="progress-row">
-            <span className="num-label">Total vs ${WEEKLY_TOTAL_TARGET.toFixed(2)}</span>
+            <span className="num-label">Total vs ${WEEKLY_TOTAL_TARGET.toFixed(0)}</span>
             <span className="num-label">
               {Math.min(Math.round((totalSpent / WEEKLY_TOTAL_TARGET) * 100), 100)}%
             </span>
           </div>
-          <div className="progress-track" style={{ height: 10 }}>
+          <div className="progress-track" style={{ height: 6 }}>
             <div
               className="progress-fill"
               style={{
@@ -193,29 +193,26 @@ export default function PanelBudget() {
           const hasArrow = lastWeek > 0 && Math.abs(diff) > 0.5;
 
           return (
-            <div key={cat.id} style={{ marginBottom: 8 }}>
+            <div key={cat.id} style={{ marginBottom: 4 }}>
               <div className="progress-row">
-                <span className="list-name">
+                <span style={{ fontSize: 10, color: "var(--text-secondary)" }}>
                   {cat.label}
-                  <span style={{ fontSize: 10, color: "var(--text-muted)", marginLeft: 4 }}>
-                    {cat.sub}
-                  </span>
                 </span>
-                <span style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                <span style={{ display: "flex", alignItems: "baseline", gap: 3 }}>
                   {hasArrow && (
-                    <span style={{ fontSize: 9, fontWeight: 700, color: diff > 0 ? "#e74c3c" : "#2ecc71" }}>
+                    <span style={{ fontSize: 8, fontWeight: 700, color: diff > 0 ? "#e74c3c" : "#2ecc71" }}>
                       {diff > 0 ? "↑" : "↓"}
                     </span>
                   )}
-                  <span className="list-val" style={{ color, fontSize: 12 }}>
+                  <span style={{ color, fontSize: 10, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
                     ${spent.toFixed(0)}
                     <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>
-                      {" "}/ ${cat.target.toFixed(0)}
+                      /{cat.target.toFixed(0)}
                     </span>
                   </span>
                 </span>
               </div>
-              <div className="progress-track">
+              <div className="progress-track" style={{ height: 4 }}>
                 <div className="progress-fill" style={{ width: `${pct}%`, background: color }} />
               </div>
             </div>
@@ -224,30 +221,22 @@ export default function PanelBudget() {
 
         {/* Other — catch-all, shown without a target bar */}
         {otherSpent > 0 && (
-          <div style={{ marginBottom: 8 }}>
+          <div style={{ marginBottom: 4 }}>
             <div className="progress-row">
-              <span className="list-name">
-                Other
-                <span style={{ fontSize: 10, color: "var(--text-muted)", marginLeft: 4 }}>Misc</span>
-              </span>
-              <span className="list-val" style={{ color: "var(--text-muted)", fontSize: 12 }}>
+              <span style={{ fontSize: 10, color: "var(--text-secondary)" }}>Other</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
                 ${otherSpent.toFixed(0)}
               </span>
             </div>
           </div>
         )}
 
-        {/* ING Balance row — no target, no progress bar */}
+        {/* ING Balance row */}
         {mounted && data?.balance != null && (
-          <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid var(--border)" }}>
+          <div style={{ marginTop: 4, paddingTop: 4, borderTop: "1px solid var(--border)" }}>
             <div className="progress-row">
-              <span className="list-name">
-                ING Balance
-                <span style={{ fontSize: 10, color: "var(--text-muted)", marginLeft: 4 }}>
-                  as of {formatWeekLabel(data.balance.week_start)}
-                </span>
-              </span>
-              <span className="list-val" style={{ color: "var(--cyan)", fontSize: 12 }}>
+              <span style={{ fontSize: 10, color: "var(--text-secondary)" }}>ING Balance</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: "var(--cyan)", fontVariantNumeric: "tabular-nums" }}>
                 ${data.balance.value.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
@@ -255,12 +244,6 @@ export default function PanelBudget() {
         )}
       </div>
 
-      {/* Last updated footer */}
-      {mounted && data?.last_updated && (
-        <div style={{ fontSize: 9, color: "var(--text-muted)", marginTop: 6, textAlign: "right" }}>
-          Last updated: {formatLastUpdated(data.last_updated)}
-        </div>
-      )}
     </div>
   );
 }
