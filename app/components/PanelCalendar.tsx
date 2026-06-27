@@ -88,29 +88,34 @@ export default function PanelCalendar() {
   }, [loadCalendar]);
 
   return (
-    <div className="panel">
-      <div className="panel-title" style={{ flexShrink: 0 }}>Family Calendar · Upcoming</div>
-
-      <div className="divider" style={{ flexShrink: 0 }} />
-
-      {/* ── Upcoming events — clipped, no scroll ── */}
-      <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column", gap: 8 }}>
-
-        {missing.length > 0 && !calLoading && (
-          <div style={{
-            background: "rgba(243,156,18,0.07)", border: "1px solid rgba(243,156,18,0.2)",
-            borderRadius: 5, padding: "6px 10px", fontSize: 10, color: "var(--amber)",
-          }}>
-            ⚠ Not connected: {missing.join(", ")} · Set MS_CAL_*_REFRESH in Netlify.
-          </div>
+    <div className="card">
+      <div className="card-header">
+        <div className="card-title">Family Calendar</div>
+        {!calLoading && missing.length === 0 && (
+          <span className="badge badge-green">● Live</span>
         )}
-
-        {calLoading && (
-          <div style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "center", padding: "20px 0" }}>
-            Loading calendar…
-          </div>
+        {!calLoading && missing.length > 0 && (
+          <span className="badge badge-amber">⚠ Partial</span>
         )}
+      </div>
 
+      {missing.length > 0 && !calLoading && (
+        <div style={{
+          background: "rgba(245,166,35,0.07)", border: "1px solid rgba(245,166,35,0.2)",
+          borderRadius: 5, padding: "5px 8px", fontSize: 10, color: "var(--amber)",
+          marginBottom: 8, flexShrink: 0,
+        }}>
+          ⚠ Not connected: {missing.join(", ")}
+        </div>
+      )}
+
+      {calLoading && (
+        <div style={{ fontSize: 12, color: "var(--text-muted)", padding: "12px 0" }}>
+          Loading calendar…
+        </div>
+      )}
+
+      <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column", gap: 10 }}>
         {!calLoading && ACCOUNTS.map(acct => {
           const personEvents = events.filter(e => e.account === acct.key).slice(0, 2);
           const notConnected = missing.some(m =>
@@ -123,26 +128,26 @@ export default function PanelCalendar() {
           return (
             <div key={acct.key}>
               <div style={{
-                fontSize: 10, fontWeight: 700, textTransform: "uppercase",
-                letterSpacing: "0.08em", color, marginBottom: 2,
+                fontSize: 11, fontWeight: 700, textTransform: "uppercase",
+                letterSpacing: "0.06em", color, marginBottom: 4,
               }}>
                 {acct.label}
               </div>
 
               {notConnected ? (
-                <div style={{ fontSize: 10, color: "var(--text-muted)", paddingLeft: 4 }}>Not connected</div>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", paddingLeft: 4 }}>Not connected</div>
               ) : personEvents.length === 0 ? (
-                <div style={{ fontSize: 10, color: "var(--text-muted)", paddingLeft: 4 }}>No upcoming events</div>
+                <div style={{ fontSize: 11, color: "var(--text-muted)", paddingLeft: 4 }}>No upcoming events</div>
               ) : (
                 personEvents.map(e => (
-                  <div key={e.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "2px 0" }}>
+                  <div key={e.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "3px 0" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                       <div style={{ width: 3, height: 20, borderRadius: 2, flexShrink: 0, background: color }} />
-                      <div style={{ fontSize: 11, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div style={{ fontSize: 12, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {e.subject || "(No title)"}
                       </div>
                     </div>
-                    <div style={{ fontSize: 10, color: "var(--text-muted)", flexShrink: 0, marginLeft: 6 }}>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)", flexShrink: 0, marginLeft: 6 }}>
                       {e.isAllDay ? "all day" : countdown(e.startISO)}
                     </div>
                   </div>
@@ -153,13 +158,11 @@ export default function PanelCalendar() {
         })}
 
         {!calLoading && events.length === 0 && missing.length === 0 && (
-          <div style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "center", padding: "20px 0" }}>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "center", padding: "12px 0" }}>
             No upcoming events.
           </div>
         )}
-
       </div>
-
     </div>
   );
 }

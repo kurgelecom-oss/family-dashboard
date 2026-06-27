@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 
 const MONTHLY_TARGET = 15000;
-const PL_POLL_MS = 5 * 60 * 1000; // 5 minutes
+const PL_POLL_MS = 5 * 60 * 1000;
 
 type ShopifyData = {
   todayOrders: number;
@@ -28,6 +28,67 @@ function pickPl(d: PlData | null, ...keys: string[]): number | undefined {
     }
   }
   return undefined;
+}
+
+function fmt(n: number) {
+  return n >= 1000
+    ? `$${(n / 1000).toFixed(1)}k`
+    : `$${n.toLocaleString("en-AU", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+}
+
+function fmtVal(v: number | undefined) { return v !== undefined ? fmt(v) : "—"; }
+function fmtRoas(v: number | undefined) { return v !== undefined ? `${v.toFixed(2)}×` : "—"; }
+function fmtPct(v: number | undefined) { return v !== undefined ? `${v.toFixed(1)}%` : "—"; }
+
+function MonthlySparkline({
+  monthRevenue,
+  target,
+  loading,
+}: {
+  monthRevenue: number;
+  target: number;
+  loading: boolean;
+}) {
+  const now = new Date();
+  const todayDay = now.getDate();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
+  const W = 200;
+  const H = 48;
+  const PAD = 3;
+
+  const xOf = (d: number) => PAD + (d / daysInMonth) * (W - PAD * 2);
+  const yOf = (v: number) => H - PAD - (Math.min(v, target * 1.15) / (target * 1.15)) * (H - PAD * 2);
+
+  const ax1 = xOf(0), ay1 = H - PAD;
+  const ax2 = xOf(todayDay), ay2 = yOf(monthRevenue);
+  const tx2 = xOf(daysInMonth), ty2 = PAD + 2;
+
+  if (loading) {
+    return <div style={{ height: H, background: "var(--progress-track)", borderRadius: 4 }} />;
+  }
+
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      style={{ width: "100%", height: H, display: "block" }}
+      preserveAspectRatio="none"
+    >
+      <line
+        x1={ax1} y1={ay1} x2={tx2} y2={ty2}
+        stroke="var(--amber)" strokeWidth="1.5" strokeDasharray="5 3" opacity="0.55"
+      />
+      <line
+        x1={ax1} y1={ay1} x2={ax2} y2={ay2}
+        stroke="var(--cyan)" strokeWidth="2" strokeLinecap="round"
+      />
+      <circle cx={ax2} cy={ay2} r="3.5" fill="var(--cyan)" />
+      <line
+        x1={ax2} y1={0} x2={ax2} y2={H}
+        stroke="rgba(255,255,255,0.08)" strokeWidth="1"
+      />
+    </svg>
+  );
 }
 
 export default function PanelEcom() {
@@ -77,109 +138,147 @@ export default function PanelEcom() {
     return () => { clearInterval(i1); clearInterval(i2); };
   }, [loadShopify, loadPl]);
 
-  const fmt = (n: number) =>
-    n >= 1000
-      ? `$${(n / 1000).toFixed(1)}k`
-      : `$${n.toLocaleString("en-AU", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-
-  const fmtVal = (v: number | undefined) => (v !== undefined ? fmt(v) : "—");
-  const fmtRoas = (v: number | undefined) => (v !== undefined ? `${v.toFixed(2)}x` : "—");
-  const fmtPct = (v: number | undefined) => (v !== undefined ? `${v.toFixed(1)}%` : "—");
-
   const monthPct = data ? Math.min(Math.round((data.monthRevenue / MONTHLY_TARGET) * 100), 100) : 0;
   const hasError = !!data?.error;
 
   const pl = (plStale ? plLastGood : plData) ?? null;
-  const plRevenue     = pickPl(pl, "revenue", "Revenue", "total_revenue", "sales", "Sales");
-  const plCogs        = pickPl(pl, "cogs", "COGS", "cost_of_goods", "costOfGoods");
-  const plGrossProfit = pickPl(pl, "grossProfit", "gross_profit", "GrossProfit", "gp", "GP");
-  const plAdSpend     = pickPl(pl, "adSpend", "ad_spend", "AdSpend", "advertising", "ads");
-  const plRoas        = pickPl(pl, "roas", "ROAS", "return_on_ad_spend");
-  const plGpPct       = pickPl(pl, "gpPercent", "gp_percent", "gross_margin", "GrossMargin", "gp_margin");
+  const plRevenue     = pickPl(pl, "revenue",     "Revenue",      "total_revenue",  "sales",       "Sales");
+  const plCogs        = pickPl(pl, "cogs",         "COGS",        "cost_of_goods",  "costOfGoods");
+  const plGrossProfit = pickPl(pl, "grossProfit",  "gross_profit","GrossProfit",    "gp",          "GP");
+  const plAdSpend     = pickPl(pl, "adSpend",      "ad_spend",    "AdSpend",        "advertising", "ads");
+  const plRoas        = pickPl(pl, "roas",         "ROAS",        "return_on_ad_spend");
+  const plGpPct       = pickPl(pl, "gpPercent",    "gp_percent",  "gross_margin",   "GrossMargin", "gp_margin");
+
+  const monthLabel = mounted
+    ? new Date().toLocaleDateString("en-AU", { month: "long", year: "numeric" })
+    : "";
 
   return (
-    <div className="panel">
-
-      {/* HEADER */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexShrink: 0 }}>
-        <div>
-          <div className="panel-title">Nihal · Ecom Business</div>
-          <div className="panel-subtitle">
-            {mounted ? new Date().toLocaleDateString("en-AU", { month: "long", year: "numeric" }) : ""}
-            {hasError && <span style={{ color: "var(--red)", marginLeft: 6 }}>· auth error</span>}
-          </div>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+    <>
+      {/* ── Card 1: Revenue Today ── */}
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">Revenue Today</div>
           <span className={`badge ${loading ? "badge-cyan" : hasError ? "badge-red" : "badge-green"}`}>
-            {loading ? "Loading…" : hasError ? "⚠ Shopify error" : "● Live"}
+            {loading ? "Loading…" : hasError ? "⚠ Error" : "● Live"}
           </span>
-          <a
-            href="https://product-pl-tracker.netlify.app/"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              fontSize: 10, color: "#f59e0b", textDecoration: "none",
-              fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
-              background: "rgba(245,158,11,0.1)", padding: "2px 7px", borderRadius: 4,
-              border: "1px solid rgba(245,158,11,0.2)",
-            }}
-          >
-            P&amp;L →
-          </a>
-        </div>
-      </div>
-
-      {/* TODAY STATS — compact */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, flexShrink: 0 }}>
-        <div className="stat-cell">
-          <div className="stat-num sm cyan">{loading ? "—" : fmt(data?.todayRevenue ?? 0)}</div>
-          <div className="stat-sublabel">Revenue today</div>
-        </div>
-        <div className="stat-cell">
-          <div className="stat-num sm">{loading ? "—" : (data?.todayOrders ?? 0)}</div>
-          <div className="stat-sublabel">Orders today</div>
-        </div>
-      </div>
-
-      <div className="divider" />
-
-      {/* P&L + PROGRESS — fills remaining space, clipped not scrolled */}
-      <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 3 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "var(--text-muted)" }}>
-            P&amp;L · This Month
-          </span>
-          {plStale && <span style={{ fontSize: 9, color: "var(--amber)", fontWeight: 700, textTransform: "uppercase" }}>⚠ stale</span>}
-          {plLoading && !plStale && <span style={{ fontSize: 9, color: "var(--text-muted)" }}>loading…</span>}
         </div>
 
-        {[
-          { label: "Revenue",      val: fmtVal(plRevenue),     color: "var(--cyan)" },
-          { label: "COGS",         val: fmtVal(plCogs),         color: "var(--text-secondary)" },
-          { label: "Gross Profit", val: fmtVal(plGrossProfit),  color: plGrossProfit !== undefined && plGrossProfit > 0 ? "var(--green)" : "var(--text-secondary)" },
-          { label: "Ad Spend",     val: fmtVal(plAdSpend),      color: "var(--text-secondary)" },
-          { label: "ROAS",         val: fmtRoas(plRoas),        color: plRoas !== undefined && plRoas >= 2 ? "var(--green)" : "var(--text-secondary)" },
-          { label: "GP%",          val: fmtPct(plGpPct),        color: "var(--text-secondary)" },
-          { label: "Month revenue", val: loading ? "—" : fmt(data?.monthRevenue ?? 0), color: "var(--green)" },
-          { label: "Target",        val: fmt(MONTHLY_TARGET),    color: "var(--text-secondary)" },
-        ].map((row) => (
-          <div key={row.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "3px 0", borderBottom: "1px solid var(--border)" }}>
-            <span className="list-name">{row.label}</span>
-            <span className="list-val" style={{ color: row.color }}>{row.val}</span>
+        <div className="stat-pair" style={{ flex: 1 }}>
+          <div className="stat-box">
+            <div className="stat-box-num cyan">
+              {loading ? "—" : fmt(data?.todayRevenue ?? 0)}
+            </div>
+            <div className="stat-box-label">Revenue</div>
           </div>
-        ))}
-
-        <div style={{ marginTop: 6 }}>
-          <div className="progress-row">
-            <span className="num-label">Monthly progress</span>
-            <span className="num-label">{loading ? "—" : `${monthPct}%`}</span>
-          </div>
-          <div className="progress-track">
-            <div className="progress-fill" style={{ width: `${monthPct}%`, background: "var(--cyan)" }} />
+          <div className="stat-box">
+            <div className="stat-box-num">
+              {loading ? "—" : (data?.todayOrders ?? 0)}
+            </div>
+            <div className="stat-box-label">Orders</div>
           </div>
         </div>
       </div>
 
-    </div>
+      {/* ── Card 2: Revenue This Month ── */}
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">This Month</div>
+          <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{monthLabel}</span>
+        </div>
+
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, gap: 10 }}>
+          <div>
+            <div className="hero-num sm green">
+              {loading ? "—" : fmt(data?.monthRevenue ?? 0)}
+            </div>
+            <div className="sub-label">toward ${(MONTHLY_TARGET / 1000).toFixed(0)}k target</div>
+            <div className={`delta ${monthPct >= 50 ? "up" : "down"}`}>
+              {monthPct >= 100 ? "▲ Target reached!" : monthPct >= 50 ? `▲ ${monthPct}% of target` : `▼ ${monthPct}% of target`}
+            </div>
+          </div>
+
+          <div>
+            <div className="progress-row">
+              <span style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                Monthly progress
+              </span>
+              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                {loading ? "—" : `${monthPct}%`}
+              </span>
+            </div>
+            <div className="progress-track">
+              <div className="progress-fill" style={{ width: `${monthPct}%`, background: "var(--cyan)" }} />
+            </div>
+          </div>
+
+          <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
+            <MonthlySparkline
+              monthRevenue={data?.monthRevenue ?? 0}
+              target={MONTHLY_TARGET}
+              loading={loading}
+            />
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+              <span style={{ fontSize: 10, color: "var(--cyan)", fontWeight: 600 }}>— Actual</span>
+              <span style={{ fontSize: 10, color: "var(--amber)", fontWeight: 600 }}>-- Target pace</span>
+            </div>
+          </div>
+
+          <div>
+            <a
+              href="https://product-pl-tracker.netlify.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                fontSize: 10, color: "var(--amber)", textDecoration: "none",
+                fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
+                background: "rgba(245,166,35,0.1)", padding: "2px 7px", borderRadius: 4,
+                border: "1px solid rgba(245,166,35,0.2)", display: "inline-flex",
+              }}
+            >
+              P&amp;L Tracker →
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Card 3: P&L This Month ── */}
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">P&amp;L · This Month</div>
+          {plStale && <span className="badge badge-amber">⚠ Stale</span>}
+          {plLoading && !plStale && <span className="badge badge-cyan">Loading…</span>}
+        </div>
+
+        <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+          {[
+            { label: "Revenue",      val: fmtVal(plRevenue),                                                                   color: "var(--cyan)" },
+            { label: "COGS",         val: fmtVal(plCogs),                                                                      color: "var(--text-secondary)" },
+            { label: "Gross Profit", val: fmtVal(plGrossProfit), color: plGrossProfit !== undefined && plGrossProfit > 0 ? "var(--green)" : "var(--text-secondary)" },
+            { label: "Ad Spend",     val: fmtVal(plAdSpend),                                                                   color: "var(--text-secondary)" },
+            { label: "ROAS",         val: fmtRoas(plRoas),       color: plRoas !== undefined && plRoas >= 2 ? "var(--green)" : "var(--text-secondary)" },
+            { label: "GP%",          val: fmtPct(plGpPct),                                                                     color: "var(--text-secondary)" },
+          ].map((row) => (
+            <div className="list-row" key={row.label}>
+              <span className="list-label">{row.label}</span>
+              <span className="list-value" style={{ color: row.color }}>{row.val}</span>
+            </div>
+          ))}
+
+          <div className="divider" style={{ margin: "4px 0" }} />
+
+          <div className="list-row">
+            <span className="list-label">Month revenue</span>
+            <span className="list-value" style={{ color: "var(--green)" }}>
+              {loading ? "—" : fmt(data?.monthRevenue ?? 0)}
+            </span>
+          </div>
+          <div className="list-row">
+            <span className="list-label">Target</span>
+            <span className="list-value" style={{ color: "var(--text-secondary)" }}>{fmt(MONTHLY_TARGET)}</span>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }

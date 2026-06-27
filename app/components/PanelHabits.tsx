@@ -3,32 +3,32 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase, getTodayDate, getWeekStart } from "../lib/supabase";
 
 const HABITS = [
-  { id: "wake",      block: "pre",    points: 0 },
-  { id: "fajr",      block: "pre",    points: 0 },
-  { id: "bed",       block: "pre",    points: 0 },
-  { id: "movement",  block: "pre",    points: 0 },
-  { id: "breakfast", block: "pre",    points: 0 },
-  { id: "quran",     block: "pre",    points: 0 },
-  { id: "goals",     block: "pre",    points: 2 },
-  { id: "school",    block: "school", points: 3 },
-  { id: "readtheory",block: "school", points: 1 },
-  { id: "khan",      block: "school", points: 1 },
-  { id: "journal",   block: "school", points: 1 },
-  { id: "soccer",    block: "arvo",   points: 2 }, // conditional Mon/Wed — counted if present
-  { id: "btn",       block: "arvo",   points: 1 },
-  { id: "namaz",     block: "arvo",   points: 1 },
-  { id: "room",      block: "arvo",   points: 0 },
-  { id: "shower",    block: "arvo",   points: 0 },
-  { id: "teeth",     block: "arvo",   points: 0 },
-  { id: "reading",   block: "arvo",   points: 1 },
+  { id: "wake",       block: "pre",    points: 0 },
+  { id: "fajr",       block: "pre",    points: 0 },
+  { id: "bed",        block: "pre",    points: 0 },
+  { id: "movement",   block: "pre",    points: 0 },
+  { id: "breakfast",  block: "pre",    points: 0 },
+  { id: "quran",      block: "pre",    points: 0 },
+  { id: "goals",      block: "pre",    points: 2 },
+  { id: "school",     block: "school", points: 3 },
+  { id: "readtheory", block: "school", points: 1 },
+  { id: "khan",       block: "school", points: 1 },
+  { id: "journal",    block: "school", points: 1 },
+  { id: "soccer",     block: "arvo",   points: 2 },
+  { id: "btn",        block: "arvo",   points: 1 },
+  { id: "namaz",      block: "arvo",   points: 1 },
+  { id: "room",       block: "arvo",   points: 0 },
+  { id: "shower",     block: "arvo",   points: 0 },
+  { id: "teeth",      block: "arvo",   points: 0 },
+  { id: "reading",    block: "arvo",   points: 1 },
 ];
 
 const HABIT_POINTS: Record<string, number> = Object.fromEntries(HABITS.map(h => [h.id, h.points]));
 
-const BASE_HABITS = HABITS.filter(h => h.id !== "soccer"); // non-conditional count for display
+const BASE_HABITS = HABITS.filter(h => h.id !== "soccer");
 const BLOCKS = [
-  { id: "pre",    label: "Pre-School", color: "#f59e0b" },
-  { id: "school", label: "Homeschool", color: "#00c9ff" },
+  { id: "pre",    label: "Pre-School", color: "var(--amber)" },
+  { id: "school", label: "Homeschool", color: "var(--cyan)" },
   { id: "arvo",   label: "Evening",    color: "#a78bfa" },
 ];
 
@@ -39,7 +39,6 @@ export default function PanelHabits() {
   const [streak, setStreak] = useState<number | null>(null);
 
   const load = useCallback(async () => {
-    // Today's completions
     const { data, error } = await supabase
       .from("habit_completions")
       .select("habit_id")
@@ -50,7 +49,6 @@ export default function PanelHabits() {
       setCompleted(map);
     }
 
-    // Weekly points
     const weekStart = getWeekStart();
     const today = getTodayDate();
     const { data: weekData, error: weekErr } = await supabase
@@ -60,13 +58,10 @@ export default function PanelHabits() {
       .lte("completed_date", today);
     if (!weekErr && weekData) {
       let total = 0;
-      weekData.forEach((r: { habit_id: string }) => {
-        total += HABIT_POINTS[r.habit_id] || 0;
-      });
+      weekData.forEach((r: { habit_id: string }) => { total += HABIT_POINTS[r.habit_id] || 0; });
       setWeeklyPts(total);
     }
 
-    // Streak: consecutive days with >=5 completions
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 60);
     const cutoffStr = cutoff.toISOString().split("T")[0];
@@ -109,43 +104,48 @@ export default function PanelHabits() {
   const pct = Math.round((todayDone / BASE_HABITS.length) * 100);
 
   return (
-    <div className="panel">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div>
-          <div className="panel-title">Ansar · Daily Habits</div>
-          <div className="panel-subtitle">
-            Live · {mounted ? new Date().toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" }) : ""}
-          </div>
-        </div>
-        <a href="/ansar" style={{
-          fontSize: 10, color: "#f59e0b", textDecoration: "none",
-          fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
-          background: "rgba(245,158,11,0.1)", padding: "3px 8px", borderRadius: 4,
-          border: "1px solid rgba(245,158,11,0.2)",
-        }}>Ansar&apos;s Page →</a>
+    <div className="card">
+      <div className="card-header">
+        <div className="card-title">Ansar · Habits</div>
+        <a
+          href="/ansar"
+          style={{
+            fontSize: 10, color: "var(--amber)", textDecoration: "none",
+            fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
+            background: "rgba(245,166,35,0.1)", padding: "2px 7px", borderRadius: 4,
+            border: "1px solid rgba(245,166,35,0.2)", display: "inline-flex",
+          }}
+        >
+          Full page →
+        </a>
       </div>
 
-      {/* STATS: today pts / weekly pts / streak */}
-      <div className="stat-grid stat-grid-3" style={{ flex: "0 0 auto", gap: 4 }}>
-        <div className="stat-cell">
-          <div className="stat-num lg cyan">{mounted ? todayPts : "—"}</div>
-          <div className="stat-sublabel">Today</div>
+      {/* Hero stats */}
+      <div className="stat-pair" style={{ flex: "0 0 auto" }}>
+        <div className="stat-box">
+          <div className="stat-box-num cyan">{mounted ? todayPts : "—"}</div>
+          <div className="stat-box-label">Today pts</div>
         </div>
-        <div className="stat-cell">
-          <div className="stat-num lg" style={{ color: "#2ecc71" }}>{mounted && weeklyPts !== null ? weeklyPts : "—"}</div>
-          <div className="stat-sublabel">This week</div>
-        </div>
-        <div className="stat-cell">
-          <div className="stat-num lg" style={{ color: "#a78bfa", display: "flex", alignItems: "center", gap: 3, justifyContent: "center" }}>
-            {mounted && streak !== null ? streak : "—"}
-            {mounted && streak !== null && streak > 0 && <span style={{ fontSize: 14 }}>🔥</span>}
-          </div>
-          <div className="stat-sublabel">Streak</div>
+        <div className="stat-box">
+          <div className="stat-box-num green">{mounted && weeklyPts !== null ? weeklyPts : "—"}</div>
+          <div className="stat-box-label">This week</div>
         </div>
       </div>
 
-      <div className="divider" />
+      {/* Streak */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, flexShrink: 0 }}>
+        <span style={{ fontSize: 22, fontWeight: 700, color: "#a78bfa", fontVariantNumeric: "tabular-nums" }}>
+          {mounted && streak !== null ? streak : "—"}
+        </span>
+        {mounted && streak !== null && streak > 0 && <span style={{ fontSize: 14 }}>🔥</span>}
+        <span style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+          day streak
+        </span>
+      </div>
 
+      <div className="divider" style={{ margin: "8px 0" }} />
+
+      {/* Block progress */}
       <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
         {BLOCKS.map(block => {
           const bHabits = BASE_HABITS.filter(h => h.block === block.id);
@@ -153,8 +153,8 @@ export default function PanelHabits() {
           return (
             <div key={block.id} style={{ marginBottom: 8 }}>
               <div className="progress-row">
-                <span className="list-name">{block.label}</span>
-                <span className="list-val" style={{ fontSize: 12, color: block.color }}>{bDone}/{bHabits.length}</span>
+                <span className="list-label">{block.label}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: block.color }}>{bDone}/{bHabits.length}</span>
               </div>
               <div className="progress-track">
                 <div className="progress-fill" style={{
@@ -167,17 +167,18 @@ export default function PanelHabits() {
         })}
       </div>
 
-      <div className="divider" />
+      <div className="divider" style={{ margin: "4px 0 6px" }} />
 
-      <div>
+      {/* Daily overall */}
+      <div style={{ flexShrink: 0 }}>
         <div className="progress-row">
-          <span className="num-label">Daily progress</span>
-          <span className="num-label">{mounted ? pct : 0}%</span>
+          <span style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>Daily progress</span>
+          <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{mounted ? pct : 0}%</span>
         </div>
-        <div className="progress-track" style={{ height: 10 }}>
+        <div className="progress-track thick">
           <div className="progress-fill" style={{
             width: mounted ? `${pct}%` : "0%",
-            background: "linear-gradient(90deg, #f59e0b, #2ecc71)",
+            background: "linear-gradient(90deg, var(--amber), var(--green))",
           }} />
         </div>
       </div>
