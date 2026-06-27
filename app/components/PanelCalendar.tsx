@@ -75,68 +75,74 @@ function countdown(iso: string): string {
   return eventDate.toLocaleDateString("en-AU", { day: "numeric", month: "short" });
 }
 
-function ToastContainer({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id: string) => void }) {
+function BannerContainer({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id: string) => void }) {
   if (toasts.length === 0) return null;
 
   return (
-    <div style={{
-      position:      "fixed",
-      top:           64,
-      right:         16,
-      zIndex:        9999,
-      display:       "flex",
-      flexDirection: "column",
-      gap:           8,
-      pointerEvents: "none",
-    }}>
-      {toasts.map(toast => (
-        <div key={toast.id} style={{
-          pointerEvents: "auto",
-          background:    "var(--bg-card)",
-          border:        "1px solid var(--border)",
-          borderLeft:    `4px solid ${toast.personColor}`,
-          borderRadius:  8,
-          padding:       "12px 16px",
-          boxShadow:     "0 4px 16px rgba(0,0,0,0.2)",
-          minWidth:      280,
-          maxWidth:      360,
-          position:      "relative",
-        }}>
-          <div style={{
-            fontSize:     14,
-            fontWeight:   600,
-            color:        "var(--text-primary)",
-            paddingRight: 20,
-            marginBottom: 4,
-            overflow:     "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace:   "nowrap",
-          }}>
-            {toast.subject || "(No title)"}
-          </div>
-          <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-            starts in {toast.minsUntil} min
+    <>
+      <style>{`
+        @keyframes bannerSlideDown {
+          from { transform: translateY(-100%); }
+          to   { transform: translateY(0); }
+        }
+      `}</style>
+      {toasts.map((toast, index) => (
+        <div
+          key={toast.id}
+          style={{
+            position:       "fixed",
+            top:            56 + index * 52,
+            left:           0,
+            right:          0,
+            zIndex:         9999,
+            width:          "100%",
+            background:     toast.personColor,
+            color:          "#ffffff",
+            padding:        "14px 24px",
+            display:        "flex",
+            alignItems:     "center",
+            justifyContent: "space-between",
+            boxShadow:      "0 4px 16px rgba(0,0,0,0.2)",
+            animation:      "bannerSlideDown 0.3s ease forwards",
+            boxSizing:      "border-box",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", minWidth: 0, overflow: "hidden" }}>
+            <div style={{
+              width:        10,
+              height:       10,
+              borderRadius: "50%",
+              background:   "rgba(255,255,255,0.6)",
+              marginRight:  10,
+              flexShrink:   0,
+            }} />
+            <span style={{ fontSize: 16, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {toast.subject || "(No title)"}
+            </span>
+            <span style={{ fontSize: 14, fontWeight: 400, color: "rgba(255,255,255,0.85)", marginLeft: 6, flexShrink: 0 }}>
+              {` — starts in ${toast.minsUntil} min`}
+            </span>
           </div>
           <button
             onClick={() => onDismiss(toast.id)}
             style={{
-              position:   "absolute",
-              top:        10,
-              right:      10,
-              background: "none",
-              border:     "none",
-              cursor:     "pointer",
-              fontSize:   14,
-              color:      "var(--text-secondary)",
-              padding:    "2px 4px",
-              lineHeight: 1,
+              background:   "rgba(0,0,0,0.15)",
+              border:       "1px solid rgba(255,255,255,0.3)",
+              borderRadius: 6,
+              padding:      "6px 14px",
+              cursor:       "pointer",
+              fontSize:     13,
+              fontWeight:   600,
+              color:        "#ffffff",
+              flexShrink:   0,
+              marginLeft:   16,
             }}
           >
-            ×
+            ✕ Dismiss
           </button>
         </div>
       ))}
-    </div>
+    </>
   );
 }
 
@@ -209,7 +215,7 @@ export default function PanelCalendar() {
 
   return (
     <>
-      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+      <BannerContainer toasts={toasts} onDismiss={dismissToast} />
 
       <div className="card">
         <div className="card-header">
