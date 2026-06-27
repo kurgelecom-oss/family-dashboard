@@ -45,8 +45,13 @@ type ToastItem = {
   personColor: string;
 };
 
+function parseEventTime(iso: string): number {
+  const hasTimezone = iso.endsWith("Z") || iso.includes("+") || (iso.length > 19 && iso.slice(10).includes("-"));
+  return new Date(hasTimezone ? iso : iso + "+10:00").getTime();
+}
+
 function countdown(iso: string): string {
-  const diffMs = new Date(iso).getTime() - Date.now();
+  const diffMs = parseEventTime(iso) - Date.now();
   if (diffMs <= 0) return "now";
 
   const mins  = Math.floor(diffMs / 60_000);
@@ -177,7 +182,7 @@ export default function PanelCalendar() {
       if (event.isAllDay) continue;
       if (toastedIds.current.has(event.id)) continue;
 
-      const diffMs = new Date(event.startISO).getTime() - now;
+      const diffMs = parseEventTime(event.startISO) - now;
       console.log(
         `[Calendar] "${event.subject}" | raw startISO: ${event.startISO} | now: ${new Date().toISOString()} | diffMs/60000: ${(diffMs / 60_000).toFixed(2)} min`
       );
