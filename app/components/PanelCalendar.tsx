@@ -178,7 +178,10 @@ export default function PanelCalendar() {
       if (toastedIds.current.has(event.id)) continue;
 
       const diffMs = new Date(event.startISO).getTime() - now;
-      if (diffMs >= -5 * 60_000 && diffMs <= threshold) {
+      console.log(
+        `[Calendar] "${event.subject}" | raw startISO: ${event.startISO} | now: ${new Date().toISOString()} | diffMs/60000: ${(diffMs / 60_000).toFixed(2)} min`
+      );
+      if (diffMs >= -15 * 60_000 && diffMs <= threshold) {
         const minsUntil   = Math.floor(diffMs / 60_000);
         const personColor = TOAST_COLORS[event.account] ?? "#6b7a99";
 
