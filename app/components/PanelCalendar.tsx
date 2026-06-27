@@ -1,6 +1,5 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { createPortal } from "react-dom";
 
 const COLOR_MAP: Record<string, string> = {
   cyan:  "var(--cyan)",
@@ -77,12 +76,12 @@ function countdown(iso: string): string {
 }
 
 function ToastContainer({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id: string) => void }) {
-  if (typeof document === "undefined" || toasts.length === 0) return null;
+  if (toasts.length === 0) return null;
 
-  return createPortal(
+  return (
     <div style={{
       position:      "fixed",
-      top:           72,
+      top:           64,
       right:         16,
       zIndex:        9999,
       display:       "flex",
@@ -98,7 +97,7 @@ function ToastContainer({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss:
           borderLeft:    `4px solid ${toast.personColor}`,
           borderRadius:  8,
           padding:       "12px 16px",
-          boxShadow:     "0 4px 12px rgba(0,0,0,0.12)",
+          boxShadow:     "0 4px 16px rgba(0,0,0,0.2)",
           minWidth:      280,
           maxWidth:      360,
           position:      "relative",
@@ -115,7 +114,7 @@ function ToastContainer({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss:
           }}>
             {toast.subject || "(No title)"}
           </div>
-          <div style={{ fontSize: 12, color: "#6b7a99" }}>
+          <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
             starts in {toast.minsUntil} min
           </div>
           <button
@@ -127,18 +126,17 @@ function ToastContainer({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss:
               background: "none",
               border:     "none",
               cursor:     "pointer",
-              fontSize:   12,
-              color:      "#6b7a99",
+              fontSize:   14,
+              color:      "var(--text-secondary)",
               padding:    "2px 4px",
               lineHeight: 1,
             }}
           >
-            ✕
+            ×
           </button>
         </div>
       ))}
-    </div>,
-    document.body
+    </div>
   );
 }
 
@@ -166,7 +164,7 @@ export default function PanelCalendar() {
 
   const checkUpcomingEvents = useCallback(() => {
     const now       = Date.now();
-    const threshold = 30 * 60 * 1000;
+    const threshold = 60 * 60 * 1000;
     const newToasts: ToastItem[] = [];
 
     for (const event of events) {
@@ -174,7 +172,7 @@ export default function PanelCalendar() {
       if (toastedIds.current.has(event.id)) continue;
 
       const diffMs = new Date(event.startISO).getTime() - now;
-      if (diffMs > 0 && diffMs <= threshold) {
+      if (diffMs >= 0 && diffMs <= threshold) {
         const minsUntil   = Math.floor(diffMs / 60_000);
         const personColor = TOAST_COLORS[event.account] ?? "#6b7a99";
 
