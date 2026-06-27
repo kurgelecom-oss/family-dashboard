@@ -189,7 +189,7 @@ export default function PanelEcom() {
 
         <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, gap: 10 }}>
           <div>
-            <div className="hero-num sm green">
+            <div className="hero-num lg green">
               {loading ? "—" : fmt(data?.monthRevenue ?? 0)}
             </div>
             <div className="sub-label">toward ${(MONTHLY_TARGET / 1000).toFixed(0)}k target</div>

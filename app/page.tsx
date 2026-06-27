@@ -1,5 +1,4 @@
 "use client";
-import { useEffect } from "react";
 import Header from "./components/Header";
 import PanelGoals from "./components/PanelGoals";
 import PanelEcom from "./components/PanelEcom";
@@ -7,21 +6,7 @@ import PanelBudget from "./components/PanelBudget";
 import PanelCalendar from "./components/PanelCalendar";
 import PanelHabits from "./components/PanelHabits";
 
-function getAestHour(): number {
-  return (new Date().getUTCHours() + 10) % 24;
-}
-
 export default function Dashboard() {
-  useEffect(() => {
-    const apply = () => {
-      const theme = getAestHour() >= 17 ? "night" : "day";
-      document.documentElement.setAttribute("data-theme", theme);
-    };
-    apply();
-    const id = setInterval(apply, 60_000);
-    return () => clearInterval(id);
-  }, []);
-
   return (
     <div className="dashboard">
       <Header />
@@ -38,10 +23,14 @@ export default function Dashboard() {
         <div className="dashboard-col">
           <PanelBudget />
         </div>
-        {/* Column 4 — Family */}
+        {/* Column 4 — Family: Calendar gets 1.5x height, Habits gets 1x */}
         <div className="dashboard-col">
-          <PanelCalendar />
-          <PanelHabits />
+          <div style={{ flex: 1.5, minHeight: 0, display: "flex", flexDirection: "column" }}>
+            <PanelCalendar />
+          </div>
+          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+            <PanelHabits />
+          </div>
         </div>
       </div>
     </div>

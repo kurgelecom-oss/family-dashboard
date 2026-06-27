@@ -91,7 +91,7 @@ export default function PanelBudget() {
 
         <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: 0 }}>
           <div>
-            <div className={`hero-num sm ${overBudget ? "red" : ""}`}>
+            <div className={`hero-num lg ${overBudget ? "red" : ""}`}>
               ${totalSpent.toFixed(0)}
             </div>
             <div className="sub-label">spent this week</div>

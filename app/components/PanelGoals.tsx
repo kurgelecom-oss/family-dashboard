@@ -60,7 +60,7 @@ export default function PanelGoals() {
 
             <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: 0 }}>
               <div>
-                <div className="hero-num sm" style={{ color: g.color }}>
+                <div className="hero-num" style={{ color: g.color }}>
                   {fmtExact(g.revenue)}
                 </div>
                 <div className="sub-label">{fmtExact(actual.revenue)} earned</div>
@@ -124,7 +124,7 @@ export default function PanelGoals() {
 
             <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: 0 }}>
               <div>
-                <div className="hero-num sm" style={{ color: "var(--cyan)" }}>{daysLeft}</div>
+                <div className="hero-num" style={{ color: "var(--cyan)" }}>{daysLeft}</div>
                 <div className="sub-label">days remaining</div>
                 <div style={{
                   fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
