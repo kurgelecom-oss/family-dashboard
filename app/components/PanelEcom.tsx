@@ -150,6 +150,7 @@ export default function PanelEcom() {
   const plAdSpend     = pickPl(pl, "adSpend",      "ad_spend",    "AdSpend",        "advertising", "ads");
   const plRoas        = pickPl(pl, "roas",         "ROAS",        "return_on_ad_spend");
   const plGpPct       = pickPl(pl, "gpPercent",    "gp_percent",  "gross_margin",   "GrossMargin", "gp_margin");
+  const activeProduct = pl ? (pl.activeProduct as string | undefined) : undefined;
 
   const monthLabel = mounted
     ? new Date().toLocaleDateString("en-AU", { month: "long", year: "numeric" })
@@ -254,23 +255,28 @@ export default function PanelEcom() {
 
         <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
           {[
-            { label: "Revenue",      val: fmtVal(plRevenue),                                                                   color: "var(--cyan)" },
-            { label: "COGS",         val: fmtVal(plCogs),                                                                      color: "var(--text-secondary)" },
-            { label: "Gross Profit", val: fmtVal(plGrossProfit), color: plGrossProfit !== undefined && plGrossProfit > 0 ? "var(--green)" : "var(--text-secondary)" },
-            { label: "Ad Spend",     val: fmtVal(plAdSpend),                                                                   color: "var(--text-secondary)" },
-            { label: "ROAS",         val: fmtRoas(plRoas),       color: plRoas !== undefined && plRoas >= 2 ? "var(--green)" : "var(--text-secondary)" },
-            { label: "GP%",          val: fmtPct(plGpPct),                                                                     color: "var(--text-secondary)" },
+            { label: "P&L Revenue",  val: fmtVal(plRevenue),     color: "var(--cyan)",           subLabel: activeProduct },
+            { label: "COGS",         val: fmtVal(plCogs),         color: "var(--text-secondary)", subLabel: undefined },
+            { label: "Gross Profit", val: fmtVal(plGrossProfit),  color: plGrossProfit !== undefined && plGrossProfit > 0 ? "var(--green)" : "var(--text-secondary)", subLabel: undefined },
+            { label: "Ad Spend",     val: fmtVal(plAdSpend),      color: "var(--text-secondary)", subLabel: undefined },
+            { label: "ROAS",         val: fmtRoas(plRoas),        color: plRoas !== undefined && plRoas >= 2 ? "var(--green)" : "var(--text-secondary)", subLabel: undefined },
+            { label: "GP%",          val: fmtPct(plGpPct),        color: "var(--text-secondary)", subLabel: undefined },
           ].map((row) => (
-            <div className="list-row" key={row.label}>
-              <span className="list-label">{row.label}</span>
-              <span className="list-value" style={{ color: row.color }}>{row.val}</span>
+            <div className="list-row" key={row.label} style={{ flexDirection: "column", alignItems: "flex-start", gap: 0 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+                <span className="list-label">{row.label}</span>
+                <span className="list-value" style={{ color: row.color }}>{row.val}</span>
+              </div>
+              {row.subLabel && (
+                <span style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 1 }}>{row.subLabel}</span>
+              )}
             </div>
           ))}
 
           <div className="divider" style={{ margin: "4px 0" }} />
 
           <div className="list-row">
-            <span className="list-label">Month revenue</span>
+            <span className="list-label">Shopify Revenue</span>
             <span className="list-value" style={{ color: "var(--green)" }}>
               {loading ? "—" : fmt(data?.monthRevenue ?? 0)}
             </span>
