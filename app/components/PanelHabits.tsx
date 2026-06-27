@@ -134,7 +134,7 @@ export default function PanelHabits() {
 
       {/* Streak */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, flexShrink: 0 }}>
-        <span style={{ fontSize: 22, fontWeight: 700, color: "#a78bfa", fontVariantNumeric: "tabular-nums" }}>
+        <span style={{ fontSize: 28, fontWeight: 700, color: "#a78bfa", fontVariantNumeric: "tabular-nums" }}>
           {mounted && streak !== null ? streak : "—"}
         </span>
         {mounted && streak !== null && streak > 0 && <span style={{ fontSize: 14 }}>🔥</span>}
@@ -151,7 +151,7 @@ export default function PanelHabits() {
           const bHabits = BASE_HABITS.filter(h => h.block === block.id);
           const bDone = bHabits.filter(h => completed[h.id]).length;
           return (
-            <div key={block.id} style={{ marginBottom: 8 }}>
+            <div key={block.id} style={{ marginBottom: 4 }}>
               <div className="progress-row">
                 <span className="list-label">{block.label}</span>
                 <span style={{ fontSize: 12, fontWeight: 600, color: block.color }}>{bDone}/{bHabits.length}</span>

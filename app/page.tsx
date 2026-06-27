@@ -25,7 +25,7 @@ export default function Dashboard() {
         </div>
         {/* Column 4 — Family: Calendar gets 1.5x height, Habits gets 1x */}
         <div className="dashboard-col">
-          <div style={{ flex: 1.5, minHeight: 0, display: "flex", flexDirection: "column" }}>
+          <div style={{ flex: 1.6, minHeight: 0, display: "flex", flexDirection: "column" }}>
             <PanelCalendar />
           </div>
           <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>

@@ -54,7 +54,7 @@ function MonthlySparkline({
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
 
   const W = 200;
-  const H = 48;
+  const H = 60;
   const PAD = 3;
 
   const xOf = (d: number) => PAD + (d / daysInMonth) * (W - PAD * 2);
@@ -65,29 +65,31 @@ function MonthlySparkline({
   const tx2 = xOf(daysInMonth), ty2 = PAD + 2;
 
   if (loading) {
-    return <div style={{ height: H, background: "var(--progress-track)", borderRadius: 4 }} />;
+    return <div style={{ flex: 1, minHeight: 0, background: "var(--progress-track)", borderRadius: 4 }} />;
   }
 
   return (
-    <svg
-      viewBox={`0 0 ${W} ${H}`}
-      style={{ width: "100%", height: H, display: "block" }}
-      preserveAspectRatio="none"
-    >
-      <line
-        x1={ax1} y1={ay1} x2={tx2} y2={ty2}
-        stroke="var(--amber)" strokeWidth="1.5" strokeDasharray="5 3" opacity="0.55"
-      />
-      <line
-        x1={ax1} y1={ay1} x2={ax2} y2={ay2}
-        stroke="var(--cyan)" strokeWidth="2" strokeLinecap="round"
-      />
-      <circle cx={ax2} cy={ay2} r="3.5" fill="var(--cyan)" />
-      <line
-        x1={ax2} y1={0} x2={ax2} y2={H}
-        stroke="rgba(255,255,255,0.08)" strokeWidth="1"
-      />
-    </svg>
+    <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", display: "block" }}
+        preserveAspectRatio="none"
+      >
+        <line
+          x1={ax1} y1={ay1} x2={tx2} y2={ty2}
+          stroke="var(--amber)" strokeWidth="1.5" strokeDasharray="5 3" opacity="0.55"
+        />
+        <line
+          x1={ax1} y1={ay1} x2={ax2} y2={ay2}
+          stroke="var(--cyan)" strokeWidth="2" strokeLinecap="round"
+        />
+        <circle cx={ax2} cy={ay2} r="3.5" fill="var(--cyan)" />
+        <line
+          x1={ax2} y1={0} x2={ax2} y2={H}
+          stroke="rgba(255,255,255,0.08)" strokeWidth="1"
+        />
+      </svg>
+    </div>
   );
 }
 
@@ -155,16 +157,15 @@ export default function PanelEcom() {
 
   return (
     <>
-      {/* ── Card 1: Revenue Today ── */}
-      <div className="card">
+      {/* ── Card 1: Revenue Today — compact, auto height ── */}
+      <div className="card" style={{ flex: "0 0 auto", padding: "12px" }}>
         <div className="card-header">
           <div className="card-title">Revenue Today</div>
           <span className={`badge ${loading ? "badge-cyan" : hasError ? "badge-red" : "badge-green"}`}>
             {loading ? "Loading…" : hasError ? "⚠ Error" : "● Live"}
           </span>
         </div>
-
-        <div className="stat-pair" style={{ flex: 1 }}>
+        <div className="stat-pair">
           <div className="stat-box">
             <div className="stat-box-num cyan">
               {loading ? "—" : fmt(data?.todayRevenue ?? 0)}
@@ -181,13 +182,13 @@ export default function PanelEcom() {
       </div>
 
       {/* ── Card 2: Revenue This Month ── */}
-      <div className="card">
+      <div className="card" style={{ flex: 1.8, minHeight: 0, overflow: "hidden" }}>
         <div className="card-header">
           <div className="card-title">This Month</div>
           <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{monthLabel}</span>
         </div>
 
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, gap: 10 }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, gap: 6 }}>
           <div>
             <div className="hero-num lg green">
               {loading ? "—" : fmt(data?.monthRevenue ?? 0)}
@@ -212,19 +213,20 @@ export default function PanelEcom() {
             </div>
           </div>
 
-          <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
+          {/* Sparkline fills remaining space */}
+          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: 4 }}>
             <MonthlySparkline
               monthRevenue={data?.monthRevenue ?? 0}
               target={MONTHLY_TARGET}
               loading={loading}
             />
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", flexShrink: 0 }}>
               <span style={{ fontSize: 10, color: "var(--cyan)", fontWeight: 600 }}>— Actual</span>
               <span style={{ fontSize: 10, color: "var(--amber)", fontWeight: 600 }}>-- Target pace</span>
             </div>
           </div>
 
-          <div>
+          <div style={{ flexShrink: 0 }}>
             <a
               href="https://product-pl-tracker.netlify.app/"
               target="_blank"
@@ -243,7 +245,7 @@ export default function PanelEcom() {
       </div>
 
       {/* ── Card 3: P&L This Month ── */}
-      <div className="card">
+      <div className="card" style={{ flex: 1.2, minHeight: 0, overflow: "hidden" }}>
         <div className="card-header">
           <div className="card-title">P&amp;L · This Month</div>
           {plStale && <span className="badge badge-amber">⚠ Stale</span>}
