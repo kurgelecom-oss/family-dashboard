@@ -221,6 +221,16 @@ export default function PanelCalendar() {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
+  const isTodayEvent = (iso: string): boolean => {
+    const eventDate = new Date(parseEventTime(iso));
+    const today = new Date();
+    return (
+      eventDate.getDate() === today.getDate() &&
+      eventDate.getMonth() === today.getMonth() &&
+      eventDate.getFullYear() === today.getFullYear()
+    );
+  };
+
   return (
     <>
       <BannerContainer toasts={toasts} onDismiss={dismissToast} />
@@ -254,7 +264,7 @@ export default function PanelCalendar() {
 
         <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column", gap: 10 }}>
           {!calLoading && ACCOUNTS.map(acct => {
-            const personEvents = events.filter(e => e.account === acct.key).slice(0, 2);
+            const personEvents = events.filter(e => e.account === acct.key && isTodayEvent(e.startISO));
             const notConnected = missing.some(m =>
               m === (acct.key === "TAYLAN" ? "taylan.k8@hotmail.com" :
                      acct.key === "NIHAL"  ? "nils_gvi@hotmail.com"  :
@@ -274,7 +284,7 @@ export default function PanelCalendar() {
                 {notConnected ? (
                   <div style={{ fontSize: 11, color: "var(--text-muted)", paddingLeft: 4 }}>Not connected</div>
                 ) : personEvents.length === 0 ? (
-                  <div style={{ fontSize: 11, color: "var(--text-muted)", paddingLeft: 4 }}>No upcoming events</div>
+                  <div style={{ fontSize: 11, color: "var(--text-muted)", paddingLeft: 4 }}>No events today</div>
                 ) : (
                   personEvents.map(e => (
                     <div key={e.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "3px 0" }}>
@@ -296,9 +306,62 @@ export default function PanelCalendar() {
 
           {!calLoading && events.length === 0 && missing.length === 0 && (
             <div style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "center", padding: "12px 0" }}>
-              No upcoming events.
+              No events today.
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">Time Allocation</div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div style={{ padding: "10px 12px", background: "rgba(255,153,51,0.08)", borderRadius: 8, border: "1px solid rgba(255,153,51,0.2)" }}>
+              <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                Taylan Weekly
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", marginBottom: 2 }}>
+                56.5h
+              </div>
+              <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
+                Deep-work capacity
+              </div>
+            </div>
+            <div style={{ padding: "10px 12px", background: "rgba(172,32,219,0.08)", borderRadius: 8, border: "1px solid rgba(172,32,219,0.2)" }}>
+              <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                Nihal Weekly
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", marginBottom: 2 }}>
+                56h
+              </div>
+              <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
+                Deep-work capacity
+              </div>
+            </div>
+          </div>
+          <a
+            href="https://time-allocation-board.netlify.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              padding: "10px 14px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 8, color: "var(--text-secondary)", fontSize: 12, fontWeight: 600,
+              textDecoration: "none", transition: "all 0.2s ease", cursor: "pointer",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(255,255,255,0.08)";
+              e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+              e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)";
+            }}
+          >
+            📊 View Full Board
+          </a>
         </div>
       </div>
     </>
