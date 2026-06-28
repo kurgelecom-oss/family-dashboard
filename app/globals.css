@@ -132,6 +132,7 @@ html, body {
   margin-bottom: 8px;
   flex-shrink: 0;
   gap: 8px;
+  min-width: 0;
 }
 
 .card-title {
@@ -140,7 +141,11 @@ html, body {
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  flex-shrink: 0;
+  min-width: 0;
+  flex-shrink: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ── HERO NUMBER ───────────────────────────────────────────────── */
