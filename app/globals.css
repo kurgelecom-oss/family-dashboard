@@ -262,8 +262,8 @@ html, body {
 }
 .list-row:last-child { border-bottom: none; }
 
-.list-label { font-size: 13px; color: var(--text-secondary); }
-.list-value { font-size: 14px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.list-label { font-size: 13px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.list-value { font-size: 14px; font-weight: 600; color: var(--text-primary); font-variant-numeric: tabular-nums; flex-shrink: 0; margin-left: 8px; }
 
 /* ── HORIZONTAL BAR CHART ──────────────────────────────────────── */
 .hbar-row {

@@ -84,17 +84,17 @@ export default function PanelGoals() {
 
               {/* Details */}
               <div style={{ borderTop: "1px solid var(--border)", paddingTop: 3 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 0", borderBottom: "1px solid var(--border)" }}>
-                  <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Orders remaining</span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>{ordersRemaining}</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "2px 0", borderBottom: "1px solid var(--border)", minWidth: 0, gap: 8 }}>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>Orders remaining</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{ordersRemaining}</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 0", borderBottom: "1px solid var(--border)" }}>
-                  <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Ad spend</span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>{fmtExact(g.adSpend)}</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "2px 0", borderBottom: "1px solid var(--border)", minWidth: 0, gap: 8 }}>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>Ad spend</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{fmtExact(g.adSpend)}</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}>
-                  <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Net profit</span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--green)", fontVariantNumeric: "tabular-nums" }}>{fmtExact(g.netProfit)}</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "2px 0", minWidth: 0, gap: 8 }}>
+                  <span style={{ fontSize: 12, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>Net profit</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--green)", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{fmtExact(g.netProfit)}</span>
                 </div>
               </div>
             </div>
@@ -154,17 +154,17 @@ export default function PanelGoals() {
               </div>
 
               <div style={{ borderTop: "1px solid var(--border)", paddingTop: 3 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 0", borderBottom: "1px solid var(--border)" }}>
-                  <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>Target date</span>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)" }}>31 Dec 2026</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "2px 0", borderBottom: "1px solid var(--border)", minWidth: 0, gap: 8 }}>
+                  <span style={{ fontSize: 11, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>Target date</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-primary)", flexShrink: 0 }}>31 Dec 2026</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 0", borderBottom: "1px solid var(--border)" }}>
-                  <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>Days elapsed</span>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>{daysElapsed}</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "2px 0", borderBottom: "1px solid var(--border)", minWidth: 0, gap: 8 }}>
+                  <span style={{ fontSize: 11, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>Days elapsed</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{daysElapsed}</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", padding: "2px 0" }}>
-                  <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>% window used</span>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: barColor, fontVariantNumeric: "tabular-nums" }}>{pctUsed}%</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "2px 0", minWidth: 0, gap: 8 }}>
+                  <span style={{ fontSize: 11, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>% window used</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: barColor, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{pctUsed}%</span>
                 </div>
               </div>
             </div>
