@@ -341,6 +341,32 @@ export default function PanelCalendar() {
               </div>
             </div>
           </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div style={{ padding: "10px 12px", background: "rgba(231,76,60,0.08)", borderRadius: 8, border: "1px solid rgba(231,76,60,0.2)" }}>
+              <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+                Nick Calls
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", marginBottom: 4 }}>
+                Tue, Fri
+              </div>
+              <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+                8:00 AM
+              </div>
+            </div>
+            <div style={{ padding: "10px 12px", background: "rgba(52,152,219,0.08)", borderRadius: 8, border: "1px solid rgba(52,152,219,0.2)" }}>
+              <div style={{ fontSize: 10, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+                Origins Mentorship
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)", marginBottom: 4 }}>
+                Mon–Thu
+              </div>
+              <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+                8:30 PM
+              </div>
+            </div>
+          </div>
+
           <a
             href="https://time-allocation-board.netlify.app/"
             target="_blank"
