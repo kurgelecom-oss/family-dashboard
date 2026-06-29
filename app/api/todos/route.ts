@@ -22,7 +22,7 @@ async function fetchNotionTodos(): Promise<NotionTodo[]> {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${NOTION_TOKEN}`,
-      "Notion-Version": "2024-06-15",
+      "Notion-Version": "2026-03-11",
       "Content-Type": "application/json",
     },
     body: JSON.stringify({}),

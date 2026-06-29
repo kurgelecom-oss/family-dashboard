@@ -108,7 +108,9 @@ export default function PanelHabits() {
       <div className="card-header">
         <div className="card-title">Ansar · Habits</div>
         <a
-          href="/ansar"
+          href="https://ansar-habits-tracker.netlify.app/"
+          target="_blank"
+          rel="noopener noreferrer"
           style={{
             fontSize: 10, color: "var(--amber)", textDecoration: "none",
             fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
