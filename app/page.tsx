@@ -5,6 +5,7 @@ import PanelEcom from "./components/PanelEcom";
 import PanelBudget from "./components/PanelBudget";
 import PanelCalendar from "./components/PanelCalendar";
 import PanelHabits from "./components/PanelHabits";
+import PanelTodos from "./components/PanelTodos";
 
 export default function Dashboard() {
   return (
@@ -23,12 +24,15 @@ export default function Dashboard() {
         <div className="dashboard-col">
           <PanelBudget />
         </div>
-        {/* Column 4 — Family: Calendar gets 1.5x height, Habits gets 1x */}
+        {/* Column 4 — Family: Calendar gets 1.2x, Todos gets 1x, Habits gets 0.8x */}
         <div className="dashboard-col">
-          <div style={{ flex: 1.6, minHeight: 0, display: "flex", flexDirection: "column" }}>
+          <div style={{ flex: 1.2, minHeight: 0, display: "flex", flexDirection: "column" }}>
             <PanelCalendar />
           </div>
           <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+            <PanelTodos />
+          </div>
+          <div style={{ flex: 0.8, minHeight: 0, display: "flex", flexDirection: "column" }}>
             <PanelHabits />
           </div>
         </div>

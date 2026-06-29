@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Next Steps Panel Preview - Kurgel Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* ── NIGHT THEME (default) ─────────────────────── */
+    :root {
+      --bg-base:        #1e2140;
+      --bg-card:        #252a4a;
+      --bg-inner:       #1e2140;
+      --border:         rgba(255,255,255,0.06);
+      --text-primary:   #ffffff;
+      --text-secondary: #8b92b8;
+      --text-muted:     #5a6080;
+      --text-label:     #8b92b8;
+      --cyan:           #00d4ff;
+      --amber:          #f5a623;
+      --green:          #2ecc71;
+      --red:            #e74c3c;
+      --progress-track: rgba(255,255,255,0.1);
+      --card-shadow:    none;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      background: var(--bg-base);
+      color: var(--text-primary);
+      font-size: 13px;
+      min-height: 100vh;
+      padding: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 450px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      height: 600px;
+      min-height: 0;
+      box-shadow: var(--card-shadow);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 4px;
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .badge-cyan {
+      background: rgba(0, 212, 255, 0.15);
+      color: var(--cyan);
+      border: 1px solid rgba(0, 212, 255, 0.3);
+    }
+
+    .notion-link {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      background: rgba(0, 212, 255, 0.15);
+      border: 1px solid rgba(0, 212, 255, 0.3);
+      color: var(--cyan);
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .notion-link:hover {
+      background: rgba(0, 212, 255, 0.25);
+      border-color: rgba(0, 212, 255, 0.6);
+    }
+
+    .stats-row {
+      display: flex;
+      gap: 10px;
+      font-size: 11px;
+      color: var(--text-muted);
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stats-row span {
+      flex-shrink: 0;
+    }
+
+    .stats-row .spacer {
+      flex: 1;
+    }
+
+    .todo-container {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding-right: 4px;
+    }
+
+    .todo-container::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .todo-container::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .todo-container::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+    }
+
+    .todo-item {
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .todo-item.personal {
+      border-color: #9370db;
+      background: rgba(147, 112, 219, 0.1);
+    }
+
+    .todo-item.work {
+      border-color: #00d4ff;
+      background: rgba(0, 212, 255, 0.1);
+    }
+
+    .todo-item.family {
+      border-color: #2ecc71;
+      background: rgba(46, 204, 113, 0.1);
+    }
+
+    .todo-item.urgent:hover {
+      box-shadow: 0 0 12px rgba(255, 255, 255, 0.15);
+    }
+
+    .todo-item-inner {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .todo-item input[type="checkbox"] {
+      margin-top: 2px;
+      cursor: pointer;
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      accent-color: inherit;
+    }
+
+    .todo-item.personal input[type="checkbox"] {
+      accent-color: #9370db;
+    }
+
+    .todo-item.work input[type="checkbox"] {
+      accent-color: #00d4ff;
+    }
+
+    .todo-item.family input[type="checkbox"] {
+      accent-color: #2ecc71;
+    }
+
+    .todo-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .todo-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+
+    .todo-icon {
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    .todo-title {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-primary);
+      flex: 1;
+    }
+
+    .todo-title.completed {
+      text-decoration: line-through;
+      opacity: 0.6;
+    }
+
+    .todo-meta {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      font-size: 10px;
+    }
+
+    .todo-date {
+      font-weight: 600;
+    }
+
+    .todo-priority-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--red);
+      opacity: 0.8;
+      flex-shrink: 0;
+    }
+
+    .todo-expanded {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid;
+      font-size: 11px;
+      color: var(--text-secondary);
+      animation: slideDown 0.2s ease;
+    }
+
+    .todo-section-label {
+      color: var(--text-muted);
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 2px;
+      font-weight: 600;
+    }
+
+    .todo-notes {
+      margin-bottom: 6px;
+    }
+
+    .todo-subtasks {
+      margin-bottom: 0;
+    }
+
+    .todo-subtask {
+      margin-bottom: 3px;
+      padding-left: 6px;
+    }
+
+    .todo-handles {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      opacity: 0.5;
+      cursor: grab;
+      flex-shrink: 0;
+    }
+
+    .handle-dot {
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 20px 10px;
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    .focus-mode-btn {
+      width: 100%;
+      padding: 6px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .focus-mode-btn:hover {
+      background: rgba(0, 212, 255, 0.15);
+      border-color: var(--cyan);
+    }
+
+    .focus-mode-btn.active {
+      background: rgba(0, 212, 255, 0.1);
+      color: var(--cyan);
+      border-color: var(--cyan);
+    }
+
+    @keyframes shimmer {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .shimmer-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+      animation: shimmer 2s infinite;
+      pointer-events: none;
+    }
+
+    /* Stat value styling */
+    .stat-value {
+      color: var(--cyan);
+      font-weight: 600;
+    }
+
+    .stat-value.green {
+      color: var(--green);
+    }
+
+    .color-personal { color: #9370db; }
+    .color-work { color: #00d4ff; }
+    .color-family { color: #2ecc71; }
+
+    .overdue { color: var(--red); }
+    .urgent { color: var(--amber); }
+    .soon { color: var(--cyan); }
+
+    .title-header {
+      margin-bottom: 20px;
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 12px;
+    }
+
+    .title-header h1 {
+      font-size: 24px;
+      margin-bottom: 4px;
+      color: var(--text-primary);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="title-header">
+      <h1>✨ Next Steps Panel Preview</h1>
+      <p>Interactive preview of the WOW to-do widget for Kurgel Dashboard</p>
+    </div>
+
+    <div class="card">
+      <!-- Header -->
+      <div class="card-header">
+        <div style="display: flex; align-items: center; gap: 6px; flex: 1;">
+          <div class="card-title">Next Steps</div>
+          <a class="notion-link" href="https://app.notion.com/p/Next-To-Do-Items-38e5429afa9080a2829bef96d31d9f5e" target="_blank" title="Open in Notion">↗</a>
+        </div>
+        <span class="badge badge-cyan">● Synced</span>
+      </div>
+
+      <!-- Stats Row -->
+      <div class="stats-row">
+        <span><span class="stat-value">4</span> pending</span>
+        <span><span class="stat-value green">3</span> this week</span>
+        <span class="spacer"></span>
+        <span><span class="stat-value">60%</span> complete</span>
+      </div>
+
+      <!-- Todo Items Container -->
+      <div class="todo-container" id="todoContainer">
+        <!-- Items will be inserted here -->
+      </div>
+
+      <!-- Focus Mode Button -->
+      <button class="focus-mode-btn" id="focusModeBtn">Top 3 Mode</button>
+    </div>
+  </div>
+
+  <script>
+    const MOCK_TODOS = [
+      {
+        id: "1",
+        title: "Review Q3 business strategy",
+        priority: "high",
+        context: "work",
+        dueDate: "2026-06-30",
+        completed: false,
+        notes: "Quarterly planning session",
+        subtasks: ["Review metrics", "Update roadmap"],
+      },
+      {
+        id: "2",
+        title: "Family dinner planning",
+        priority: "medium",
+        context: "family",
+        dueDate: "2026-07-05",
+        completed: false,
+      },
+      {
+        id: "3",
+        title: "Personal development reading",
+        priority: "low",
+        context: "personal",
+        completed: false,
+        notes: "Continue with 'Atomic Habits'",
+      },
+      {
+        id: "4",
+        title: "Respond to client emails",
+        priority: "high",
+        context: "work",
+        dueDate: "2026-06-29",
+        completed: false,
+      },
+      {
+        id: "5",
+        title: "Schedule dentist appointment",
+        priority: "medium",
+        context: "personal",
+        dueDate: "2026-07-10",
+        completed: false,
+      },
+    ];
+
+    const CONTEXT_ICONS = { personal: "👤", work: "💼", family: "👨‍👩‍👧‍👦" };
+    const CONTEXT_CLASSES = { personal: "personal", work: "work", family: "family" };
+    let expandedId = null;
+    let focusMode = false;
+    let todos = [...MOCK_TODOS];
+
+    function getUrgencyColor(dueDate) {
+      if (!dueDate) return "";
+      const due = new Date(dueDate).getTime();
+      const now = new Date().getTime();
+      const daysUntil = Math.ceil((due - now) / (1000 * 60 * 60 * 24));
+
+      if (daysUntil <= 0) return "overdue";
+      if (daysUntil <= 1) return "urgent";
+      if (daysUntil <= 3) return "soon";
+      return "";
+    }
+
+    function formatDueDate(dueDate) {
+      if (!dueDate) return "";
+      const due = new Date(dueDate);
+      const now = new Date();
+      const daysUntil = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (daysUntil <= 0) return "OVERDUE";
+      if (daysUntil === 1) return "Tomorrow";
+      if (daysUntil <= 7) return `${daysUntil}d`;
+      return due.toLocaleDateString("en-AU", { month: "short", day: "numeric" });
+    }
+
+    function renderTodos() {
+      const container = document.getElementById("todoContainer");
+      container.innerHTML = "";
+
+      const urgentTodos = todos
+        .filter(t => !t.completed)
+        .sort((a, b) => {
+          const priorityOrder = { high: 0, medium: 1, low: 2 };
+          return priorityOrder[a.priority] - priorityOrder[b.priority];
+        });
+
+      const displayTodos = focusMode ? urgentTodos.slice(0, 3) : urgentTodos;
+
+      if (displayTodos.length === 0) {
+        container.innerHTML = '<div class="empty-state">✨ All caught up!</div>';
+        return;
+      }
+
+      displayTodos.forEach(todo => {
+        const isExpanded = expandedId === todo.id;
+        const isUrgent = todo.priority === "high" || (todo.dueDate && new Date(todo.dueDate) < new Date(Date.now() + 86400000));
+        const urgencyColor = getUrgencyColor(todo.dueDate);
+
+        const item = document.createElement("div");
+        item.className = `todo-item ${CONTEXT_CLASSES[todo.context]} ${isUrgent ? "urgent" : ""}`;
+        if (isUrgent) {
+          item.innerHTML += '<div class="shimmer-overlay"></div>';
+        }
+
+        let html = `
+          <div class="todo-item-inner">
+            <input type="checkbox" ${todo.completed ? "checked" : ""} data-id="${todo.id}">
+            <div class="todo-content">
+              <div class="todo-header">
+                <span class="todo-icon color-${todo.context}">${CONTEXT_ICONS[todo.context]}</span>
+                <span class="todo-title ${todo.completed ? "completed" : ""}">${todo.title}</span>
+              </div>
+        `;
+
+        if (todo.dueDate || todo.priority === "high") {
+          html += '<div class="todo-meta">';
+          if (todo.dueDate) {
+            html += `<span class="todo-date ${urgencyColor}">${formatDueDate(todo.dueDate)}</span>`;
+          }
+          if (todo.priority === "high") {
+            html += '<span class="todo-priority-dot"></span>';
+          }
+          html += '</div>';
+        }
+
+        if (isExpanded) {
+          html += '<div class="todo-expanded">';
+          if (todo.notes) {
+            html += `
+              <div class="todo-notes">
+                <div class="todo-section-label">Notes</div>
+                ${todo.notes}
+              </div>
+            `;
+          }
+          if (todo.subtasks && todo.subtasks.length > 0) {
+            html += '<div class="todo-subtasks"><div class="todo-section-label">Subtasks</div>';
+            todo.subtasks.forEach(st => {
+              html += `<div class="todo-subtask">✓ ${st}</div>`;
+            });
+            html += '</div>';
+          }
+          html += '</div>';
+        }
+
+        html += `
+            </div>
+            <div class="todo-handles">
+              <div class="handle-dot" style="background: ${todo.context === "personal" ? "#9370db" : todo.context === "work" ? "#00d4ff" : "#2ecc71"}"></div>
+              <div class="handle-dot" style="background: ${todo.context === "personal" ? "#9370db" : todo.context === "work" ? "#00d4ff" : "#2ecc71"}"></div>
+            </div>
+          </div>
+        `;
+
+        item.innerHTML = html;
+        item.addEventListener("click", (e) => {
+          if (e.target.type !== "checkbox") {
+            expandedId = isExpanded ? null : todo.id;
+            renderTodos();
+          }
+        });
+
+        item.querySelector("input[type='checkbox']").addEventListener("change", (e) => {
+          todos = todos.map(t => t.id === todo.id ? { ...t, completed: !t.completed } : t);
+          renderTodos();
+        });
+
+        container.appendChild(item);
+      });
+    }
+
+    document.getElementById("focusModeBtn").addEventListener("click", () => {
+      focusMode = !focusMode;
+      const btn = document.getElementById("focusModeBtn");
+      btn.textContent = focusMode ? "Show All" : "Top 3 Mode";
+      btn.classList.toggle("active", focusMode);
+      renderTodos();
+    });
+
+    // Initial render
+    renderTodos();
+  </script>
+</body>
+</html>
