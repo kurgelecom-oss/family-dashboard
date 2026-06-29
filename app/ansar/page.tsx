@@ -202,108 +202,123 @@ export default function AnsarPage() {
   const WEEKLY_MAX = SOCCER_DAYS.includes(dayName) ? 51 : 47; // 2 soccer days × 2pts extra
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0f1419", color: "#ffffff", fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#0f1419", color: "#ffffff", fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", overflowX: "hidden" }}>
 
       {/* HEADER */}
       <header style={{
         background: "#16192d", borderBottom: "1px solid #2d3543",
-        padding: "12px 20px", display: "flex", alignItems: "center",
+        padding: "16px 24px", display: "flex", alignItems: "center",
         justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100,
       }}>
         <div>
-          <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em", color: "#ffffff" }}>
+          <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.02em", color: "#ffffff" }}>
             Ansar <span style={{ color: "#ffa500" }}>· Daily Habits</span>
           </div>
-          <div style={{ fontSize: 10, color: "#757f8f", textTransform: "uppercase", letterSpacing: "0.1em", marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ fontSize: 12, color: "#757f8f", marginTop: 4, display: "flex", alignItems: "center", gap: 8 }}>
             {mounted ? new Date().toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long" }) : ""} · {time}
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 4 }}>
-              <span style={{ width: 5, height: 5, borderRadius: "50%", background: online ? "#00ff88" : "#ff4444", display: "inline-block" }} />
-              <span style={{ color: online ? "#00ff88" : "#ff4444" }}>{online ? "Live" : "Offline"}</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: online ? "#00ff88" : "#ff4444", display: "inline-block" }} />
+              <span style={{ color: online ? "#00ff88" : "#ff4444", fontSize: 11, fontWeight: 500 }}>{online ? "Live" : "Offline"}</span>
             </span>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 32, fontWeight: 700, color: "#ffa500", lineHeight: 1 }}>{mounted ? todayPts : 0}</div>
-            <div style={{ fontSize: 9, color: "#757f8f", textTransform: "uppercase", letterSpacing: "0.1em" }}>pts today</div>
-          </div>
-          <a href="/" style={{
-            fontSize: 10, color: "#b0b5c1", textDecoration: "none", fontWeight: 600,
-            letterSpacing: "0.06em", textTransform: "uppercase",
-            background: "#1f2438", padding: "4px 10px", borderRadius: 4, border: "1px solid #2d3543",
-          }}>← Dashboard</a>
-        </div>
+        <a href="/" style={{
+          fontSize: 11, color: "#b0b5c1", textDecoration: "none", fontWeight: 600,
+          background: "#1f2438", padding: "6px 12px", borderRadius: 6, border: "1px solid #2d3543",
+          cursor: "pointer", transition: "all 150ms ease-out",
+        }}>← Dashboard</a>
       </header>
 
-      <div style={{ maxWidth: 860, margin: "0 auto", padding: "16px 20px 40px" }}>
+      <div style={{ width: "100%", padding: "24px", overflow: "auto" }}>
 
-        {/* TOP STATS ROW */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
-          {/* Today points */}
-          <div style={{ background: "#16192d", border: "1px solid #2d3543", borderRadius: 10, padding: "16px", boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)" }}>
-            <div style={{ fontSize: 28, fontWeight: 700, color: "#ffa500", lineHeight: 1 }}>{mounted ? todayPts : "—"}</div>
-            <div style={{ fontSize: 10, color: "#757f8f", marginTop: 3, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 500 }}>Points Today</div>
-          </div>
-          {/* Weekly points */}
-          <div style={{ background: "#16192d", border: "1px solid #2d3543", borderRadius: 10, padding: "16px", boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)" }}>
-            <div style={{ fontSize: 28, fontWeight: 700, color: "#00ff88", lineHeight: 1 }}>{mounted && weeklyPts !== null ? weeklyPts : "—"}</div>
-            <div style={{ fontSize: 10, color: "#757f8f", marginTop: 3, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 500 }}>Week Total</div>
-          </div>
-          {/* Streak */}
-          <div style={{ background: "#16192d", border: "1px solid #2d3543", borderRadius: 10, padding: "16px", boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)" }}>
-            <div style={{ fontSize: 28, fontWeight: 700, color: "#00d9ff", lineHeight: 1, display: "flex", alignItems: "center", gap: 4 }}>
-              {mounted && streak !== null ? streak : "—"}
-              {mounted && streak !== null && streak > 0 && <span style={{ fontSize: 18 }}>🔥</span>}
+        {/* TOP METRICS ROW */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 24 }}>
+          {/* Today points metric */}
+          <div style={{ background: "#16192d", border: "1px solid #2d3543", borderRadius: 12, padding: "20px", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)" }}>
+            <div style={{ fontSize: 12, color: "#757f8f", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600, marginBottom: 8 }}>Points Today</div>
+            <div style={{ fontSize: 36, fontWeight: 700, color: "#ffa500", lineHeight: 1 }}>{mounted ? todayPts : "—"}</div>
+            <div style={{ fontSize: 12, color: "#b0b5c1", marginTop: 8, display: "flex", alignItems: "center", gap: 4 }}>
+              <span>📊</span> {mounted ? todayDone : 0}/{habits.length} complete
             </div>
-            <div style={{ fontSize: 10, color: "#757f8f", marginTop: 3, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 500 }}>Day Streak</div>
+          </div>
+
+          {/* Weekly points metric */}
+          <div style={{ background: "#16192d", border: "1px solid #2d3543", borderRadius: 12, padding: "20px", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)" }}>
+            <div style={{ fontSize: 12, color: "#757f8f", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600, marginBottom: 8 }}>Week Total</div>
+            <div style={{ fontSize: 36, fontWeight: 700, color: "#00ff88", lineHeight: 1 }}>{mounted && weeklyPts !== null ? weeklyPts : "—"}</div>
+            <div style={{ fontSize: 12, color: "#b0b5c1", marginTop: 8, display: "flex", alignItems: "center", gap: 4 }}>
+              <span>📈</span> /{WEEKLY_MAX} pts max
+            </div>
+          </div>
+
+          {/* Streak metric */}
+          <div style={{ background: "#16192d", border: "1px solid #2d3543", borderRadius: 12, padding: "20px", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)" }}>
+            <div style={{ fontSize: 12, color: "#757f8f", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600, marginBottom: 8 }}>Day Streak</div>
+            <div style={{ fontSize: 36, fontWeight: 700, color: "#00d9ff", lineHeight: 1, display: "flex", alignItems: "center", gap: 4 }}>
+              {mounted && streak !== null ? streak : "—"}
+              {mounted && streak !== null && streak > 0 && <span>🔥</span>}
+            </div>
+            <div style={{ fontSize: 12, color: "#b0b5c1", marginTop: 8 }}>Consecutive days</div>
+          </div>
+
+          {/* Progress percentage */}
+          <div style={{ background: "#16192d", border: "1px solid #2d3543", borderRadius: 12, padding: "20px", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)" }}>
+            <div style={{ fontSize: 12, color: "#757f8f", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600, marginBottom: 8 }}>Progress</div>
+            <div style={{ fontSize: 36, fontWeight: 700, color: "#00d9ff", lineHeight: 1 }}>{mounted ? overallPct : 0}%</div>
+            <div style={{ fontSize: 12, color: "#b0b5c1", marginTop: 8 }}>Today's completion</div>
           </div>
         </div>
 
-        {/* OVERALL PROGRESS BAR */}
-        <div style={{ background: "#16192d", border: "1px solid #2d3543", borderRadius: 10, padding: "16px", marginBottom: 10, boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-            <span style={{ fontSize: 11, color: "#b0b5c1", fontWeight: 600 }}>Today&apos;s Progress</span>
-            <span style={{ fontSize: 11, color: "#ffffff", fontWeight: 600 }}>{mounted ? todayDone : 0} of {habits.length} habits complete</span>
+        {/* PROGRESS BAR */}
+        <div style={{ background: "#16192d", border: "1px solid #2d3543", borderRadius: 12, padding: "16px", marginBottom: 24, boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+            <span style={{ fontSize: 13, color: "#b0b5c1", fontWeight: 600 }}>Today&apos;s Progress</span>
+            <span style={{ fontSize: 13, color: "#ffffff", fontWeight: 700 }}>{mounted ? todayDone : 0} of {habits.length} habits</span>
           </div>
-          <div style={{ height: 8, background: "#1f2438", borderRadius: 4, overflow: "hidden" }}>
+          <div style={{ height: 10, background: "#1f2438", borderRadius: 6, overflow: "hidden" }}>
             <div style={{
-              height: "100%", borderRadius: 4, transition: "width 200ms ease-in-out",
+              height: "100%", borderRadius: 6, transition: "width 200ms ease-in-out",
               width: mounted ? `${overallPct}%` : "0%",
               background: "linear-gradient(90deg, #ffa500, #00ff88)",
             }} />
           </div>
         </div>
 
-        {/* SOCCER TRAINING BADGE — only show on Mon/Wed */}
-        {mounted && SOCCER_DAYS.includes(dayName) && (
-          <div style={{
-            background: "rgba(255,165,0,0.1)", border: "1px solid rgba(255,165,0,0.3)",
-            borderRadius: 8, padding: "8px 12px", marginBottom: 10,
-            fontSize: 11, color: "#ffa500", fontWeight: 600, display: "flex", alignItems: "center", gap: 6,
-          }}>
-            ⚽ Soccer training day — check afternoon block for bonus habit (+2 pts)
-          </div>
-        )}
+        {/* ALERTS & STATUS SECTION */}
+        <div style={{ marginBottom: 24 }}>
+          {/* SOCCER TRAINING BADGE — only show on Mon/Wed */}
+          {mounted && SOCCER_DAYS.includes(dayName) && (
+            <div style={{
+              background: "rgba(255,165,0,0.1)", border: "1px solid rgba(255,165,0,0.3)",
+              borderRadius: 10, padding: "12px 16px", marginBottom: 12,
+              fontSize: 12, color: "#ffa500", fontWeight: 600, display: "flex", alignItems: "center", gap: 8,
+            }}>
+              ⚽ Soccer training day — check afternoon block for bonus habit (+2 pts)
+            </div>
+          )}
 
-        {/* WEEKLY STATUS */}
-        <div style={{
-          background: "#16192d", border: `1px solid ${weekThreshold.color}40`,
-          borderRadius: 10, padding: "16px", marginBottom: 16,
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
-        }}>
-          <div>
-            <div style={{ fontSize: 10, color: "#757f8f", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4, fontWeight: 600 }}>This week you&apos;re on track for</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: weekThreshold.color }}>{weekThreshold.label}</div>
-            <div style={{ fontSize: 11, color: "#b0b5c1", marginTop: 3 }}>{weekThreshold.desc}</div>
-          </div>
-          <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 16 }}>
-            <div style={{ fontSize: 32, fontWeight: 700, color: weekThreshold.color, lineHeight: 1 }}>{mounted && weeklyPts !== null ? weeklyPts : "—"}</div>
-            <div style={{ fontSize: 10, color: "#757f8f" }}>/ {WEEKLY_MAX} pts max</div>
+          {/* WEEKLY STATUS */}
+          <div style={{
+            background: "#16192d", border: `1px solid ${weekThreshold.color}40`,
+            borderRadius: 12, padding: "20px",
+            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)",
+          }}>
+            <div style={{ fontSize: 12, color: "#757f8f", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8, fontWeight: 600 }}>This week you&apos;re on track for</div>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: weekThreshold.color, marginBottom: 8 }}>{weekThreshold.label}</div>
+                <div style={{ fontSize: 13, color: "#b0b5c1", lineHeight: 1.6 }}>{weekThreshold.desc}</div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ fontSize: 32, fontWeight: 700, color: weekThreshold.color, lineHeight: 1 }}>{mounted && weeklyPts !== null ? weeklyPts : "—"}</div>
+                <div style={{ fontSize: 11, color: "#757f8f", marginTop: 4 }}>/ {WEEKLY_MAX} pts</div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* HABIT BLOCKS */}
+        {/* HABIT BLOCKS GRID */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 16, marginBottom: 24 }}>
         {BLOCKS.map(block => {
           const blockHabits = habits.filter(h => h.block === block.id);
           if (blockHabits.length === 0) return null;
@@ -312,25 +327,25 @@ export default function AnsarPage() {
           const blockPct = Math.round((blockDone / blockHabits.length) * 100);
 
           return (
-            <div key={block.id} style={{ background: "#16192d", border: "1px solid #2d3543", borderRadius: 10, marginBottom: 10, overflow: "hidden", boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)" }}>
-              <div style={{ height: 2, background: block.color }} />
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", borderBottom: "1px solid #2d3543" }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: block.color }}>{block.label}</div>
-                  <div style={{ fontSize: 10, color: "#757f8f", marginTop: 2, fontWeight: 500 }}>{block.subtitle}</div>
+            <div key={block.id} style={{ background: "#16192d", border: "1px solid #2d3543", borderRadius: 12, overflow: "hidden", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)", display: "flex", flexDirection: "column" }}>
+              <div style={{ height: 3, background: block.color }} />
+              <div style={{ padding: "16px", borderBottom: "1px solid #2d3543" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: block.color }}>{block.label}</div>
+                    <div style={{ fontSize: 11, color: "#757f8f", marginTop: 4, fontWeight: 500 }}>{block.subtitle}</div>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: "#ffffff" }}>{blockDone}/{blockHabits.length}</div>
+                    <div style={{ fontSize: 11, color: "#757f8f", marginTop: 2, fontWeight: 500 }}>{blockPts} pts</div>
+                  </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#ffffff" }}>{blockDone}/{blockHabits.length}</div>
-                    <div style={{ fontSize: 10, color: "#757f8f", fontWeight: 500 }}>{blockPts} pts earned</div>
-                  </div>
-                  <div style={{ width: 48, background: "#1f2438", borderRadius: 3, height: 6, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${blockPct}%`, background: block.color, borderRadius: 3, transition: "width 200ms ease-in-out" }} />
-                  </div>
+                <div style={{ height: 6, background: "#1f2438", borderRadius: 3, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${blockPct}%`, background: block.color, borderRadius: 3, transition: "width 200ms ease-in-out", boxShadow: `0 0 8px ${block.color}40` }} />
                 </div>
               </div>
 
-              <div style={{ padding: "12px" }}>
+              <div style={{ padding: "12px", flex: 1, overflowY: "auto", maxHeight: "400px" }}>
                 {blockHabits.map((habit) => {
                   const state = mounted ? getHabitState(habit, blockHabits, completed) : "locked";
                   const isDone = state === "done";
@@ -394,37 +409,42 @@ export default function AnsarPage() {
             </div>
           );
         })}
+        </div>
 
         {/* REWARD TIERS */}
-        <div style={{ background: "#16192d", border: "1px solid #2d3543", borderRadius: 10, overflow: "hidden", boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)" }}>
-          <div style={{ height: 2, background: "linear-gradient(90deg, #ffa500, #00ff88, #00d9ff)" }} />
-          <div style={{ padding: "16px" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#ffffff", marginBottom: 12 }}>🏆 Weekly Reward Tiers</div>
-            {THRESHOLDS.map((t, i) => {
-              const weekPts = weeklyPts ?? 0;
-              const isActive = mounted && weekPts >= t.min && (i === 0 || weekPts < THRESHOLDS[i - 1].min);
-              const isAchieved = mounted && weekPts >= t.min;
-              return (
-                <div key={t.min} style={{
-                  display: "flex", alignItems: "center", gap: 12,
-                  padding: "12px", borderRadius: 8, marginBottom: 6,
-                  background: isActive ? t.color + "10" : "#1f2438",
-                  border: `1px solid ${isActive ? t.color + "50" : "#2d3543"}`,
-                  opacity: isAchieved ? 1 : 0.5,
-                }}>
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: t.color, flexShrink: 0, boxShadow: isActive ? `0 0 8px ${t.color}` : "none" }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: t.color }}>{t.label}</div>
-                    <div style={{ fontSize: 11, color: "#757f8f", marginTop: 1 }}>{t.desc}</div>
+        <div style={{ background: "#16192d", border: "1px solid #2d3543", borderRadius: 12, overflow: "hidden", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.2)" }}>
+          <div style={{ height: 3, background: "linear-gradient(90deg, #ffa500, #00ff88, #00d9ff)" }} />
+          <div style={{ padding: "20px" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#ffffff", marginBottom: 16 }}>🏆 Weekly Reward Tiers</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+              {THRESHOLDS.map((t, i) => {
+                const weekPts = weeklyPts ?? 0;
+                const isActive = mounted && weekPts >= t.min && (i === 0 || weekPts < THRESHOLDS[i - 1].min);
+                const isAchieved = mounted && weekPts >= t.min;
+                return (
+                  <div key={t.min} style={{
+                    display: "flex", flexDirection: "column", gap: 8,
+                    padding: "12px", borderRadius: 8,
+                    background: isActive ? t.color + "15" : "#1f2438",
+                    border: `1px solid ${isActive ? t.color + "50" : "#2d3543"}`,
+                    opacity: isAchieved ? 1 : 0.5,
+                    transition: "all 200ms ease-out",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ width: 10, height: 10, borderRadius: "50%", background: t.color, flexShrink: 0, boxShadow: isActive ? `0 0 8px ${t.color}` : "none" }} />
+                      <div style={{ fontSize: 12, fontWeight: 700, color: t.color }}>{t.label}</div>
+                    </div>
+                    <div style={{ fontSize: 10, color: "#757f8f", lineHeight: 1.4 }}>{t.desc}</div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: t.color, marginTop: 4 }}>{t.min}+ pts</div>
                   </div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#757f8f", flexShrink: 0 }}>{t.min}+ pts</div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
 
       </div>
+      <div style={{ height: 40 }} />
     </div>
   );
 }
