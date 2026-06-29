@@ -37,16 +37,16 @@ function buildHabits(dayName: string) {
 }
 
 const BLOCKS = [
-  { id: "pre",    label: "🌅 Pre-Homeschool",      subtitle: "Before 8:30am",    color: "#f59e0b" },
-  { id: "school", label: "📚 Homeschool",           subtitle: "4 hour block",     color: "#00c9ff" },
-  { id: "arvo",   label: "🌆 Afternoon & Evening",  subtitle: "After school",     color: "#a78bfa" },
+  { id: "pre",    label: "🌅 Pre-Homeschool",      subtitle: "Before 8:30am",    color: "#ffa500" },
+  { id: "school", label: "📚 Homeschool",           subtitle: "4 hour block",     color: "#00d9ff" },
+  { id: "arvo",   label: "🌆 Afternoon & Evening",  subtitle: "After school",     color: "#00ff88" },
 ];
 
 const THRESHOLDS = [
-  { min: 40, label: "Full Weekend 🏆", desc: "PS5 Sat+Sun · Full iPad · Movie Friday · Free time", color: "#2ecc71" },
-  { min: 32, label: "Good Week ✅",    desc: "PS5 Saturday only · iPad normal · Free time",        color: "#00c9ff" },
-  { min: 25, label: "Average Week ⚠️", desc: "No PS5 · iPad halved · Catch-up Saturday morning",  color: "#f59e0b" },
-  { min: 0,  label: "Reset Week ❌",   desc: "No PS5 · No iPad · Full catch-up weekend",           color: "#e74c3c" },
+  { min: 40, label: "Full Weekend 🏆", desc: "PS5 Sat+Sun · Full iPad · Movie Friday · Free time", color: "#00ff88" },
+  { min: 32, label: "Good Week ✅",    desc: "PS5 Saturday only · iPad normal · Free time",        color: "#00d9ff" },
+  { min: 25, label: "Average Week ⚠️", desc: "No PS5 · iPad halved · Catch-up Saturday morning",  color: "#ffa500" },
+  { min: 0,  label: "Reset Week ❌",   desc: "No PS5 · No iPad · Full catch-up weekend",           color: "#ff4444" },
 ];
 
 function getThreshold(pts: number) {
@@ -202,35 +202,35 @@ export default function AnsarPage() {
   const WEEKLY_MAX = SOCCER_DAYS.includes(dayName) ? 51 : 47; // 2 soccer days × 2pts extra
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0d0f14", color: "#f0f2f8", fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "#0f1419", color: "#ffffff", fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
 
       {/* HEADER */}
       <header style={{
-        background: "#13161e", borderBottom: "1px solid #232736",
+        background: "#16192d", borderBottom: "1px solid #2d3543",
         padding: "12px 20px", display: "flex", alignItems: "center",
         justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100,
       }}>
         <div>
-          <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em" }}>
-            Ansar <span style={{ color: "#f59e0b" }}>· Daily Habits</span>
+          <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em", color: "#ffffff" }}>
+            Ansar <span style={{ color: "#ffa500" }}>· Daily Habits</span>
           </div>
-          <div style={{ fontSize: 10, color: "#5a6080", textTransform: "uppercase", letterSpacing: "0.1em", marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ fontSize: 10, color: "#757f8f", textTransform: "uppercase", letterSpacing: "0.1em", marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
             {mounted ? new Date().toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long" }) : ""} · {time}
             <span style={{ display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 4 }}>
-              <span style={{ width: 5, height: 5, borderRadius: "50%", background: online ? "#2ecc71" : "#e74c3c", display: "inline-block" }} />
-              <span style={{ color: online ? "#2ecc71" : "#e74c3c" }}>{online ? "Live" : "Offline"}</span>
+              <span style={{ width: 5, height: 5, borderRadius: "50%", background: online ? "#00ff88" : "#ff4444", display: "inline-block" }} />
+              <span style={{ color: online ? "#00ff88" : "#ff4444" }}>{online ? "Live" : "Offline"}</span>
             </span>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 32, fontWeight: 800, color: "#f59e0b", lineHeight: 1 }}>{mounted ? todayPts : 0}</div>
-            <div style={{ fontSize: 9, color: "#5a6080", textTransform: "uppercase", letterSpacing: "0.1em" }}>pts today</div>
+            <div style={{ fontSize: 32, fontWeight: 700, color: "#ffa500", lineHeight: 1 }}>{mounted ? todayPts : 0}</div>
+            <div style={{ fontSize: 9, color: "#757f8f", textTransform: "uppercase", letterSpacing: "0.1em" }}>pts today</div>
           </div>
           <a href="/" style={{
-            fontSize: 10, color: "#5a6080", textDecoration: "none", fontWeight: 600,
+            fontSize: 10, color: "#b0b5c1", textDecoration: "none", fontWeight: 600,
             letterSpacing: "0.06em", textTransform: "uppercase",
-            background: "#1a1d2e", padding: "4px 10px", borderRadius: 4, border: "1px solid #232736",
+            background: "#1f2438", padding: "4px 10px", borderRadius: 4, border: "1px solid #2d3543",
           }}>← Dashboard</a>
         </div>
       </header>
@@ -240,36 +240,36 @@ export default function AnsarPage() {
         {/* TOP STATS ROW */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
           {/* Today points */}
-          <div style={{ background: "#13161e", border: "1px solid #232736", borderRadius: 8, padding: "12px 14px" }}>
-            <div style={{ fontSize: 28, fontWeight: 800, color: "#f59e0b", lineHeight: 1 }}>{mounted ? todayPts : "—"}</div>
-            <div style={{ fontSize: 10, color: "#5a6080", marginTop: 3, textTransform: "uppercase", letterSpacing: "0.07em" }}>Points Today</div>
+          <div style={{ background: "#16192d", border: "1px solid #2d3543", borderRadius: 10, padding: "16px", boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)" }}>
+            <div style={{ fontSize: 28, fontWeight: 700, color: "#ffa500", lineHeight: 1 }}>{mounted ? todayPts : "—"}</div>
+            <div style={{ fontSize: 10, color: "#757f8f", marginTop: 3, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 500 }}>Points Today</div>
           </div>
           {/* Weekly points */}
-          <div style={{ background: "#13161e", border: "1px solid #232736", borderRadius: 8, padding: "12px 14px" }}>
-            <div style={{ fontSize: 28, fontWeight: 800, color: "#2ecc71", lineHeight: 1 }}>{mounted && weeklyPts !== null ? weeklyPts : "—"}</div>
-            <div style={{ fontSize: 10, color: "#5a6080", marginTop: 3, textTransform: "uppercase", letterSpacing: "0.07em" }}>Week Total</div>
+          <div style={{ background: "#16192d", border: "1px solid #2d3543", borderRadius: 10, padding: "16px", boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)" }}>
+            <div style={{ fontSize: 28, fontWeight: 700, color: "#00ff88", lineHeight: 1 }}>{mounted && weeklyPts !== null ? weeklyPts : "—"}</div>
+            <div style={{ fontSize: 10, color: "#757f8f", marginTop: 3, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 500 }}>Week Total</div>
           </div>
           {/* Streak */}
-          <div style={{ background: "#13161e", border: "1px solid #232736", borderRadius: 8, padding: "12px 14px" }}>
-            <div style={{ fontSize: 28, fontWeight: 800, color: "#a78bfa", lineHeight: 1, display: "flex", alignItems: "center", gap: 4 }}>
+          <div style={{ background: "#16192d", border: "1px solid #2d3543", borderRadius: 10, padding: "16px", boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)" }}>
+            <div style={{ fontSize: 28, fontWeight: 700, color: "#00d9ff", lineHeight: 1, display: "flex", alignItems: "center", gap: 4 }}>
               {mounted && streak !== null ? streak : "—"}
               {mounted && streak !== null && streak > 0 && <span style={{ fontSize: 18 }}>🔥</span>}
             </div>
-            <div style={{ fontSize: 10, color: "#5a6080", marginTop: 3, textTransform: "uppercase", letterSpacing: "0.07em" }}>Day Streak</div>
+            <div style={{ fontSize: 10, color: "#757f8f", marginTop: 3, textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 500 }}>Day Streak</div>
           </div>
         </div>
 
         {/* OVERALL PROGRESS BAR */}
-        <div style={{ background: "#13161e", border: "1px solid #232736", borderRadius: 8, padding: "10px 14px", marginBottom: 10 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-            <span style={{ fontSize: 11, color: "#8b92b4", fontWeight: 600 }}>Today&apos;s Progress</span>
-            <span style={{ fontSize: 11, color: "#f0f2f8", fontWeight: 700 }}>{mounted ? todayDone : 0} of {habits.length} habits complete</span>
+        <div style={{ background: "#16192d", border: "1px solid #2d3543", borderRadius: 10, padding: "16px", marginBottom: 10, boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+            <span style={{ fontSize: 11, color: "#b0b5c1", fontWeight: 600 }}>Today&apos;s Progress</span>
+            <span style={{ fontSize: 11, color: "#ffffff", fontWeight: 600 }}>{mounted ? todayDone : 0} of {habits.length} habits complete</span>
           </div>
-          <div style={{ height: 8, background: "#1a1d2e", borderRadius: 4, overflow: "hidden" }}>
+          <div style={{ height: 8, background: "#1f2438", borderRadius: 4, overflow: "hidden" }}>
             <div style={{
-              height: "100%", borderRadius: 4, transition: "width 0.4s ease",
+              height: "100%", borderRadius: 4, transition: "width 200ms ease-in-out",
               width: mounted ? `${overallPct}%` : "0%",
-              background: "linear-gradient(90deg, #f59e0b, #2ecc71)",
+              background: "linear-gradient(90deg, #ffa500, #00ff88)",
             }} />
           </div>
         </div>
@@ -277,9 +277,9 @@ export default function AnsarPage() {
         {/* SOCCER TRAINING BADGE — only show on Mon/Wed */}
         {mounted && SOCCER_DAYS.includes(dayName) && (
           <div style={{
-            background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)",
-            borderRadius: 6, padding: "7px 12px", marginBottom: 10,
-            fontSize: 11, color: "#f59e0b", fontWeight: 600, display: "flex", alignItems: "center", gap: 6,
+            background: "rgba(255,165,0,0.1)", border: "1px solid rgba(255,165,0,0.3)",
+            borderRadius: 8, padding: "8px 12px", marginBottom: 10,
+            fontSize: 11, color: "#ffa500", fontWeight: 600, display: "flex", alignItems: "center", gap: 6,
           }}>
             ⚽ Soccer training day — check afternoon block for bonus habit (+2 pts)
           </div>
@@ -287,18 +287,19 @@ export default function AnsarPage() {
 
         {/* WEEKLY STATUS */}
         <div style={{
-          background: "#13161e", border: `1px solid ${weekThreshold.color}40`,
-          borderRadius: 8, padding: "12px 14px", marginBottom: 16,
+          background: "#16192d", border: `1px solid ${weekThreshold.color}40`,
+          borderRadius: 10, padding: "16px", marginBottom: 16,
           display: "flex", alignItems: "center", justifyContent: "space-between",
+          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
         }}>
           <div>
-            <div style={{ fontSize: 10, color: "#5a6080", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>This week you&apos;re on track for</div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: weekThreshold.color }}>{weekThreshold.label}</div>
-            <div style={{ fontSize: 11, color: "#8b92b4", marginTop: 3 }}>{weekThreshold.desc}</div>
+            <div style={{ fontSize: 10, color: "#757f8f", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4, fontWeight: 600 }}>This week you&apos;re on track for</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: weekThreshold.color }}>{weekThreshold.label}</div>
+            <div style={{ fontSize: 11, color: "#b0b5c1", marginTop: 3 }}>{weekThreshold.desc}</div>
           </div>
           <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 16 }}>
-            <div style={{ fontSize: 32, fontWeight: 800, color: weekThreshold.color, lineHeight: 1 }}>{mounted && weeklyPts !== null ? weeklyPts : "—"}</div>
-            <div style={{ fontSize: 10, color: "#5a6080" }}>/ {WEEKLY_MAX} pts max</div>
+            <div style={{ fontSize: 32, fontWeight: 700, color: weekThreshold.color, lineHeight: 1 }}>{mounted && weeklyPts !== null ? weeklyPts : "—"}</div>
+            <div style={{ fontSize: 10, color: "#757f8f" }}>/ {WEEKLY_MAX} pts max</div>
           </div>
         </div>
 
@@ -311,25 +312,25 @@ export default function AnsarPage() {
           const blockPct = Math.round((blockDone / blockHabits.length) * 100);
 
           return (
-            <div key={block.id} style={{ background: "#13161e", border: "1px solid #232736", borderRadius: 8, marginBottom: 10, overflow: "hidden" }}>
+            <div key={block.id} style={{ background: "#16192d", border: "1px solid #2d3543", borderRadius: 10, marginBottom: 10, overflow: "hidden", boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)" }}>
               <div style={{ height: 2, background: block.color }} />
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px 10px", borderBottom: "1px solid #232736" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px", borderBottom: "1px solid #2d3543" }}>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: block.color }}>{block.label}</div>
-                  <div style={{ fontSize: 10, color: "#5a6080", marginTop: 2 }}>{block.subtitle}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: block.color }}>{block.label}</div>
+                  <div style={{ fontSize: 10, color: "#757f8f", marginTop: 2, fontWeight: 500 }}>{block.subtitle}</div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{blockDone}/{blockHabits.length}</div>
-                    <div style={{ fontSize: 10, color: "#5a6080" }}>{blockPts} pts earned</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#ffffff" }}>{blockDone}/{blockHabits.length}</div>
+                    <div style={{ fontSize: 10, color: "#757f8f", fontWeight: 500 }}>{blockPts} pts earned</div>
                   </div>
-                  <div style={{ width: 48, background: "#1a1d2e", borderRadius: 3, height: 6, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${blockPct}%`, background: block.color, borderRadius: 3, transition: "width 0.4s" }} />
+                  <div style={{ width: 48, background: "#1f2438", borderRadius: 3, height: 6, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${blockPct}%`, background: block.color, borderRadius: 3, transition: "width 200ms ease-in-out" }} />
                   </div>
                 </div>
               </div>
 
-              <div style={{ padding: "8px 10px" }}>
+              <div style={{ padding: "12px" }}>
                 {blockHabits.map((habit) => {
                   const state = mounted ? getHabitState(habit, blockHabits, completed) : "locked";
                   const isDone = state === "done";
@@ -343,45 +344,45 @@ export default function AnsarPage() {
                       onClick={() => toggle(habit.id, state)}
                       style={{
                         display: "flex", alignItems: "center", gap: 12,
-                        padding: "11px 12px", marginBottom: 5, borderRadius: 6,
-                        border: `1px solid ${isDone ? block.color + "50" : isAvailable ? "#2d3244" : "#1e2230"}`,
-                        background: isDone ? block.color + "10" : isAvailable ? "#1a1d2e" : "#111318",
-                        opacity: isLocked ? 0.35 : 1,
+                        padding: "12px", marginBottom: 6, borderRadius: 8,
+                        border: `1px solid ${isDone ? block.color + "50" : isAvailable ? "#2d3543" : "#1f2438"}`,
+                        background: isDone ? block.color + "0a" : isAvailable ? "#1f2438" : "#16192d",
+                        opacity: isLocked ? 0.5 : 1,
                         cursor: isAvailable ? "pointer" : "default",
-                        transition: "all 0.15s ease",
+                        transition: "all 150ms ease-out",
                         WebkitTapHighlightColor: "transparent",
                       }}
                     >
                       <div style={{
-                        width: 22, height: 22, borderRadius: 5, flexShrink: 0,
-                        border: `2px solid ${isDone ? block.color : isAvailable ? "#363a52" : "#232736"}`,
+                        width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                        border: `2px solid ${isDone ? block.color : isAvailable ? "#2d3543" : "#1f2438"}`,
                         background: isDone ? block.color : "transparent",
                         display: "flex", alignItems: "center", justifyContent: "center",
-                        transition: "all 0.15s ease",
+                        transition: "all 150ms ease-out",
                       }}>
                         {isSaving ? <span style={{ fontSize: 10 }}>⏳</span> :
-                         isDone ? <span style={{ fontSize: 12, color: "#000", fontWeight: 800 }}>✓</span> :
+                         isDone ? <span style={{ fontSize: 12, color: "#000", fontWeight: 700 }}>✓</span> :
                          isLocked ? <span style={{ fontSize: 9 }}>🔒</span> : null}
                       </div>
 
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{
                           fontSize: 13, fontWeight: isAvailable ? 600 : 500,
-                          color: isDone ? "#5a6080" : isLocked ? "#363a52" : "#f0f2f8",
+                          color: isDone ? "#757f8f" : isLocked ? "#565f70" : "#ffffff",
                           textDecoration: isDone ? "line-through" : "none",
                         }}>
                           {habit.icon} {habit.label}
                         </div>
-                        {isLocked && <div style={{ fontSize: 10, color: "#363a52", marginTop: 2 }}>Complete previous habits to unlock</div>}
+                        {isLocked && <div style={{ fontSize: 10, color: "#565f70", marginTop: 2, fontWeight: 500 }}>Complete previous habits to unlock</div>}
                       </div>
 
                       {habit.points > 0 && (
                         <div style={{
-                          fontSize: 11, fontWeight: 700, flexShrink: 0,
-                          color: isDone ? block.color : isLocked ? "#2d3244" : "#8b92b4",
-                          background: isDone ? block.color + "20" : "#0d0f14",
-                          padding: "3px 8px", borderRadius: 4,
-                          border: `1px solid ${isDone ? block.color + "40" : "#232736"}`,
+                          fontSize: 11, fontWeight: 600, flexShrink: 0,
+                          color: isDone ? block.color : isLocked ? "#565f70" : "#b0b5c1",
+                          background: isDone ? block.color + "15" : "#1f2438",
+                          padding: "4px 8px", borderRadius: 6,
+                          border: `1px solid ${isDone ? block.color + "40" : "#2d3543"}`,
                         }}>
                           +{habit.points} pt{habit.points > 1 ? "s" : ""}
                         </div>
@@ -395,10 +396,10 @@ export default function AnsarPage() {
         })}
 
         {/* REWARD TIERS */}
-        <div style={{ background: "#13161e", border: "1px solid #232736", borderRadius: 8, overflow: "hidden" }}>
-          <div style={{ height: 2, background: "linear-gradient(90deg, #f59e0b, #2ecc71, #00c9ff)" }} />
-          <div style={{ padding: "12px 14px" }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#f0f2f8", marginBottom: 10 }}>🏆 Weekly Reward Tiers</div>
+        <div style={{ background: "#16192d", border: "1px solid #2d3543", borderRadius: 10, overflow: "hidden", boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)" }}>
+          <div style={{ height: 2, background: "linear-gradient(90deg, #ffa500, #00ff88, #00d9ff)" }} />
+          <div style={{ padding: "16px" }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#ffffff", marginBottom: 12 }}>🏆 Weekly Reward Tiers</div>
             {THRESHOLDS.map((t, i) => {
               const weekPts = weeklyPts ?? 0;
               const isActive = mounted && weekPts >= t.min && (i === 0 || weekPts < THRESHOLDS[i - 1].min);
@@ -406,17 +407,17 @@ export default function AnsarPage() {
               return (
                 <div key={t.min} style={{
                   display: "flex", alignItems: "center", gap: 12,
-                  padding: "10px 12px", borderRadius: 6, marginBottom: 5,
-                  background: isActive ? t.color + "15" : "#1a1d2e",
-                  border: `1px solid ${isActive ? t.color + "50" : "#232736"}`,
-                  opacity: isAchieved ? 1 : 0.45,
+                  padding: "12px", borderRadius: 8, marginBottom: 6,
+                  background: isActive ? t.color + "10" : "#1f2438",
+                  border: `1px solid ${isActive ? t.color + "50" : "#2d3543"}`,
+                  opacity: isAchieved ? 1 : 0.5,
                 }}>
                   <div style={{ width: 8, height: 8, borderRadius: "50%", background: t.color, flexShrink: 0, boxShadow: isActive ? `0 0 8px ${t.color}` : "none" }} />
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: t.color }}>{t.label}</div>
-                    <div style={{ fontSize: 11, color: "#5a6080", marginTop: 1 }}>{t.desc}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: t.color }}>{t.label}</div>
+                    <div style={{ fontSize: 11, color: "#757f8f", marginTop: 1 }}>{t.desc}</div>
                   </div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "#5a6080", flexShrink: 0 }}>{t.min}+ pts</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#757f8f", flexShrink: 0 }}>{t.min}+ pts</div>
                 </div>
               );
             })}
