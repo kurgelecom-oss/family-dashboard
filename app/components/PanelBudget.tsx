@@ -21,14 +21,6 @@ interface SummaryData {
   last_updated: string | null;
 }
 
-interface NetPosition {
-  total_income: number;
-  total_spend: number;
-  net: number;
-  surplus: boolean;
-  income_breakdown: { source: string; label: string; amount: number }[];
-}
-
 function formatWeekLabel(isoDate: string): string {
   const mon = new Date(isoDate + "T00:00:00");
   const sun = new Date(mon);
@@ -44,22 +36,12 @@ function formatWeekLabel(isoDate: string): string {
 
 export default function PanelBudget() {
   const [data, setData] = useState<SummaryData | null>(null);
-  const [netPos, setNetPos] = useState<NetPosition | null>(null);
-  const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
 
   const load = useCallback(async () => {
-    try {
-      await fetch("/api/income/sync");
-      const [summaryRes, netRes] = await Promise.all([
-        fetch("/api/budget/summary"),
-        fetch("/api/net-position"),
-      ]);
-      if (summaryRes.ok) setData(await summaryRes.json());
-      if (netRes.ok) setNetPos(await netRes.json());
-    } finally {
-      setLoading(false);
-    }
+    await fetch("/api/income/sync");
+    const summaryRes = await fetch("/api/budget/summary");
+    if (summaryRes.ok) setData(await summaryRes.json());
   }, []);
 
   useEffect(() => {
@@ -125,75 +107,6 @@ export default function PanelBudget() {
               Enter spend →
             </a>
           </div>
-        </div>
-      </div>
-
-      {/* ── Card 2: Income vs Spend ── */}
-      <div className="card" style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-        <div className="card-header">
-          <div className="card-title">Income vs Spend</div>
-          {mounted && netPos && (
-            <span className={`badge ${netPos.surplus ? "badge-green" : "badge-red"}`}>
-              {netPos.surplus ? "Surplus" : "Deficit"}
-            </span>
-          )}
-        </div>
-
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-          {mounted && netPos ? (
-            <>
-              {netPos.income_breakdown.map((item) => (
-                <div className="list-row" key={item.source}>
-                  <span className="list-label">{item.label}</span>
-                  <span className="list-value" style={{ color: "var(--green)", fontVariantNumeric: "tabular-nums" }}>
-                    +${item.amount.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-              ))}
-
-              <div className="divider" style={{ margin: "4px 0" }} />
-
-              <div className="list-row">
-                <span className="list-label" style={{ fontWeight: 700 }}>Total In</span>
-                <span className="list-value" style={{ color: "var(--green)" }}>
-                  +${netPos.total_income.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-              <div className="list-row">
-                <span className="list-label" style={{ fontWeight: 700 }}>Total Spent</span>
-                <span className="list-value" style={{ color: "var(--red)" }}>
-                  -${netPos.total_spend.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-
-              <div className="divider" style={{ margin: "4px 0" }} />
-
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 2 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: "var(--text-primary)" }}>Net</span>
-                <span style={{
-                  fontSize: 20, fontWeight: 700, fontVariantNumeric: "tabular-nums",
-                  color: netPos.surplus ? "var(--green)" : "var(--red)",
-                }}>
-                  {netPos.surplus ? "+" : "-"}${Math.abs(netPos.net).toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-
-              {data?.balance != null && (
-                <div style={{ marginTop: 6, paddingTop: 6, borderTop: "1px solid var(--border)" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span className="list-label">ING Balance</span>
-                    <span className="list-value" style={{ color: "var(--cyan)" }}>
-                      ${data.balance.value.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </>
-          ) : (
-            <div style={{ fontSize: 12, color: "var(--text-muted)", padding: "12px 0" }}>
-              {loading ? "Loading…" : "No data"}
-            </div>
-          )}
         </div>
       </div>
     </>
