@@ -11,11 +11,16 @@ interface TodoItem {
   notes?: string;
 }
 
-const CONTEXT_COLORS = {
+const CONTEXT_COLORS: Record<string, { bg: string; border: string; icon: string }> = {
   personal: { bg: "rgba(147, 112, 219, 0.1)", border: "#9370db", icon: "👤" },
   work: { bg: "rgba(0, 212, 255, 0.1)", border: "#00d4ff", icon: "💼" },
   family: { bg: "rgba(46, 204, 113, 0.1)", border: "#2ecc71", icon: "👨‍👩‍👧‍👦" },
+  asap: { bg: "rgba(255, 99, 71, 0.1)", border: "#ff6347", icon: "🔥" },
 };
+
+// Fallback for any Notion context value not mapped above — prevents a crash
+// when a new Context option is added in Notion.
+const DEFAULT_CONTEXT_COLOR = { bg: "rgba(160, 160, 160, 0.1)", border: "#a0a0a0", icon: "📌" };
 
 function getUrgencyColor(dueDate?: string): string {
   if (!dueDate) return "var(--text-secondary)";
@@ -97,7 +102,7 @@ export default function PanelTodos() {
         <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }}>
           <div className="card-title">Next Steps</div>
           <a
-            href="https://app.notion.com/p/Next-To-Do-Items-38e5429afa9080a2829bef96d31d9f5e"
+            href="https://app.notion.com/p/38e5429afa9080d9a82ada50b5ab437c"
             target="_blank"
             rel="noopener noreferrer"
             title="Open in Notion"
@@ -167,7 +172,7 @@ export default function PanelTodos() {
         ) : (
           displayTodos.map((todo) => {
             const isExpanded = expandedId === todo.id;
-            const color = CONTEXT_COLORS[todo.context];
+            const color = CONTEXT_COLORS[todo.context] || DEFAULT_CONTEXT_COLOR;
             const urgencyColor = getUrgencyColor(todo.dueDate);
             const isUrgent = todo.priority === "high" || (todo.dueDate && new Date(todo.dueDate) < new Date(Date.now() + 86400000));
 

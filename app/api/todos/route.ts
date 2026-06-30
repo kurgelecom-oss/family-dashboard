@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const NOTION_TOKEN = process.env.NOTION_TOKEN;
-const NOTION_DB_ID = process.env.NOTION_DB_ID;
+// Notion-Version 2026-03-11 queries DATA SOURCES, not databases.
+// This must be the data_source_id, not the database_id.
+const NOTION_DATA_SOURCE_ID = process.env.NOTION_DATA_SOURCE_ID;
 
 interface NotionTodo {
   id: string;
@@ -14,11 +16,11 @@ interface NotionTodo {
 }
 
 async function fetchNotionTodos(): Promise<NotionTodo[]> {
-  if (!NOTION_TOKEN || !NOTION_DB_ID) {
+  if (!NOTION_TOKEN || !NOTION_DATA_SOURCE_ID) {
     throw new Error("Missing Notion credentials");
   }
 
-  const response = await fetch(`https://api.notion.com/v1/databases/${NOTION_DB_ID}/query`, {
+  const response = await fetch(`https://api.notion.com/v1/data_sources/${NOTION_DATA_SOURCE_ID}/query`, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${NOTION_TOKEN}`,
