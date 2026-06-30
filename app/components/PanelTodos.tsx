@@ -22,6 +22,14 @@ const CONTEXT_COLORS: Record<string, { bg: string; border: string; icon: string 
 // when a new Context option is added in Notion.
 const DEFAULT_CONTEXT_COLOR = { bg: "rgba(160, 160, 160, 0.1)", border: "#a0a0a0", icon: "📌" };
 
+// Priority pill styling — mirrors the Notion select colors (High=red,
+// Medium=yellow, Low=green). Keyed by the lowercased Notion option name.
+const PRIORITY_META: Record<string, { label: string; fg: string; bg: string; border: string }> = {
+  high: { label: "HIGH", fg: "#ff6b6b", bg: "rgba(255, 99, 99, 0.15)", border: "rgba(255, 99, 99, 0.4)" },
+  medium: { label: "MED", fg: "#ffc857", bg: "rgba(255, 200, 87, 0.15)", border: "rgba(255, 200, 87, 0.4)" },
+  low: { label: "LOW", fg: "#4ade80", bg: "rgba(74, 222, 128, 0.14)", border: "rgba(74, 222, 128, 0.35)" },
+};
+
 function getUrgencyColor(dueDate?: string): string {
   if (!dueDate) return "var(--text-secondary)";
   const due = new Date(dueDate).getTime();
@@ -173,6 +181,7 @@ export default function PanelTodos() {
           displayTodos.map((todo) => {
             const isExpanded = expandedId === todo.id;
             const color = CONTEXT_COLORS[todo.context] || DEFAULT_CONTEXT_COLOR;
+            const prio = PRIORITY_META[todo.priority] || PRIORITY_META.medium;
             const urgencyColor = getUrgencyColor(todo.dueDate);
             const isUrgent = todo.priority === "high" || (todo.dueDate && new Date(todo.dueDate) < new Date(Date.now() + 86400000));
 
@@ -242,28 +251,32 @@ export default function PanelTodos() {
                       >
                         {todo.title}
                       </span>
+                      {/* Priority pill — color/label mirror the Notion tier */}
+                      <span
+                        style={{
+                          marginLeft: "auto",
+                          flexShrink: 0,
+                          padding: "1px 5px",
+                          borderRadius: 4,
+                          fontSize: 9,
+                          fontWeight: 700,
+                          letterSpacing: "0.04em",
+                          lineHeight: 1.5,
+                          color: prio.fg,
+                          background: prio.bg,
+                          border: `1px solid ${prio.border}`,
+                        }}
+                      >
+                        {prio.label}
+                      </span>
                     </div>
 
-                    {/* Due date + priority */}
-                    {(todo.dueDate || todo.priority === "high") && (
+                    {/* Due date */}
+                    {todo.dueDate && (
                       <div style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 10 }}>
-                        {todo.dueDate && (
-                          <span style={{ color: urgencyColor, fontWeight: 600 }}>
-                            {formatDueDate(todo.dueDate)}
-                          </span>
-                        )}
-                        {todo.priority === "high" && (
-                          <span
-                            style={{
-                              display: "inline-block",
-                              width: 6,
-                              height: 6,
-                              borderRadius: "50%",
-                              background: "var(--red)",
-                              opacity: 0.8,
-                            }}
-                          />
-                        )}
+                        <span style={{ color: urgencyColor, fontWeight: 600 }}>
+                          {formatDueDate(todo.dueDate)}
+                        </span>
                       </div>
                     )}
 
