@@ -104,7 +104,7 @@ export async function GET() {
     try {
       const accessToken = await getAccessToken(refreshToken);
       const raw = await fetchEvents(accessToken, startISO, endISO);
-      raw.filter(e => e.isOrganizer === true).slice(0, 2).forEach(e => {
+      raw.filter(e => e.isOrganizer === true).slice(0, 3).forEach(e => {
         events.push({
           id:       `${account.key}-${e.id}`,
           subject:  e.subject ?? "(No title)",

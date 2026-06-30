@@ -275,26 +275,26 @@ export default function PanelCalendar() {
             return (
               <div key={acct.key}>
                 <div style={{
-                  fontSize: 11, fontWeight: 700, textTransform: "uppercase",
+                  fontSize: 12, fontWeight: 700, textTransform: "uppercase",
                   letterSpacing: "0.06em", color, marginBottom: 4,
                 }}>
                   {acct.label}
                 </div>
 
                 {notConnected ? (
-                  <div style={{ fontSize: 11, color: "var(--text-muted)", paddingLeft: 4 }}>Not connected</div>
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)", paddingLeft: 4 }}>Not connected</div>
                 ) : personEvents.length === 0 ? (
-                  <div style={{ fontSize: 11, color: "var(--text-muted)", paddingLeft: 4 }}>No events today</div>
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)", paddingLeft: 4 }}>No events today</div>
                 ) : (
                   personEvents.map(e => (
                     <div key={e.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "3px 0" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                         <div style={{ width: 3, height: 20, borderRadius: 2, flexShrink: 0, background: color }} />
-                        <div style={{ fontSize: 12, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <div style={{ fontSize: 13, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {e.subject || "(No title)"}
                         </div>
                       </div>
-                      <div style={{ fontSize: 11, color: "var(--text-muted)", flexShrink: 0, marginLeft: 6 }}>
+                      <div style={{ fontSize: 12, color: "var(--text-secondary)", flexShrink: 0, marginLeft: 6 }}>
                         {e.isAllDay ? "all day" : countdown(e.startISO)}
                       </div>
                     </div>
