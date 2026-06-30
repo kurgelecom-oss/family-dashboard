@@ -100,7 +100,7 @@ export default function PanelTodos() {
       {/* ── Header ── */}
       <div className="card-header">
         <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }}>
-          <div className="card-title">Next Steps</div>
+          <div className="card-title">Action Items</div>
           <a
             href="https://app.notion.com/p/38e5429afa9080c98967cfef39103c0c"
             target="_blank"

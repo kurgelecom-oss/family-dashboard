@@ -24,15 +24,15 @@ export default function Dashboard() {
         <div className="dashboard-col">
           <PanelBudget />
         </div>
-        {/* Column 4 — Family: Calendar gets 1.2x, Todos gets 1x, Habits gets 0.8x */}
+        {/* Column 4 — Family: Calendar gets 0.8x, Todos (Action Items) gets 1.2x, Habits gets 1x */}
         <div className="dashboard-col">
-          <div style={{ flex: 1.2, minHeight: 0, display: "flex", flexDirection: "column" }}>
+          <div style={{ flex: 0.8, minHeight: 0, display: "flex", flexDirection: "column" }}>
             <PanelCalendar />
           </div>
-          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+          <div style={{ flex: 1.2, minHeight: 0, display: "flex", flexDirection: "column" }}>
             <PanelTodos />
           </div>
-          <div style={{ flex: 0.8, minHeight: 0, display: "flex", flexDirection: "column" }}>
+          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
             <PanelHabits />
           </div>
         </div>

@@ -196,67 +196,6 @@ export default function PanelBudget() {
           )}
         </div>
       </div>
-
-      {/* ── Card 3: Spend by Category ── */}
-      <div className="card" style={{ flex: 1.5, minHeight: 0, overflow: "hidden" }}>
-        <div className="card-header">
-          <div className="card-title">Spend by Category</div>
-        </div>
-
-        <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-          <div>
-            {CATEGORIES.map((cat) => {
-              const spent = cats[cat.id] ?? 0;
-              const pct = Math.min((spent / cat.target) * 100, 100);
-              const over = spent > cat.target;
-              const fillColor = over ? "var(--red)" : spent / cat.target >= 0.8 ? "var(--amber)" : "var(--cyan)";
-
-              return (
-                <div key={cat.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
-                  <span style={{ fontSize: 12, color: "var(--text-primary)", flexShrink: 0, width: 90, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {cat.label}
-                  </span>
-                  <div style={{ flex: 1, height: 5, background: "var(--progress-track)", borderRadius: 2, overflow: "hidden" }}>
-                    <div style={{ width: `${pct}%`, height: "100%", borderRadius: 2, background: fillColor, transition: "width 0.5s ease" }} />
-                  </div>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: over ? "var(--red)" : "var(--text-primary)", textAlign: "right", flexShrink: 0, width: 48, fontVariantNumeric: "tabular-nums" }}>
-                    ${spent.toFixed(0)}
-                  </span>
-                </div>
-              );
-            })}
-
-            {otherSpent > 0 && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
-                <span style={{ fontSize: 12, color: "var(--text-primary)", flexShrink: 0, width: 90 }}>Other</span>
-                <div style={{ flex: 1, height: 5, background: "var(--progress-track)", borderRadius: 2, overflow: "hidden" }}>
-                  <div style={{ width: "40%", height: "100%", borderRadius: 2, background: "var(--text-muted)", opacity: 0.5 }} />
-                </div>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", textAlign: "right", flexShrink: 0, width: 48 }}>
-                  ${otherSpent.toFixed(0)}
-                </span>
-              </div>
-            )}
-          </div>
-
-          <div style={{ borderTop: "1px solid var(--border)", paddingTop: 6 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-primary)", flexShrink: 0, width: 90 }}>Total</span>
-              <div style={{ flex: 1, height: 5, background: "var(--progress-track)", borderRadius: 2, overflow: "hidden" }}>
-                <div style={{
-                  width: `${Math.min((totalSpent / WEEKLY_TOTAL_TARGET) * 100, 100)}%`,
-                  height: "100%", borderRadius: 2,
-                  background: overBudget ? "var(--red)" : "var(--cyan)",
-                  transition: "width 0.5s ease",
-                }} />
-              </div>
-              <span style={{ fontSize: 12, fontWeight: 600, color: overBudget ? "var(--red)" : "var(--text-primary)", textAlign: "right", flexShrink: 0, width: 48, fontVariantNumeric: "tabular-nums" }}>
-                ${totalSpent.toFixed(0)}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
     </>
   );
 }
