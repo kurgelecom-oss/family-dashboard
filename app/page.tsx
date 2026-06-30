@@ -26,7 +26,7 @@ export default function Dashboard() {
           <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
             <PanelBudget />
           </div>
-          <div style={{ flex: 2, minHeight: 0, display: "flex", flexDirection: "column" }}>
+          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
             <PanelTodos />
           </div>
         </div>
@@ -35,7 +35,7 @@ export default function Dashboard() {
           <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
             <PanelCalendar />
           </div>
-          <div style={{ flex: 2, minHeight: 0, display: "flex", flexDirection: "column" }}>
+          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
             <PanelHabits />
           </div>
         </div>

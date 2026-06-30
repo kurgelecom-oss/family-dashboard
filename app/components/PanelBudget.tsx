@@ -61,7 +61,7 @@ export default function PanelBudget() {
   return (
     <>
       {/* ── Card 1: Weekly Spend — compact auto height ── */}
-      <div className="card" style={{ flex: "0 0 auto", padding: "10px 12px" }}>
+      <div className="card" style={{ flex: 1, minHeight: 0, padding: "10px 12px" }}>
         <div className="card-header">
           <div className="card-title">Weekly Spend</div>
           {mounted && data && (
