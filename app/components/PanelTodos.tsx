@@ -102,7 +102,7 @@ export default function PanelTodos() {
         <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }}>
           <div className="card-title">Next Steps</div>
           <a
-            href="https://app.notion.com/p/38e5429afa9080d9a82ada50b5ab437c"
+            href="https://app.notion.com/p/38e5429afa9080c98967cfef39103c0c"
             target="_blank"
             rel="noopener noreferrer"
             title="Open in Notion"
