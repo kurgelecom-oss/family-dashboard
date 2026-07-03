@@ -46,8 +46,12 @@ type ToastItem = {
 };
 
 function parseEventTime(iso: string): number {
+  // Microsoft Graph returns calendarView times in UTC with NO offset in the
+  // string (e.g. "2026-07-05T22:00:00.0000000", timeZone: "UTC"). A bare string
+  // must therefore be treated as UTC — appending a local "+10:00" offset shifted
+  // every timed event ~10h earlier (8:30pm → 10:30am) and mis-fired banners.
   const hasTimezone = iso.endsWith("Z") || iso.includes("+") || (iso.length > 19 && iso.slice(10).includes("-"));
-  return new Date(hasTimezone ? iso : iso + "+10:00").getTime();
+  return new Date(hasTimezone ? iso : iso + "Z").getTime();
 }
 
 // "3:00 PM" in Brisbane time

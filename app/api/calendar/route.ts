@@ -62,6 +62,9 @@ async function fetchEvents(accessToken: string, startISO: string, endISO: string
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
+      // Force UTC (Graph's default) so start/end dateTime strings are always
+      // UTC with no offset — the client parses bare strings as UTC.
+      Prefer: 'outlook.timezone="UTC"',
     },
   });
   if (!res.ok) {
