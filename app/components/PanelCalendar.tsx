@@ -50,34 +50,14 @@ function parseEventTime(iso: string): number {
   return new Date(hasTimezone ? iso : iso + "+10:00").getTime();
 }
 
-function countdown(iso: string): string {
-  const diffMs = parseEventTime(iso) - Date.now();
-  if (diffMs <= 0) return "now";
-
-  const mins  = Math.floor(diffMs / 60_000);
-  const hours = Math.floor(diffMs / 3_600_000);
-  const days  = Math.floor(diffMs / 86_400_000);
-
-  if (mins < 60) return `in ${mins}m`;
-  if (hours < 24) {
-    const remMins = mins % 60;
-    return remMins > 0 ? `in ${hours}h ${remMins}m` : `in ${hours}h`;
-  }
-
-  const eventDate = new Date(iso);
-  const tomorrow  = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  if (
-    eventDate.getDate()     === tomorrow.getDate()     &&
-    eventDate.getMonth()    === tomorrow.getMonth()    &&
-    eventDate.getFullYear() === tomorrow.getFullYear()
-  ) {
-    const t = eventDate.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit", hour12: true });
-    return `tomorrow ${t}`;
-  }
-
-  if (days < 7) return `in ${days} days`;
-  return eventDate.toLocaleDateString("en-AU", { day: "numeric", month: "short" });
+// "3:00 PM" in Brisbane time
+function formatEventTime(iso: string): string {
+  return new Date(parseEventTime(iso)).toLocaleTimeString("en-AU", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Australia/Brisbane",
+  });
 }
 
 function BannerContainer({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id: string) => void }) {
@@ -221,14 +201,21 @@ export default function PanelCalendar() {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  const isTodayEvent = (iso: string): boolean => {
+  const sameDay = (iso: string, ref: Date): boolean => {
     const eventDate = new Date(parseEventTime(iso));
-    const today = new Date();
     return (
-      eventDate.getDate() === today.getDate() &&
-      eventDate.getMonth() === today.getMonth() &&
-      eventDate.getFullYear() === today.getFullYear()
+      eventDate.getDate() === ref.getDate() &&
+      eventDate.getMonth() === ref.getMonth() &&
+      eventDate.getFullYear() === ref.getFullYear()
     );
+  };
+
+  const isTodayEvent = (iso: string): boolean => sameDay(iso, new Date());
+
+  const isTomorrowEvent = (iso: string): boolean => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return sameDay(iso, tomorrow);
   };
 
   return (
@@ -264,7 +251,7 @@ export default function PanelCalendar() {
 
         <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column", gap: 10 }}>
           {!calLoading && ACCOUNTS.map(acct => {
-            const personEvents = events.filter(e => e.account === acct.key && isTodayEvent(e.startISO));
+            const personEvents = events.filter(e => e.account === acct.key && (isTodayEvent(e.startISO) || isTomorrowEvent(e.startISO)));
             const notConnected = missing.some(m =>
               m === (acct.key === "TAYLAN" ? "taylan.k8@hotmail.com" :
                      acct.key === "NIHAL"  ? "nils_gvi@hotmail.com"  :
@@ -284,9 +271,12 @@ export default function PanelCalendar() {
                 {notConnected ? (
                   <div style={{ fontSize: 12, color: "var(--text-secondary)", paddingLeft: 4 }}>Not connected</div>
                 ) : personEvents.length === 0 ? (
-                  <div style={{ fontSize: 12, color: "var(--text-secondary)", paddingLeft: 4 }}>No events today</div>
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)", paddingLeft: 4 }}>No events today or tomorrow</div>
                 ) : (
-                  personEvents.map(e => (
+                  personEvents.map(e => {
+                    const tomorrow = isTomorrowEvent(e.startISO);
+                    const timeLabel = e.isAllDay ? "all day" : formatEventTime(e.startISO);
+                    return (
                     <div key={e.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "3px 0" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                         <div style={{ width: 3, height: 20, borderRadius: 2, flexShrink: 0, background: color }} />
@@ -294,11 +284,17 @@ export default function PanelCalendar() {
                           {e.subject || "(No title)"}
                         </div>
                       </div>
-                      <div style={{ fontSize: 12, color: "var(--text-secondary)", flexShrink: 0, marginLeft: 6 }}>
-                        {e.isAllDay ? "all day" : countdown(e.startISO)}
+                      <div style={{ fontSize: 12, color: "var(--text-secondary)", flexShrink: 0, marginLeft: 6, display: "flex", alignItems: "center", gap: 5 }}>
+                        {tomorrow && (
+                          <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-muted)", background: "var(--panel-2, rgba(255,255,255,0.05))", borderRadius: 3, padding: "1px 4px" }}>
+                            Tomorrow
+                          </span>
+                        )}
+                        <span>{timeLabel}</span>
                       </div>
                     </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             );
@@ -306,7 +302,7 @@ export default function PanelCalendar() {
 
           {!calLoading && events.length === 0 && missing.length === 0 && (
             <div style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "center", padding: "12px 0" }}>
-              No events today.
+              No events today or tomorrow.
             </div>
           )}
         </div>
