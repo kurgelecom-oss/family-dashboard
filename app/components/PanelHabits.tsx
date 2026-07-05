@@ -2,30 +2,83 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase, getTodayDate, getWeekStart } from "../lib/supabase";
 
+// ─── ANSAR FC block-based scoring — exact copy of app/week/page.tsx ─────────
+// Block-based, NOT per-habit sums. Daily max 10 (11 on Mon/Wed training days).
+const SOCCER_DAYS = ["Monday", "Wednesday"];
+
+const PRE_HABIT_IDS = ["feet_floor", "fajr", "bed_dressed", "movement", "breakfast", "quran", "goals"];
+
 const HABITS = [
-  { id: "wake",       block: "pre",    points: 0 },
-  { id: "fajr",       block: "pre",    points: 0 },
-  { id: "bed",        block: "pre",    points: 0 },
-  { id: "movement",   block: "pre",    points: 0 },
-  { id: "breakfast",  block: "pre",    points: 0 },
-  { id: "quran",      block: "pre",    points: 0 },
-  { id: "goals",      block: "pre",    points: 2 },
-  { id: "school",     block: "school", points: 3 },
-  { id: "readtheory", block: "school", points: 1 },
-  { id: "khan",       block: "school", points: 1 },
-  { id: "journal",    block: "school", points: 1 },
-  { id: "soccer",     block: "arvo",   points: 2 },
-  { id: "btn",        block: "arvo",   points: 1 },
-  { id: "namaz",      block: "arvo",   points: 1 },
-  { id: "room",       block: "arvo",   points: 0 },
-  { id: "shower",     block: "arvo",   points: 0 },
-  { id: "teeth",      block: "arvo",   points: 0 },
-  { id: "reading",    block: "arvo",   points: 1 },
+  { id: "feet_floor",         block: "pre" },
+  { id: "fajr",               block: "pre" },
+  { id: "bed_dressed",        block: "pre" },
+  { id: "movement",           block: "pre" },
+  { id: "breakfast",          block: "pre" },
+  { id: "quran",              block: "pre" },
+  { id: "goals",              block: "pre" },
+  { id: "homeschool_session", block: "school" },
+  { id: "readtheory",         block: "school" },
+  { id: "khan",               block: "school" },
+  { id: "journal",            block: "school" },
+  { id: "btn_cornell",        block: "arvo" },
+  { id: "all_namaz",          block: "arvo" },
+  { id: "room_tidy",          block: "arvo" },
+  { id: "shower",             block: "arvo" },
+  { id: "teeth",              block: "arvo" },
+  { id: "reading",            block: "arvo" },
 ];
 
-const HABIT_POINTS: Record<string, number> = Object.fromEntries(HABITS.map(h => [h.id, h.points]));
+const BASE_IDS = HABITS.map(h => h.id);
+function visibleIds(dayName: string): string[] {
+  return SOCCER_DAYS.includes(dayName) ? [...BASE_IDS, "soccer_training"] : BASE_IDS;
+}
 
-const BASE_HABITS = HABITS.filter(h => h.id !== "soccer");
+function scoreDay(completedIds: Set<string>, dayName: string) {
+  const hasSoccer = SOCCER_DAYS.includes(dayName);
+
+  const pre = PRE_HABIT_IDS.every(id => completedIds.has(id)) ? 2 : 0;
+
+  let school = 0;
+  if (completedIds.has("homeschool_session")) school += 3;
+  if (completedIds.has("readtheory") && completedIds.has("khan")) school += 1;
+  if (completedIds.has("journal")) school += 1;
+
+  let arvo = 0;
+  if (completedIds.has("btn_cornell")) arvo += 1;
+  if (completedIds.has("all_namaz")) arvo += 1;
+
+  const conditional = hasSoccer && completedIds.has("soccer_training") ? 1 : 0;
+
+  const ids = visibleIds(dayName);
+  const perfect = ids.length > 0 && ids.every(id => completedIds.has(id));
+  const bonus = perfect ? 1 : 0;
+
+  return { total: pre + school + arvo + conditional + bonus, perfect };
+}
+
+// Weekly max = 56 (incl. +3 streak bonus for 5 Perfect Days Mon–Fri).
+const WEEKLY_MAX = 56;
+
+const THRESHOLDS = [
+  { min: 42, label: "First Team" },
+  { min: 34, label: "Bench" },
+  { min: 26, label: "Reserves" },
+  { min: 0,  label: "Training Ground" },
+];
+function getThreshold(pts: number) {
+  return THRESHOLDS.find(t => pts >= t.min) || THRESHOLDS[THRESHOLDS.length - 1];
+}
+
+function dayNameOf(dateStr: string) {
+  return new Date(dateStr + "T12:00:00").toLocaleDateString("en-AU", { weekday: "long" });
+}
+function addDays(dateStr: string, n: number) {
+  const d = new Date(dateStr + "T12:00:00");
+  d.setDate(d.getDate() + n);
+  return d.toISOString().split("T")[0];
+}
+
+const BASE_HABITS = HABITS;
 const BLOCKS = [
   { id: "pre",    label: "Pre-School", color: "var(--amber)" },
   { id: "school", label: "Homeschool", color: "var(--cyan)" },
@@ -57,8 +110,24 @@ export default function PanelHabits() {
       .gte("completed_date", weekStart)
       .lte("completed_date", today);
     if (!weekErr && weekData) {
+      const byDate: Record<string, Set<string>> = {};
+      weekData.forEach((r: { habit_id: string; completed_date: string }) => {
+        if (!byDate[r.completed_date]) byDate[r.completed_date] = new Set();
+        byDate[r.completed_date].add(r.habit_id);
+      });
+
       let total = 0;
-      weekData.forEach((r: { habit_id: string }) => { total += HABIT_POINTS[r.habit_id] || 0; });
+      Object.keys(byDate).forEach(ds => {
+        total += scoreDay(byDate[ds], dayNameOf(ds)).total;
+      });
+
+      // Weekly streak bonus: 5 Perfect Days Mon–Fri = +3 to weekly total.
+      const weekdayDates = [0, 1, 2, 3, 4].map(i => addDays(weekStart, i));
+      const allWeekdaysPerfect = weekdayDates.every(
+        ds => byDate[ds] && scoreDay(byDate[ds], dayNameOf(ds)).perfect
+      );
+      if (allWeekdaysPerfect) total += 3;
+
       setWeeklyPts(total);
     }
 
@@ -99,9 +168,12 @@ export default function PanelHabits() {
     return () => clearInterval(interval);
   }, [load]);
 
-  const todayPts = HABITS.filter(h => completed[h.id]).reduce((a, h) => a + h.points, 0);
+  const todayName = new Date().toLocaleDateString("en-AU", { weekday: "long" });
+  const todayScore = scoreDay(new Set(Object.keys(completed).filter(k => completed[k])), todayName);
+  const todayPts = todayScore.total;
   const todayDone = BASE_HABITS.filter(h => completed[h.id]).length;
   const pct = Math.round((todayDone / BASE_HABITS.length) * 100);
+  const tier = getThreshold(weeklyPts ?? 0);
 
   return (
     <div className="card">
@@ -125,12 +197,12 @@ export default function PanelHabits() {
       {/* Hero stats */}
       <div className="stat-pair" style={{ flex: "0 0 auto" }}>
         <div className="stat-box">
-          <div className="stat-box-num cyan">{mounted ? todayPts : "—"}</div>
+          <div className="stat-box-num cyan">{mounted ? todayPts : "—"}{mounted && todayScore.perfect ? " ⭐" : ""}</div>
           <div className="stat-box-label">Today pts</div>
         </div>
         <div className="stat-box">
           <div className="stat-box-num green">{mounted && weeklyPts !== null ? weeklyPts : "—"}</div>
-          <div className="stat-box-label">This week</div>
+          <div className="stat-box-label">Week /{WEEKLY_MAX} · {mounted ? tier.label : "—"}</div>
         </div>
       </div>
 
