@@ -269,8 +269,8 @@ export default function WeekPage() {
   const tier = getThreshold(weeklyPts ?? 0);
 
   return (
-    <div style={{ height: "100vh", overflowY: "auto", background: "var(--bg-base)" }}>
-      <div style={{ maxWidth: 1400, margin: "0 auto", padding: "16px 20px 40px" }}>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "var(--bg-base)" }}>
+      <div style={{ maxWidth: 1400, width: "100%", margin: "0 auto", padding: "16px 20px 40px", flex: 1, display: "flex", flexDirection: "column" }}>
 
         {/* HEADER */}
         <div className="header" style={{ marginBottom: 16 }}>
@@ -286,7 +286,7 @@ export default function WeekPage() {
         </div>
 
         {/* WEEKLY CALENDAR */}
-        <div className="card" style={{ padding: 0, overflow: "visible", flex: "none", marginBottom: 16 }}>
+        <div className="card" style={{ padding: 0, overflow: "visible", flex: 1, minHeight: 0, display: "flex", flexDirection: "column", marginBottom: 16 }}>
           {schedule.length === 0 && (
             <div style={{
               padding: "8px 12px", borderBottom: "1px solid var(--border)",
@@ -295,8 +295,8 @@ export default function WeekPage() {
               No schedule yet
             </div>
           )}
-          <div style={{ overflowX: "auto" }}>
-            <div style={{ minWidth: 980, display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
+          <div style={{ overflowX: "auto", flex: 1, display: "flex", flexDirection: "column" }}>
+            <div style={{ minWidth: 980, flex: 1, display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gridTemplateRows: "auto 1fr" }}>
 
               {/* Day header row */}
               {weekDates.map((ds, i) => {
@@ -326,7 +326,7 @@ export default function WeekPage() {
                 return (
                   <div key={`col-${ds}`} style={{
                     borderLeft: i > 0 ? "1px solid var(--border)" : "none",
-                    minHeight: 320, padding: 6,
+                    minHeight: 0, height: "100%", padding: 6,
                     background: isToday ? "rgba(245,166,35,0.06)" : "transparent",
                     display: "flex", flexDirection: "column", gap: 6,
                   }}>
