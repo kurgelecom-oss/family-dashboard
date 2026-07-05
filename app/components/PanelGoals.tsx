@@ -22,11 +22,18 @@ function fmtExact(n: number) {
 
 export default function PanelGoals() {
   const actuals = useShopifyActuals();
-  const [now, setNow] = useState(() => new Date());
+  const [now, setNow] = useState<Date | null>(null);
+  const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
 
   useEffect(() => {
+    setNow(new Date());
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    const msLeft = Math.max(TRACTION_END.getTime() - new Date().getTime(), 0);
+    setDaysRemaining(Math.floor(msLeft / 86_400_000));
   }, []);
 
   const statusBadge = actuals.loading
@@ -104,16 +111,15 @@ export default function PanelGoals() {
 
       {/* ── Traction Window ── */}
       {(() => {
-        const msLeft      = Math.max(TRACTION_END.getTime() - now.getTime(), 0);
-        const daysLeft    = Math.floor(msLeft / 86_400_000);
-        const midnight    = new Date(now); midnight.setHours(24, 0, 0, 0);
-        const secsToday   = Math.max(Math.floor((midnight.getTime() - now.getTime()) / 1000), 0);
-        const hh = String(Math.floor(secsToday / 3600)).padStart(2, "0");
-        const mm = String(Math.floor((secsToday % 3600) / 60)).padStart(2, "0");
-        const ss = String(secsToday % 60).padStart(2, "0");
-        const msElapsed   = now.getTime() - TRACTION_START.getTime();
-        const daysElapsed = Math.max(Math.floor(msElapsed / 86_400_000), 0);
-        const pctUsed     = Math.min(Math.round((msElapsed / TRACTION_WINDOW_MS) * 100), 100);
+        const midnight    = now ? new Date(now) : null;
+        if (midnight) midnight.setHours(24, 0, 0, 0);
+        const secsToday   = now && midnight ? Math.max(Math.floor((midnight.getTime() - now.getTime()) / 1000), 0) : 0;
+        const hh = now ? String(Math.floor(secsToday / 3600)).padStart(2, "0") : "--";
+        const mm = now ? String(Math.floor((secsToday % 3600) / 60)).padStart(2, "0") : "--";
+        const ss = now ? String(secsToday % 60).padStart(2, "0") : "--";
+        const msElapsed   = now ? now.getTime() - TRACTION_START.getTime() : 0;
+        const daysElapsed = now ? Math.max(Math.floor(msElapsed / 86_400_000), 0) : null;
+        const pctUsed     = now ? Math.min(Math.round((msElapsed / TRACTION_WINDOW_MS) * 100), 100) : 0;
         const barColor    = pctUsed < 33 ? "var(--green)" : pctUsed < 75 ? "var(--amber)" : "var(--red)";
 
         return (
@@ -128,7 +134,7 @@ export default function PanelGoals() {
                 fontSize: 40, fontWeight: 700, color: "var(--cyan)",
                 lineHeight: 1, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em",
               }}>
-                {daysLeft}
+                {daysRemaining ?? "—"}
               </div>
               <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>days remaining</div>
               <div style={{
@@ -160,7 +166,7 @@ export default function PanelGoals() {
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "2px 0", borderBottom: "1px solid var(--border)", minWidth: 0, gap: 8 }}>
                   <span style={{ fontSize: 11, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>Days elapsed</span>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{daysElapsed}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{daysElapsed ?? "—"}</span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "2px 0", minWidth: 0, gap: 8 }}>
                   <span style={{ fontSize: 11, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>% window used</span>
