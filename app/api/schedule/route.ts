@@ -9,16 +9,18 @@ const NOTION_TOKEN = process.env.NOTION_TOKEN;
 // database id — GET /v1/databases/{id} 404s for it, only the query below works.
 const NOTION_SCHEDULE_DB_ID = process.env.NOTION_SCHEDULE_DB_ID;
 
-interface ScheduleRow {
-  block: string;
-  time: string;
-  order: number;
+interface ScheduleEntry {
+  entry: string;
+  days: string[];
+  date: string | null;
+  start: string;
+  end: string;
+  category: string;
   detail: string;
   emoji: string;
-  days: string[];
 }
 
-async function fetchScheduleRows(): Promise<ScheduleRow[]> {
+async function fetchScheduleEntries(): Promise<ScheduleEntry[]> {
   if (!NOTION_TOKEN || !NOTION_SCHEDULE_DB_ID) {
     throw new Error("Missing Notion credentials");
   }
@@ -39,29 +41,30 @@ async function fetchScheduleRows(): Promise<ScheduleRow[]> {
 
   const data = await response.json();
 
-  return data.results
-    .map((page: any) => {
-      const props = page.properties;
+  return data.results.map((page: any) => {
+    const props = page.properties;
 
-      return {
-        block: props.Block?.title?.[0]?.plain_text || "Untitled",
-        time: props.Time?.rich_text?.[0]?.plain_text || "",
-        order: props.Order?.number ?? 0,
-        detail: props.Detail?.rich_text?.[0]?.plain_text || "",
-        emoji: props.Emoji?.rich_text?.[0]?.plain_text || "",
-        days: (props.Days?.multi_select ?? []).map((s: { name: string }) => s.name),
-      };
-    })
-    .sort((a: ScheduleRow, b: ScheduleRow) => a.order - b.order);
+    return {
+      entry: props.Entry?.title?.[0]?.plain_text || "Untitled",
+      days: (props.Days?.multi_select ?? []).map((s: { name: string }) => s.name),
+      // Date is a one-off occurrence; keep just the YYYY-MM-DD part
+      date: props.Date?.date?.start?.slice(0, 10) ?? null,
+      start: props.Start?.rich_text?.[0]?.plain_text || "",
+      end: props.End?.rich_text?.[0]?.plain_text || "",
+      category: props.Category?.select?.name || "",
+      detail: props.Detail?.rich_text?.[0]?.plain_text || "",
+      emoji: props.Emoji?.rich_text?.[0]?.plain_text || "",
+    };
+  });
 }
 
 export async function GET() {
   try {
-    const rows = await fetchScheduleRows();
-    return NextResponse.json(rows);
+    const entries = await fetchScheduleEntries();
+    return NextResponse.json(entries);
   } catch (error) {
     console.error("Error fetching schedule:", error);
-    // Empty array with 200 so /week falls back to its hardcoded rows
+    // Empty array with 200 so /week shows its "No schedule yet" state
     return NextResponse.json([]);
   }
 }

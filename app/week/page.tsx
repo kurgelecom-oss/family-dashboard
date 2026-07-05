@@ -69,47 +69,49 @@ function addDays(dateStr: string, n: number) {
   return d.toISOString().split("T")[0];
 }
 
-// ─── Week grid config ────────────────────────────────────────────────────────
+// ─── Weekly calendar config ─────────────────────────────────────────────────
 const ANSAR = "var(--amber)"; // Ansar = orange across the dashboard
-
-const TIME_BLOCKS = [
-  { id: "morning",    label: "Morning",    time: "6:45–8:30am",    desc: "Phase 1 · Pre-homeschool", tall: true },
-  { id: "homeschool", label: "Homeschool", time: "8:30am–3:30pm",  desc: "4-hr session · ReadTheory · Khan · journal", tall: true },
-  { id: "checkpoint", label: "Checkpoint", time: "3:30pm",         desc: "Nihal habit check", tall: false },
-  { id: "evening",    label: "Evening",    time: "3:30–9:30pm",    desc: "BTN · Namaz · room · reading", tall: true },
-  { id: "lightsout",  label: "Lights out", time: "9:30pm",         desc: "", tall: false },
-];
 
 // dayIdx 0 = Monday (weekStart is Monday), matching the Notion Days options
 const DAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-// Row from /api/schedule (Notion "ANSAR OS — Weekly Schedule" data source)
-type ScheduleRow = { block: string; time: string; order: number; detail: string; emoji: string; days: string[] };
+// Entry from /api/schedule (Notion "ANSAR OS — Weekly Schedule" data source).
+// days[] = recurring weekdays; date = one-off occurrence (YYYY-MM-DD).
+type ScheduleEntry = {
+  entry: string; days: string[]; date: string | null;
+  start: string; end: string; category: string; detail: string; emoji: string;
+};
 
-// "Lights out" → "lightsout" so rows keep the ids blockForTime() targets
-function slugify(s: string) {
-  return s.toLowerCase().replace(/[^a-z0-9]/g, "");
+// Category → rgb triple, used at three alphas (bg / border / accent)
+const CATEGORY_RGB: Record<string, string> = {
+  Routine:  "245,166,35",   // orange (matches --amber)
+  Learning: "59,130,246",   // blue
+  Soccer:   "46,204,113",   // green (matches --green)
+  Prayer:   "168,85,247",   // purple
+  Screen:   "148,163,184",  // gray
+  Meal:     "234,179,8",    // yellow
+  Event:    "231,76,60",    // red (matches --red)
+};
+const DEFAULT_RGB = "245,166,35";
+function categoryRgb(category: string): string {
+  return CATEGORY_RGB[category] ?? DEFAULT_RGB;
 }
 
-// Fixed weekly commitments (soccer is also a Conditional habit worth +1/session)
-const STATIC_EVENTS: { dayIdx: number; block: string; label: string; time: string }[] = [
-  { dayIdx: 0, block: "evening", label: "⚽ Soccer", time: "7:00–8:30pm" }, // Monday
-  { dayIdx: 2, block: "evening", label: "⚽ Soccer", time: "6:00–7:30pm" }, // Wednesday
-];
-
-function blockForTime(h: number, m: number): string {
-  const t = h + m / 60;
-  if (t < 8.5) return "morning";
-  if (t < 15.5) return "homeschool";
-  if (t < 21.5) return "evening";
-  return "lightsout";
+// "6:45am" / "7:00pm" / "12:15am" → minutes since midnight; unparseable → end
+const UNPARSEABLE = 24 * 60;
+function parseStartMinutes(s: string): number {
+  const m = s.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i);
+  if (!m) return UNPARSEABLE;
+  let h = parseInt(m[1], 10) % 12;
+  if (m[3].toLowerCase() === "pm") h += 12;
+  return h * 60 + parseInt(m[2] ?? "0", 10);
 }
 
 type ApiEvent = {
   id: string; subject: string; startISO: string; endISO: string;
   isAllDay: boolean; account: string; email: string; color: string;
 };
-type GridEvent = { dayIdx: number; block: string; label: string; time: string; real: boolean };
+type GridEvent = { dayIdx: number; label: string; time: string; startMin: number };
 
 // /api/calendar returns bare UTC datetimes (Prefer: outlook.timezone="UTC")
 function parseUTC(s: string): Date {
@@ -118,7 +120,7 @@ function parseUTC(s: string): Date {
 
 export default function WeekPage() {
   const [events, setEvents] = useState<GridEvent[]>([]);
-  const [schedule, setSchedule] = useState<ScheduleRow[]>([]);
+  const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
   const [todayPts, setTodayPts] = useState<number | null>(null);
   const [todayPerfect, setTodayPerfect] = useState(false);
   const [weeklyPts, setWeeklyPts] = useState<number | null>(null);
@@ -133,10 +135,10 @@ export default function WeekPage() {
     try {
       const res = await fetch("/api/schedule");
       if (!res.ok) return;
-      const rows = (await res.json()) as ScheduleRow[];
-      if (Array.isArray(rows) && rows.length > 0) setSchedule(rows);
+      const entries = (await res.json()) as ScheduleEntry[];
+      if (Array.isArray(entries)) setSchedule(entries);
     } catch {
-      // schedule is best-effort; hardcoded TIME_BLOCKS remain as fallback
+      // schedule is best-effort; the grid shows "No schedule yet" instead
     }
   }, []);
 
@@ -154,21 +156,19 @@ export default function WeekPage() {
         const ds = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
         const dayIdx = dates.indexOf(ds);
         if (dayIdx === -1) return;
-        // Static soccer chips already cover Mon/Wed training — skip API duplicates
-        if (/soccer/i.test(e.subject) && (dayIdx === 0 || dayIdx === 2)) return;
         const end = parseUTC(e.endISO);
         const fmt = (d: Date) => d.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" }).replace(" ", "").toLowerCase();
         out.push({
           dayIdx,
-          block: e.isAllDay ? "morning" : blockForTime(start.getHours(), start.getMinutes()),
           label: `📅 ${e.subject}`,
           time: e.isAllDay ? "All day" : `${fmt(start)}–${fmt(end)}`,
-          real: true,
+          // All-day events pin to the top of the column
+          startMin: e.isAllDay ? -1 : start.getHours() * 60 + start.getMinutes(),
         });
       });
       setEvents(out);
     } catch {
-      // calendar strip is best-effort; grid still renders without it
+      // calendar chips are best-effort; grid still renders without them
     }
   }, []);
 
@@ -246,24 +246,25 @@ export default function WeekPage() {
     return () => clearInterval(id);
   }, [loadSchedule, loadCalendar, loadHabits]);
 
-  const allEvents: GridEvent[] = [
-    ...STATIC_EVENTS.map(e => ({ ...e, real: false })),
-    ...events,
-  ];
+  // Entries for one day column: recurring (days[]) OR one-off (date), by start time.
+  // "Monday"-style day names also match via the 3-letter prefix.
+  function entriesForDay(dayIdx: number): ScheduleEntry[] {
+    return schedule
+      .filter(e =>
+        e.days.some(d => d.slice(0, 3) === DAY_KEYS[dayIdx]) ||
+        e.date === weekDates[dayIdx]
+      )
+      .sort((a, b) => parseStartMinutes(a.start) - parseStartMinutes(b.start));
+  }
 
-  // Rows from /api/schedule; hardcoded TIME_BLOCKS as fallback while loading
-  // or if the route returns empty. Fallback rows fill all 7 days (old look).
-  const timeBlocks = schedule.length > 0
-    ? schedule.map(r => ({
-        id: slugify(r.block),
-        label: r.block,
-        time: r.time,
-        desc: r.detail,
-        emoji: r.emoji,
-        tall: /[–-]/.test(r.time),
-        days: r.days,
-      }))
-    : TIME_BLOCKS.map(b => ({ ...b, emoji: "", days: [...DAY_KEYS] }));
+  // MS Graph chips for one day column. Soccer chips are skipped when the Notion
+  // schedule already has a Soccer entry that day (same session, avoid doubles).
+  function eventsForDay(dayIdx: number, dayEntries: ScheduleEntry[]): GridEvent[] {
+    const soccerCovered = dayEntries.some(e => e.category === "Soccer");
+    return events
+      .filter(e => e.dayIdx === dayIdx && !(soccerCovered && /soccer/i.test(e.label)))
+      .sort((a, b) => a.startMin - b.startMin);
+  }
 
   const tier = getThreshold(weeklyPts ?? 0);
 
@@ -284,20 +285,27 @@ export default function WeekPage() {
           }}>← Dashboard</a>
         </div>
 
-        {/* WEEK GRID */}
+        {/* WEEKLY CALENDAR */}
         <div className="card" style={{ padding: 0, overflow: "visible", flex: "none", marginBottom: 16 }}>
+          {schedule.length === 0 && (
+            <div style={{
+              padding: "8px 12px", borderBottom: "1px solid var(--border)",
+              fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textAlign: "center",
+            }}>
+              No schedule yet
+            </div>
+          )}
           <div style={{ overflowX: "auto" }}>
-            <div style={{ minWidth: 860, display: "grid", gridTemplateColumns: "150px repeat(7, 1fr)" }}>
+            <div style={{ minWidth: 980, display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
 
               {/* Day header row */}
-              <div style={{ borderBottom: "1px solid var(--border)" }} />
               {weekDates.map((ds, i) => {
                 const isToday = i === todayIdx;
                 return (
                   <div key={ds} style={{
                     textAlign: "center", padding: "10px 6px",
                     borderBottom: isToday ? `2px solid ${ANSAR}` : "1px solid var(--border)",
-                    borderLeft: "1px solid var(--border)",
+                    borderLeft: i > 0 ? "1px solid var(--border)" : "none",
                     background: isToday ? "rgba(245,166,35,0.10)" : "transparent",
                   }}>
                     <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: isToday ? ANSAR : "var(--text-muted)" }}>
@@ -310,65 +318,49 @@ export default function WeekPage() {
                 );
               })}
 
-              {/* Time-block rows */}
-              {timeBlocks.map(block => {
-                const isCheckpoint = block.id === "checkpoint";
-                const isLightsOut = block.id === "lightsout";
+              {/* Day columns */}
+              {weekDates.map((ds, i) => {
+                const isToday = i === todayIdx;
+                const dayEntries = entriesForDay(i);
+                const dayEvents = eventsForDay(i, dayEntries);
                 return (
-                  <div key={block.id} style={{ display: "contents" }}>
-                    {/* Row label */}
-                    <div style={{
-                      padding: "10px 12px", borderBottom: "1px solid var(--border)",
-                      minHeight: block.tall ? 84 : 44,
-                      background: isCheckpoint ? "rgba(245,166,35,0.06)" : "transparent",
-                    }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: isCheckpoint ? ANSAR : "var(--text-primary)" }}>
-                        {block.emoji ? `${block.emoji} ` : isCheckpoint ? "🔎 " : isLightsOut ? "🌙 " : ""}{block.label}
-                      </div>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginTop: 2, fontVariantNumeric: "tabular-nums" }}>{block.time}</div>
-                      {block.desc && <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2, lineHeight: 1.4 }}>{block.desc}</div>}
-                    </div>
-
-                    {/* Day cells */}
-                    {weekDates.map((ds, i) => {
-                      const isToday = i === todayIdx;
-                      // days[] decides which columns this row fills; calendar
-                      // events still overlay in any cell regardless of fill.
-                      const filled = block.days.includes(DAY_KEYS[i]);
-                      const cellEvents = allEvents.filter(e => e.dayIdx === i && e.block === block.id);
+                  <div key={`col-${ds}`} style={{
+                    borderLeft: i > 0 ? "1px solid var(--border)" : "none",
+                    minHeight: 320, padding: 6,
+                    background: isToday ? "rgba(245,166,35,0.06)" : "transparent",
+                    display: "flex", flexDirection: "column", gap: 6,
+                  }}>
+                    {dayEntries.map((e, j) => {
+                      const rgb = categoryRgb(e.category);
                       return (
-                        <div key={`${block.id}-${ds}`} style={{
-                          borderBottom: "1px solid var(--border)", borderLeft: "1px solid var(--border)",
-                          minHeight: block.tall ? 84 : 44, padding: 6,
-                          background: isToday
-                            ? (isCheckpoint && filled ? "rgba(245,166,35,0.14)" : "rgba(245,166,35,0.10)")
-                            : (isCheckpoint && filled ? "rgba(245,166,35,0.04)" : "transparent"),
-                          display: "flex", flexDirection: "column", gap: 4,
-                          opacity: filled || cellEvents.length > 0 ? 1 : 0.35,
+                        <div key={`s-${j}`} style={{
+                          background: `rgba(${rgb},0.10)`,
+                          border: `1px solid rgba(${rgb},0.35)`,
+                          borderLeft: `3px solid rgb(${rgb})`,
+                          borderRadius: 5, padding: "5px 7px",
                         }}>
-                          {isCheckpoint && filled && (
-                            <div style={{ fontSize: 10, fontWeight: 600, color: ANSAR, textAlign: "center", opacity: isToday ? 1 : 0.55, marginTop: 4 }}>
-                              ✓ {block.time} check
-                            </div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {e.emoji ? `${e.emoji} ` : ""}{e.entry}
+                          </div>
+                          <div style={{ fontSize: 10, fontWeight: 600, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>
+                            {e.start}{e.end ? `–${e.end}` : ""}
+                          </div>
+                          {e.detail && (
+                            <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2, lineHeight: 1.4 }}>{e.detail}</div>
                           )}
-                          {isLightsOut && filled && (
-                            <div style={{ fontSize: 10, fontWeight: 600, color: "var(--text-muted)", textAlign: "center", marginTop: 4 }}>
-                              {block.time}
-                            </div>
-                          )}
-                          {cellEvents.map((e, j) => (
-                            <div key={j} style={{
-                              background: e.real ? "rgba(0,212,255,0.10)" : "rgba(245,166,35,0.14)",
-                              border: `1px solid ${e.real ? "rgba(0,212,255,0.35)" : "rgba(245,166,35,0.4)"}`,
-                              borderRadius: 5, padding: "5px 7px",
-                            }}>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.label}</div>
-                              <div style={{ fontSize: 10, fontWeight: 600, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>{e.time}</div>
-                            </div>
-                          ))}
                         </div>
                       );
                     })}
+                    {dayEvents.map((e, j) => (
+                      <div key={`e-${j}`} style={{
+                        background: "rgba(0,212,255,0.10)",
+                        border: "1px solid rgba(0,212,255,0.35)",
+                        borderRadius: 5, padding: "5px 7px",
+                      }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.label}</div>
+                        <div style={{ fontSize: 10, fontWeight: 600, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>{e.time}</div>
+                      </div>
+                    ))}
                   </div>
                 );
               })}
