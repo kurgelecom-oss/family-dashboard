@@ -80,6 +80,17 @@ const TIME_BLOCKS = [
   { id: "lightsout",  label: "Lights out", time: "9:30pm",         desc: "", tall: false },
 ];
 
+// dayIdx 0 = Monday (weekStart is Monday), matching the Notion Days options
+const DAY_KEYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+// Row from /api/schedule (Notion "ANSAR OS — Weekly Schedule" data source)
+type ScheduleRow = { block: string; time: string; order: number; detail: string; emoji: string; days: string[] };
+
+// "Lights out" → "lightsout" so rows keep the ids blockForTime() targets
+function slugify(s: string) {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
 // Fixed weekly commitments (soccer is also a Conditional habit worth +1/session)
 const STATIC_EVENTS: { dayIdx: number; block: string; label: string; time: string }[] = [
   { dayIdx: 0, block: "evening", label: "⚽ Soccer", time: "7:00–8:30pm" }, // Monday
@@ -107,6 +118,7 @@ function parseUTC(s: string): Date {
 
 export default function WeekPage() {
   const [events, setEvents] = useState<GridEvent[]>([]);
+  const [schedule, setSchedule] = useState<ScheduleRow[]>([]);
   const [todayPts, setTodayPts] = useState<number | null>(null);
   const [todayPerfect, setTodayPerfect] = useState(false);
   const [weeklyPts, setWeeklyPts] = useState<number | null>(null);
@@ -116,6 +128,17 @@ export default function WeekPage() {
   const weekStart = getWeekStart();
   const weekDates = [0, 1, 2, 3, 4, 5, 6].map(i => addDays(weekStart, i));
   const todayIdx = weekDates.indexOf(getTodayDate());
+
+  const loadSchedule = useCallback(async () => {
+    try {
+      const res = await fetch("/api/schedule");
+      if (!res.ok) return;
+      const rows = (await res.json()) as ScheduleRow[];
+      if (Array.isArray(rows) && rows.length > 0) setSchedule(rows);
+    } catch {
+      // schedule is best-effort; hardcoded TIME_BLOCKS remain as fallback
+    }
+  }, []);
 
   const loadCalendar = useCallback(async () => {
     try {
@@ -216,16 +239,31 @@ export default function WeekPage() {
     document.documentElement.setAttribute("data-theme", stored ?? getAutoTheme());
 
     setMounted(true);
+    loadSchedule();
     loadCalendar();
     loadHabits();
     const id = setInterval(() => { loadCalendar(); loadHabits(); }, 60_000);
     return () => clearInterval(id);
-  }, [loadCalendar, loadHabits]);
+  }, [loadSchedule, loadCalendar, loadHabits]);
 
   const allEvents: GridEvent[] = [
     ...STATIC_EVENTS.map(e => ({ ...e, real: false })),
     ...events,
   ];
+
+  // Rows from /api/schedule; hardcoded TIME_BLOCKS as fallback while loading
+  // or if the route returns empty. Fallback rows fill all 7 days (old look).
+  const timeBlocks = schedule.length > 0
+    ? schedule.map(r => ({
+        id: slugify(r.block),
+        label: r.block,
+        time: r.time,
+        desc: r.detail,
+        emoji: r.emoji,
+        tall: /[–-]/.test(r.time),
+        days: r.days,
+      }))
+    : TIME_BLOCKS.map(b => ({ ...b, emoji: "", days: [...DAY_KEYS] }));
 
   const tier = getThreshold(weeklyPts ?? 0);
 
@@ -273,7 +311,7 @@ export default function WeekPage() {
               })}
 
               {/* Time-block rows */}
-              {TIME_BLOCKS.map(block => {
+              {timeBlocks.map(block => {
                 const isCheckpoint = block.id === "checkpoint";
                 const isLightsOut = block.id === "lightsout";
                 return (
@@ -285,7 +323,7 @@ export default function WeekPage() {
                       background: isCheckpoint ? "rgba(245,166,35,0.06)" : "transparent",
                     }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: isCheckpoint ? ANSAR : "var(--text-primary)" }}>
-                        {isCheckpoint ? "🔎 " : isLightsOut ? "🌙 " : ""}{block.label}
+                        {block.emoji ? `${block.emoji} ` : isCheckpoint ? "🔎 " : isLightsOut ? "🌙 " : ""}{block.label}
                       </div>
                       <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginTop: 2, fontVariantNumeric: "tabular-nums" }}>{block.time}</div>
                       {block.desc && <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2, lineHeight: 1.4 }}>{block.desc}</div>}
@@ -294,24 +332,28 @@ export default function WeekPage() {
                     {/* Day cells */}
                     {weekDates.map((ds, i) => {
                       const isToday = i === todayIdx;
+                      // days[] decides which columns this row fills; calendar
+                      // events still overlay in any cell regardless of fill.
+                      const filled = block.days.includes(DAY_KEYS[i]);
                       const cellEvents = allEvents.filter(e => e.dayIdx === i && e.block === block.id);
                       return (
                         <div key={`${block.id}-${ds}`} style={{
                           borderBottom: "1px solid var(--border)", borderLeft: "1px solid var(--border)",
                           minHeight: block.tall ? 84 : 44, padding: 6,
                           background: isToday
-                            ? (isCheckpoint ? "rgba(245,166,35,0.14)" : "rgba(245,166,35,0.10)")
-                            : (isCheckpoint ? "rgba(245,166,35,0.04)" : "transparent"),
+                            ? (isCheckpoint && filled ? "rgba(245,166,35,0.14)" : "rgba(245,166,35,0.10)")
+                            : (isCheckpoint && filled ? "rgba(245,166,35,0.04)" : "transparent"),
                           display: "flex", flexDirection: "column", gap: 4,
+                          opacity: filled || cellEvents.length > 0 ? 1 : 0.35,
                         }}>
-                          {isCheckpoint && (
+                          {isCheckpoint && filled && (
                             <div style={{ fontSize: 10, fontWeight: 600, color: ANSAR, textAlign: "center", opacity: isToday ? 1 : 0.55, marginTop: 4 }}>
-                              ✓ 3:30pm check
+                              ✓ {block.time} check
                             </div>
                           )}
-                          {isLightsOut && (
+                          {isLightsOut && filled && (
                             <div style={{ fontSize: 10, fontWeight: 600, color: "var(--text-muted)", textAlign: "center", marginTop: 4 }}>
-                              9:30pm
+                              {block.time}
                             </div>
                           )}
                           {cellEvents.map((e, j) => (
