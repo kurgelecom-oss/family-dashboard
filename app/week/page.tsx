@@ -234,16 +234,22 @@ export default function WeekPage() {
   }, []);
 
   useEffect(() => {
-    // Match the dashboard's theme behaviour (Header.tsx) since /week has no Header
-    const stored = localStorage.getItem("themeOverride") as "day" | "night" | null;
-    document.documentElement.setAttribute("data-theme", stored ?? getAutoTheme());
+    // Match the dashboard's theme behaviour (Header.tsx) since /week has no Header.
+    // Re-checked every 60s so an always-on display auto-flips at 5pm and picks up
+    // dashboard toggles (themeOverride) within a minute.
+    const applyTheme = () => {
+      const stored = localStorage.getItem("themeOverride") as "day" | "night" | null;
+      document.documentElement.setAttribute("data-theme", stored ?? getAutoTheme());
+    };
+    applyTheme();
 
     setMounted(true);
     loadSchedule();
     loadCalendar();
     loadHabits();
     const id = setInterval(() => { loadCalendar(); loadHabits(); }, 60_000);
-    return () => clearInterval(id);
+    const themeId = setInterval(applyTheme, 60_000);
+    return () => { clearInterval(id); clearInterval(themeId); };
   }, [loadSchedule, loadCalendar, loadHabits]);
 
   // Entries for one day column: recurring (days[]) OR one-off (date), by start time.
