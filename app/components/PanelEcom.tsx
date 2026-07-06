@@ -229,7 +229,7 @@ export default function PanelEcom() {
 
           <div style={{ flexShrink: 0 }}>
             <a
-              href="https://product-pl-tracker.netlify.app/"
+              href="https://ecom-launchpad-mentor.netlify.app/"
               target="_blank"
               rel="noopener noreferrer"
               style={{
@@ -239,7 +239,7 @@ export default function PanelEcom() {
                 border: "1px solid rgba(245,166,35,0.2)", display: "inline-flex",
               }}
             >
-              P&amp;L Tracker →
+              Ecom Launchpad →
             </a>
           </div>
         </div>
