@@ -269,11 +269,11 @@ export default function WeekPage() {
   const tier = getThreshold(weeklyPts ?? 0);
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "var(--bg-base)" }}>
-      <div style={{ maxWidth: 1400, width: "100%", margin: "0 auto", padding: "16px 20px 40px", flex: 1, display: "flex", flexDirection: "column" }}>
+    // Mirrors .dashboard (globals.css): fixed-viewport flex column, no page scroll
+    <div style={{ height: "100dvh", width: "100vw", overflow: "hidden", display: "flex", flexDirection: "column", gap: 12, padding: 12, background: "var(--bg-base)" }}>
 
         {/* HEADER */}
-        <div className="header" style={{ marginBottom: 16 }}>
+        <div className="header">
           <div className="header-brand">
             <div className="header-name">ANSAR <span style={{ color: ANSAR }}>· WEEK</span></div>
             <div className="header-sub">Nihal&apos;s weekly view · ANSAR FC</div>
@@ -286,7 +286,7 @@ export default function WeekPage() {
         </div>
 
         {/* WEEKLY CALENDAR */}
-        <div className="card" style={{ padding: 0, overflow: "visible", flex: 1, minHeight: 0, display: "flex", flexDirection: "column", marginBottom: 16 }}>
+        <div className="card" style={{ padding: 0, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
           {schedule.length === 0 && (
             <div style={{
               padding: "8px 12px", borderBottom: "1px solid var(--border)",
@@ -295,8 +295,8 @@ export default function WeekPage() {
               No schedule yet
             </div>
           )}
-          <div style={{ overflowX: "auto", flex: 1, display: "flex", flexDirection: "column" }}>
-            <div style={{ minWidth: 980, flex: 1, display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gridTemplateRows: "auto 1fr" }}>
+          <div style={{ overflowX: "auto", overflowY: "hidden", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+            <div style={{ minWidth: 980, flex: 1, minHeight: 0, display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gridTemplateRows: "auto 1fr" }}>
 
               {/* Day header row */}
               {weekDates.map((ds, i) => {
@@ -326,7 +326,7 @@ export default function WeekPage() {
                 return (
                   <div key={`col-${ds}`} style={{
                     borderLeft: i > 0 ? "1px solid var(--border)" : "none",
-                    minHeight: 0, height: "100%", padding: 6,
+                    minHeight: 0, overflowY: "auto", padding: 6,
                     background: isToday ? "rgba(245,166,35,0.06)" : "transparent",
                     display: "flex", flexDirection: "column", gap: 6,
                   }}>
@@ -337,7 +337,7 @@ export default function WeekPage() {
                           background: `rgba(${rgb},0.10)`,
                           border: `1px solid rgba(${rgb},0.35)`,
                           borderLeft: `3px solid rgb(${rgb})`,
-                          borderRadius: 5, padding: "5px 7px",
+                          borderRadius: 5, padding: "5px 7px", flexShrink: 0,
                         }}>
                           <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {e.emoji ? `${e.emoji} ` : ""}{e.entry}
@@ -355,7 +355,7 @@ export default function WeekPage() {
                       <div key={`e-${j}`} style={{
                         background: "rgba(0,212,255,0.10)",
                         border: "1px solid rgba(0,212,255,0.35)",
-                        borderRadius: 5, padding: "5px 7px",
+                        borderRadius: 5, padding: "5px 7px", flexShrink: 0,
                       }}>
                         <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.label}</div>
                         <div style={{ fontSize: 10, fontWeight: 600, color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>{e.time}</div>
@@ -407,7 +407,6 @@ export default function WeekPage() {
           </div>
         </div>
 
-      </div>
     </div>
   );
 }
