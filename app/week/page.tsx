@@ -167,11 +167,18 @@ export default function WeekPage() {
             <div className="header-name">ANSAR <span style={{ color: ANSAR }}>· WEEK</span></div>
             <div className="header-sub">Nihal&apos;s weekly view · ANSAR FC</div>
           </div>
-          <a href="/" style={{
-            fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", textDecoration: "none",
-            background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 6,
-            padding: "8px 14px",
-          }}>← Dashboard</a>
+          <div style={{ display: "flex", gap: 8 }}>
+            <a href="https://app.notion.com/p/e51f4aa820c644f4bc832a6717790f1b?v=0e3d3a73d6d44e22b38ad53e458e4212" target="_blank" rel="noopener noreferrer" style={{
+              fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", textDecoration: "none",
+              background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 6,
+              padding: "8px 14px",
+            }}>Edit in Notion ↗</a>
+            <a href="/" style={{
+              fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", textDecoration: "none",
+              background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 6,
+              padding: "8px 14px",
+            }}>← Dashboard</a>
+          </div>
         </div>
 
         {/* WEEKLY CALENDAR */}
