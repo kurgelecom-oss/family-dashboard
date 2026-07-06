@@ -2,7 +2,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { getTodayDate, getWeekStart } from "../lib/supabase";
 import WeekProgressStrip from "../components/WeekProgressStrip";
-import WeekHabitsPanel from "../components/WeekHabitsPanel";
 
 // ─── Theme (mirrors Header.tsx so /week matches the dashboard) ──────────────
 function getAestHour(): number {
@@ -182,8 +181,7 @@ export default function WeekPage() {
           </div>
         </div>
 
-        {/* WEEKLY CALENDAR + HABITS SIDE PANEL */}
-        <div style={{ flex: 1, minHeight: 0, display: "flex", gap: 12 }}>
+        {/* WEEKLY CALENDAR */}
         <div className="card" style={{ padding: 0, flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
           {schedule.length === 0 && (
             <div style={{
@@ -264,10 +262,6 @@ export default function WeekPage() {
               })}
             </div>
           </div>
-        </div>
-
-        {/* HABITS SIDE PANEL */}
-        <WeekHabitsPanel />
         </div>
 
         {/* PROGRESS STRIP */}
