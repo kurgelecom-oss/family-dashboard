@@ -68,6 +68,7 @@ export default function Header() {
       <div className="header-right">
         <a href="/week" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "var(--text-secondary)", textDecoration: "none", opacity: 0.5, transition: "opacity 0.2s", marginRight: 12 }} onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")} onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.5")}>Ansar Week</a>
         <a href="https://luxury-kringle-cf4171.netlify.app/" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "var(--text-secondary)", textDecoration: "none", opacity: 0.5, transition: "opacity 0.2s", marginRight: 12 }} onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")} onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.5")}>links</a>
+        <a href="https://time-allocation-board.netlify.app/" target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "var(--text-secondary)", textDecoration: "none", opacity: 0.5, transition: "opacity 0.2s", marginRight: 12 }} onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")} onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.5")}>Time Board</a>
         <div className="header-date">{date}</div>
         <div className="header-time">{time}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
