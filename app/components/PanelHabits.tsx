@@ -4,39 +4,28 @@ import { supabase, getTodayDate, getWeekStart } from "../lib/supabase";
 
 // ─── ANSAR FC block-based scoring — exact copy of app/week/page.tsx ─────────
 // Block-based, NOT per-habit sums. Daily max 10 (11 on Mon/Wed training days).
+// Habit list (id/block/order) is now sourced from Notion via /api/habits —
+// only the specific-habit-id checks below are still literal, since they
+// encode which habits carry which bonus, not just which block they're in.
 const SOCCER_DAYS = ["Monday", "Wednesday"];
 
-const PRE_HABIT_IDS = ["feet_floor", "fajr", "bed_dressed", "movement", "breakfast", "quran", "goals"];
-
-const HABITS = [
-  { id: "feet_floor",         block: "pre" },
-  { id: "fajr",               block: "pre" },
-  { id: "bed_dressed",        block: "pre" },
-  { id: "movement",           block: "pre" },
-  { id: "breakfast",          block: "pre" },
-  { id: "quran",              block: "pre" },
-  { id: "goals",              block: "pre" },
-  { id: "homeschool_session", block: "school" },
-  { id: "readtheory",         block: "school" },
-  { id: "khan",               block: "school" },
-  { id: "journal",            block: "school" },
-  { id: "btn_cornell",        block: "arvo" },
-  { id: "all_namaz",          block: "arvo" },
-  { id: "room_tidy",          block: "arvo" },
-  { id: "shower",             block: "arvo" },
-  { id: "teeth",              block: "arvo" },
-  { id: "reading",            block: "arvo" },
-];
-
-const BASE_IDS = HABITS.map(h => h.id);
-function visibleIds(dayName: string): string[] {
-  return SOCCER_DAYS.includes(dayName) ? [...BASE_IDS, "soccer_training"] : BASE_IDS;
+interface Habit {
+  id: string;
+  name: string;
+  block: string;
+  order: number;
+  points: number;
+  pointType: string;
 }
 
-function scoreDay(completedIds: Set<string>, dayName: string) {
+function visibleIds(dayName: string, baseIds: string[]): string[] {
+  return SOCCER_DAYS.includes(dayName) ? [...baseIds, "soccer_training"] : baseIds;
+}
+
+function scoreDay(completedIds: Set<string>, dayName: string, preIds: string[], baseIds: string[]) {
   const hasSoccer = SOCCER_DAYS.includes(dayName);
 
-  const pre = PRE_HABIT_IDS.every(id => completedIds.has(id)) ? 2 : 0;
+  const pre = preIds.length > 0 && preIds.every(id => completedIds.has(id)) ? 2 : 0;
 
   let school = 0;
   if (completedIds.has("homeschool_session")) school += 3;
@@ -49,7 +38,7 @@ function scoreDay(completedIds: Set<string>, dayName: string) {
 
   const conditional = hasSoccer && completedIds.has("soccer_training") ? 1 : 0;
 
-  const ids = visibleIds(dayName);
+  const ids = visibleIds(dayName, baseIds);
   const perfect = ids.length > 0 && ids.every(id => completedIds.has(id));
   const bonus = perfect ? 1 : 0;
 
@@ -78,7 +67,6 @@ function addDays(dateStr: string, n: number) {
   return d.toISOString().split("T")[0];
 }
 
-const BASE_HABITS = HABITS;
 const BLOCKS = [
   { id: "pre",    label: "Pre-School", color: "var(--amber)" },
   { id: "school", label: "Homeschool", color: "var(--cyan)" },
@@ -87,11 +75,33 @@ const BLOCKS = [
 
 export default function PanelHabits() {
   const [completed, setCompleted] = useState<Record<string, boolean>>({});
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [pointsActive, setPointsActive] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [weeklyPts, setWeeklyPts] = useState<number | null>(null);
   const [streak, setStreak] = useState<number | null>(null);
 
-  const load = useCallback(async () => {
+  const loadHabitList = useCallback(async () => {
+    try {
+      const res = await fetch("/api/habits");
+      const data = await res.json();
+      setHabits(Array.isArray(data) ? data : []);
+    } catch {
+      setHabits([]);
+    }
+  }, []);
+
+  const loadSettings = useCallback(async () => {
+    try {
+      const res = await fetch("/api/settings");
+      const data = await res.json();
+      setPointsActive(data?.pointsActive ?? true);
+    } catch {
+      // keep previous value on failure
+    }
+  }, []);
+
+  const load = useCallback(async (preIds: string[], baseIds: string[]) => {
     const { data, error } = await supabase
       .from("habit_completions")
       .select("habit_id")
@@ -118,13 +128,13 @@ export default function PanelHabits() {
 
       let total = 0;
       Object.keys(byDate).forEach(ds => {
-        total += scoreDay(byDate[ds], dayNameOf(ds)).total;
+        total += scoreDay(byDate[ds], dayNameOf(ds), preIds, baseIds).total;
       });
 
       // Weekly streak bonus: 5 Perfect Days Mon–Fri = +3 to weekly total.
       const weekdayDates = [0, 1, 2, 3, 4].map(i => addDays(weekStart, i));
       const allWeekdaysPerfect = weekdayDates.every(
-        ds => byDate[ds] && scoreDay(byDate[ds], dayNameOf(ds)).perfect
+        ds => byDate[ds] && scoreDay(byDate[ds], dayNameOf(ds), preIds, baseIds).perfect
       );
       if (allWeekdaysPerfect) total += 3;
 
@@ -163,17 +173,30 @@ export default function PanelHabits() {
 
   useEffect(() => {
     setMounted(true);
-    load();
-    const interval = setInterval(load, 10000);
+    loadHabitList();
+    loadSettings();
+  }, [loadHabitList, loadSettings]);
+
+  useEffect(() => {
+    if (habits.length === 0) return;
+    const preIds = habits.filter(h => h.block === "pre").map(h => h.id);
+    const baseIds = habits.filter(h => h.block !== "conditional").map(h => h.id);
+    load(preIds, baseIds);
+    const interval = setInterval(() => load(preIds, baseIds), 10000);
     return () => clearInterval(interval);
-  }, [load]);
+  }, [habits, load]);
+
+  const baseHabits = habits.filter(h => h.block !== "conditional");
+  const preIds = baseHabits.filter(h => h.block === "pre").map(h => h.id);
+  const baseIds = baseHabits.map(h => h.id);
 
   const todayName = new Date().toLocaleDateString("en-AU", { weekday: "long" });
-  const todayScore = scoreDay(new Set(Object.keys(completed).filter(k => completed[k])), todayName);
+  const todayScore = scoreDay(new Set(Object.keys(completed).filter(k => completed[k])), todayName, preIds, baseIds);
   const todayPts = todayScore.total;
-  const todayDone = BASE_HABITS.filter(h => completed[h.id]).length;
-  const pct = Math.round((todayDone / BASE_HABITS.length) * 100);
+  const todayDone = baseHabits.filter(h => completed[h.id]).length;
+  const pct = baseHabits.length > 0 ? Math.round((todayDone / baseHabits.length) * 100) : 0;
   const tier = getThreshold(weeklyPts ?? 0);
+  const showPoints = mounted && pointsActive;
 
   return (
     <div className="card">
@@ -197,21 +220,21 @@ export default function PanelHabits() {
       {/* Hero stats */}
       <div className="stat-pair" style={{ flex: "0 0 auto" }}>
         <div className="stat-box">
-          <div className="stat-box-num cyan">{mounted ? todayPts : "—"}{mounted && todayScore.perfect ? " ⭐" : ""}</div>
+          <div className="stat-box-num cyan">{showPoints ? todayPts : "—"}{showPoints && todayScore.perfect ? " ⭐" : ""}</div>
           <div className="stat-box-label">Today pts</div>
         </div>
         <div className="stat-box">
-          <div className="stat-box-num green">{mounted && weeklyPts !== null ? weeklyPts : "—"}</div>
-          <div className="stat-box-label">Week /{WEEKLY_MAX} · {mounted ? tier.label : "—"}</div>
+          <div className="stat-box-num green">{showPoints && weeklyPts !== null ? weeklyPts : "—"}</div>
+          <div className="stat-box-label">Week /{WEEKLY_MAX} · {showPoints ? tier.label : "—"}</div>
         </div>
       </div>
 
       {/* Streak */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, flexShrink: 0 }}>
         <span style={{ fontSize: 28, fontWeight: 700, color: "#a78bfa", fontVariantNumeric: "tabular-nums" }}>
-          {mounted && streak !== null ? streak : "—"}
+          {showPoints && streak !== null ? streak : "—"}
         </span>
-        {mounted && streak !== null && streak > 0 && <span style={{ fontSize: 14 }}>🔥</span>}
+        {showPoints && streak !== null && streak > 0 && <span style={{ fontSize: 14 }}>🔥</span>}
         <span style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
           day streak
         </span>
@@ -222,7 +245,7 @@ export default function PanelHabits() {
       {/* Block progress */}
       <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
         {BLOCKS.map(block => {
-          const bHabits = BASE_HABITS.filter(h => h.block === block.id);
+          const bHabits = baseHabits.filter(h => h.block === block.id);
           const bDone = bHabits.filter(h => completed[h.id]).length;
           return (
             <div key={block.id} style={{ marginBottom: 4 }}>
@@ -232,7 +255,7 @@ export default function PanelHabits() {
               </div>
               <div className="progress-track">
                 <div className="progress-fill" style={{
-                  width: mounted ? `${(bDone / bHabits.length) * 100}%` : "0%",
+                  width: mounted && bHabits.length > 0 ? `${(bDone / bHabits.length) * 100}%` : "0%",
                   background: block.color,
                 }} />
               </div>
