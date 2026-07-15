@@ -6,6 +6,7 @@ import PanelBudget from "./components/PanelBudget";
 import PanelCalendar from "./components/PanelCalendar";
 import PanelHabits from "./components/PanelHabits";
 import PanelTodos from "./components/PanelTodos";
+import PanelHomeschoolWeek from "./components/PanelHomeschoolWeek";
 
 export default function Dashboard() {
   return (
@@ -30,8 +31,9 @@ export default function Dashboard() {
             <PanelTodos />
           </div>
         </div>
-        {/* Column 4 — Calendar (top) + Ansar Habits (bottom). Same flex ratio as Column 3. */}
+        {/* Column 4 — Homeschool Week peek (compact) + Calendar + Ansar Habits. */}
         <div className="dashboard-col">
+          <PanelHomeschoolWeek />
           <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
             <PanelCalendar />
           </div>

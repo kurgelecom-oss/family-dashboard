@@ -164,7 +164,7 @@ export default function WeekPage() {
         {/* HEADER */}
         <div className="header">
           <div className="header-brand">
-            <div className="header-name">ANSAR <span style={{ color: ANSAR }}>· WEEK</span></div>
+            <div className="header-name">Homeschool <span style={{ color: ANSAR }}>Week</span></div>
             <div className="header-sub">Nihal&apos;s weekly view · ANSAR FC</div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
