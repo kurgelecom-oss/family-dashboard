@@ -175,12 +175,12 @@ export default function BudgetPage() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0d0f14", color: "#f0f2f8", fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ minHeight: "100vh", paddingTop: "var(--nav-h)", background: "#0d0f14", color: "#f0f2f8", fontFamily: "'Inter', sans-serif" }}>
 
       <header style={{
         background: "#13161e", borderBottom: "1px solid #232736",
         padding: "12px 20px", display: "flex", alignItems: "center",
-        justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100,
+        justifyContent: "space-between", position: "sticky", top: "var(--nav-h)", zIndex: 100,
       }}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em" }}>

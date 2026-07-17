@@ -159,7 +159,7 @@ export default function WeekPage() {
 
   return (
     // Mirrors .dashboard (globals.css): fixed-viewport flex column, no page scroll
-    <div style={{ height: "100dvh", width: "100vw", overflow: "hidden", display: "flex", flexDirection: "column", gap: 12, padding: 12, background: "var(--bg-base)" }}>
+    <div style={{ height: "calc(100dvh - var(--nav-h))", marginTop: "var(--nav-h)", width: "100vw", overflow: "hidden", display: "flex", flexDirection: "column", gap: 12, padding: 12, background: "var(--bg-base)" }}>
 
         {/* HEADER */}
         <div className="header">
