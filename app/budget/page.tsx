@@ -182,7 +182,9 @@ export default function BudgetPage() {
       <header style={{
         background: "#13161e", borderBottom: "1px solid #232736",
         padding: "12px 20px", display: "flex", alignItems: "center",
-        justifyContent: "space-between", position: "sticky", top: "var(--nav-h)", zIndex: 100,
+        // top:0 — the scroll container's padding-top already clears the nav;
+        // offsetting again would strand a 40px gap under it.
+        justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100,
       }}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-0.02em" }}>
