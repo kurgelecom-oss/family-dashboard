@@ -173,11 +173,6 @@ export default function WeekPage() {
               background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 6,
               padding: "8px 14px",
             }}>Edit in Notion ↗</a>
-            <a href="/" style={{
-              fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", textDecoration: "none",
-              background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: 6,
-              padding: "8px 14px",
-            }}>← Dashboard</a>
           </div>
         </div>
 
