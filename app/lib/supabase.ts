@@ -6,17 +6,24 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 export const supabase = createClient(supabaseUrl, supabaseKey)
 
 export function getTodayDate() {
-  return new Date().toISOString().split("T")[0]
+  const parts = new Intl.DateTimeFormat("en-AU", {
+    timeZone: "Australia/Melbourne",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date())
+  const y  = parts.find((p) => p.type === "year")!.value
+  const mo = parts.find((p) => p.type === "month")!.value
+  const d  = parts.find((p) => p.type === "day")!.value
+  return `${y}-${mo}-${d}`
 }
 
-// Returns Monday of the current week (Sydney time)
+// Returns Monday of the current week (Melbourne/AEST time)
 export function getWeekStart() {
-  const now = new Date()
-  const day = now.getDay() // 0=Sun,1=Mon,...,6=Sat
+  const today = getTodayDate()
+  const dt = new Date(today + "T12:00:00") // noon avoids DST edge
+  const day = dt.getDay() // 0=Sun,1=Mon,...,6=Sat
   const diff = day === 0 ? -6 : 1 - day // adjust to Monday
-  const monday = new Date(now)
-  monday.setDate(now.getDate() + diff)
-  return monday.toISOString().split("T")[0]
+  dt.setDate(dt.getDate() + diff)
+  return dt.toISOString().split("T")[0]
 }
 
 // Returns Monday of the PREVIOUS week (Melbourne/AEST time, safe for server-side use)
