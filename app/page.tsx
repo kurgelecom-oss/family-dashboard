@@ -1,8 +1,7 @@
 "use client";
 import Header from "./components/Header";
-import PanelGoals from "./components/PanelGoals";
+import PanelFinance from "./components/PanelFinance";
 import PanelEcom from "./components/PanelEcom";
-import PanelBudget from "./components/PanelBudget";
 import PanelCalendar from "./components/PanelCalendar";
 import PanelHabits from "./components/PanelHabits";
 import PanelTodos from "./components/PanelTodos";
@@ -13,20 +12,18 @@ export default function Dashboard() {
     <div className="dashboard">
       <Header />
       <div className="dashboard-grid">
-        {/* Column 1 — Ecom Goals */}
+        {/* Column 1 — Spending & Accounts (PocketSmith) */}
         <div className="dashboard-col">
-          <PanelGoals />
+          <PanelFinance />
         </div>
         {/* Column 2 — Ecom Business */}
         <div className="dashboard-col">
           <PanelEcom />
         </div>
-        {/* Column 3 — Weekly Spend (top) + Action Items (bottom). Mirrors Column 4 so
-            Action Items and Ansar Habits render as an even side-by-side pair. */}
+        {/* Column 3 — Action Items. The Weekly Spend panel (cancelled Module 4)
+            was removed from this route; its API routes and Supabase tables are
+            untouched and /budget still renders it. */}
         <div className="dashboard-col">
-          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-            <PanelBudget />
-          </div>
           <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
             <PanelTodos />
           </div>
