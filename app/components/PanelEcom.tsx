@@ -62,6 +62,9 @@ interface DailyContribution {
 }
 
 interface MonthPl {
+  /** False whenever COGS came from the hand-entered Launchpad bundle table. */
+  cogsVerified: boolean;
+  cogsSource: string;
   revenue: number;
   orders: number;
   cogs: number;
@@ -294,11 +297,13 @@ function LabelledRow({
   value,
   tone,
   last,
+  marker,
 }: {
   label: string;
   value: string;
   tone?: string;
   last?: boolean;
+  marker?: string;
 }) {
   return (
     <div
@@ -325,6 +330,21 @@ function LabelledRow({
       >
         {label}
       </span>
+      {marker && (
+        <span
+          style={{
+            fontSize: 8,
+            fontWeight: 700,
+            color: "var(--amber)",
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+            flexShrink: 0,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {marker}
+        </span>
+      )}
       <span
         style={{
           fontSize: 13,
@@ -689,6 +709,16 @@ function MonthPanel({ data, settings }: { data: EcomPayload; settings?: Settings
     "BREAKEVEN_AMBER_BAND_PCT",
     SETTING_DEFAULTS.BREAKEVEN_AMBER_BAND_PCT,
   );
+  const unverifiedLabel = getSetting(
+    settings,
+    "LABEL_COGS_UNVERIFIED",
+    SETTING_DEFAULTS.LABEL_COGS_UNVERIFIED,
+  );
+  // A derived number inherits the trust level of its worst input: contribution
+  // and breakeven are both functions of COGS, so an unverified COGS makes both
+  // of them unverified too. Marking only the COGS row would imply the headline
+  // is sound when it is not.
+  const unverified = m.cogsVerified === false;
 
   return (
     <div className="card" style={{ padding: "10px 12px" }}>
@@ -716,7 +746,11 @@ function MonthPanel({ data, settings }: { data: EcomPayload; settings?: Settings
             label={`Revenue · ${m.revenueSource}`}
             value={money(m.revenue)}
           />
-          <LabelledRow label="COGS" value={`-${money(m.cogs)}`} />
+          <LabelledRow
+            label="COGS"
+            value={`-${money(m.cogs)}`}
+            marker={unverified ? unverifiedLabel : undefined}
+          />
           <LabelledRow label="Gross Profit" value={money(m.grossProfit)} tone="var(--green)" />
           <LabelledRow
             label="Ad Spend · Settled"
@@ -762,6 +796,9 @@ function MonthPanel({ data, settings }: { data: EcomPayload; settings?: Settings
               style={{ marginTop: 2, fontSize: 10, whiteSpace: "nowrap" }}
             >
               Contribution Profit
+              {unverified && (
+                <span style={{ color: "var(--amber)", fontWeight: 700 }}> · {unverifiedLabel}</span>
+              )}
             </div>
           </div>
 
@@ -782,6 +819,9 @@ function MonthPanel({ data, settings }: { data: EcomPayload; settings?: Settings
               style={{ marginTop: 2, fontSize: 10, whiteSpace: "nowrap" }}
             >
               ROAS · be {be === null ? "—" : `${be.toFixed(2)}×`}
+              {unverified && (
+                <span style={{ color: "var(--amber)", fontWeight: 700 }}> ·&nbsp;UNVERIFIED</span>
+              )}
             </div>
           </div>
         </div>

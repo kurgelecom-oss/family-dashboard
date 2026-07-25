@@ -33,6 +33,9 @@ const allNum = (o: Record<string, unknown>, keys: string[]) => keys.every((k) =>
                   badge, so a 17-day-dead test renders as a healthy green Live.
    money fields   absent → "$NaN", and month.contribution absent turns the hero
                   red regardless of the true sign.
+   cogsVerified   absent → the panel would drop the unverified marker and show
+                  an unaudited COGS, plus the contribution and breakeven derived
+                  from it, as fact.
    ──────────────────────────────────────────────────────────────────────── */
 
 const ACTIVITY_STATES = ["LIVE", "AWAITING", "NONE"];
@@ -87,6 +90,11 @@ export function isEcomPayload(p: unknown): boolean {
   ) {
     return false;
   }
+  // Absence of a trust signal is not trust. A payload that omits cogsVerified
+  // must reach the error state rather than default to "verified" and present a
+  // hand-entered COGS — and the contribution and breakeven derived from it — as
+  // established fact.
+  if (typeof m["cogsVerified"] !== "boolean") return false;
   return Array.isArray(m["dailyContribution"]);
 }
 

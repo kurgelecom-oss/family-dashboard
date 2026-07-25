@@ -175,6 +175,12 @@ async function shopifyGql<T>(token: string, query: string): Promise<T> {
 interface ShopifyLineItem {
   title: string;
   quantity: number;
+  /**
+   * Shopify's "Cost per item" on the variant. Null today on every variant, so
+   * COGS still falls back to the Launchpad bundle table — but the moment these
+   * are populated this becomes the source with no code change.
+   */
+  variant: { inventoryItem: { unitCost: { amount: string } | null } | null } | null;
 }
 interface ShopifyOrder {
   name: string;
@@ -194,7 +200,13 @@ const ORDERS_QUERY = (since: string, after: string | null) => `{
       name
       createdAt
       totalPriceSet { shopMoney { amount } }
-      lineItems(first: 20) { nodes { title quantity } }
+      lineItems(first: 20) {
+        nodes {
+          title
+          quantity
+          variant { inventoryItem { unitCost { amount } } }
+        }
+      }
     }
     pageInfo { hasNextPage endCursor }
   }
@@ -301,6 +313,8 @@ interface LaunchpadTest {
   entry_window_high: number | null;
   validation_min_purchases: number | null;
   bundles_config: Bundle[] | null;
+  /** Launchpad's own verification flag on the COGS figures. */
+  cogs_verified: boolean | null;
   first_spend_at: string | null;
   created_at: string;
 }
@@ -331,9 +345,31 @@ const RUNNING = new Set(["Live", "Iterating"]);
  */
 function lineItemCogs(item: ShopifyLineItem, test: LaunchpadTest | null): number {
   if (NON_GOODS.test(item.title)) return 0;
+
+  // Preferred: Shopify's own per-variant cost, on the same records the revenue
+  // is read from, so COGS and revenue always cover identical orders. Null on
+  // every variant today, which is why the fallbacks below still run.
+  const raw = item.variant?.inventoryItem?.unitCost?.amount;
+  if (raw !== undefined && raw !== null && raw !== "") {
+    const unit = Number(raw);
+    if (Number.isFinite(unit) && unit > 0) return unit * item.quantity;
+  }
+
+  // Fallback: the Launchpad bundle table. Hand-entered and flagged by
+  // cogs_verified, which is surfaced in the panel rather than trusted silently.
   const bundle = test?.bundles_config?.find((b) => b.qty === item.quantity);
   if (bundle) return bundle.cogs;
   return (test?.cogs_per_unit ?? 0) * item.quantity;
+}
+
+/** True only when every line item priced its COGS from Shopify's unit cost. */
+function usesShopifyUnitCost(orders: ShopifyOrder[]): boolean {
+  const goods = orders.flatMap((o) => o.lineItems.nodes).filter((li) => !NON_GOODS.test(li.title));
+  if (goods.length === 0) return false;
+  return goods.every((li) => {
+    const raw = li.variant?.inventoryItem?.unitCost?.amount;
+    return raw !== undefined && raw !== null && raw !== "" && Number(raw) > 0;
+  });
 }
 
 const orderCogs = (o: ShopifyOrder, t: LaunchpadTest | null) =>
@@ -465,6 +501,11 @@ export async function GET() {
     const monthAdSpend = sum(adSpendByDay);
     const monthGross = monthRevenue - monthCogs;
 
+    // Absence of a trust signal is not trust: no active test, or a null flag,
+    // both resolve to unverified.
+    const cogsFromShopify = usesShopifyUnitCost(orders);
+    const launchpadCogsVerified = activeTest?.cogs_verified === true;
+
     /* ---- 30-day daily contribution series -------------------------------- */
     const series: { date: string; contribution: number }[] = [];
     for (let i = 0; i < SPARK_DAYS; i++) {
@@ -584,6 +625,10 @@ export async function GET() {
         contribution: round2(monthGross - monthAdSpend),
         target: monthTarget,
         targetPercent: round2(Math.min((monthRevenue / monthTarget) * 100, 100)),
+        // A derived number inherits the trust level of its worst input, so the
+        // panel marks contribution and breakeven as unverified too.
+        cogsSource: cogsFromShopify ? "shopify_unit_cost" : "launchpad_bundles",
+        cogsVerified: cogsFromShopify ? true : launchpadCogsVerified,
         revenueSource: "Shopify",
         adSpendSource: "PocketSmith · Meta",
         adSpendSourceKey: adSpendSource,
