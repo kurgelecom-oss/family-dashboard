@@ -24,9 +24,7 @@ export default function Dashboard() {
             was removed from this route; its API routes and Supabase tables are
             untouched and /budget still renders it. */}
         <div className="dashboard-col">
-          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-            <PanelTodos />
-          </div>
+          <PanelTodos />
         </div>
         {/* Column 4 — Homeschool Week peek (compact) + Calendar + Ansar Habits. */}
         <div className="dashboard-col">

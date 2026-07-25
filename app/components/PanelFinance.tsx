@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SETTING_DEFAULTS, type SettingsMap, getSetting } from "../lib/settings";
 
 /* ════════════════════════════════════════════════════════════════════════════
    Left column — LAST WEEK / LAST MONTH / ACCOUNTS.
@@ -42,6 +43,8 @@ interface PocketSmithPayload {
   generatedAt: string;
   timeZone: string;
   today: string;
+  /** Resolved server-side from the Notion settings data source. */
+  settings?: SettingsMap;
   lastWeek: PeriodSummary;
   previousWeek: PeriodSummary;
   lastMonth: PeriodSummary;
@@ -204,8 +207,6 @@ function ShellCard({
  * A spending period panel. Panels 1 and 2 are the same component — the only
  * difference is which window and which comparison period get passed in.
  */
-/** The PocketSmith account this column reports on. */
-const POCKETSMITH_URL = "https://my.pocketsmith.com/dashboard/765041-kurgel-pty-ltd";
 
 /**
  * "Open →" header link.
@@ -247,12 +248,14 @@ function PeriodPanel({
   prior,
   tone,
   headerLink,
+  includeUncategorised,
 }: {
   title: string;
   period: PeriodSummary;
   prior: PeriodSummary;
   tone: string;
   headerLink?: string;
+  includeUncategorised: boolean;
 }) {
   // The route already reports uncategorised separately; filter defensively so a
   // shape change can never render the same money twice.
@@ -310,8 +313,10 @@ function PeriodPanel({
           ))}
         </div>
 
-        {/* Uncategorised — always rendered, even at zero. PocketSmith's own
-            widget hides this row, which quietly hides real money. */}
+        {/* Uncategorised — rendered even at zero while INCLUDE_UNCATEGORISED is
+            on. PocketSmith's own widget hides this row, which quietly hides real
+            money, so the setting defaults to true. */}
+        {includeUncategorised && (
         <div
           style={{
             display: "flex",
@@ -349,6 +354,7 @@ function PeriodPanel({
             {money(uncategorised)}
           </span>
         </div>
+        )}
       </div>
     </div>
   );
@@ -557,6 +563,18 @@ export default function PanelFinance() {
     );
   }
 
+  const settings = data.settings;
+  const pocketsmithUrl = getSetting(
+    settings,
+    "POCKETSMITH_DASHBOARD_URL",
+    SETTING_DEFAULTS.POCKETSMITH_DASHBOARD_URL,
+  );
+  const includeUncategorised = getSetting(
+    settings,
+    "INCLUDE_UNCATEGORISED",
+    SETTING_DEFAULTS.INCLUDE_UNCATEGORISED,
+  );
+
   return (
     <>
       <PeriodPanel
@@ -564,13 +582,15 @@ export default function PanelFinance() {
         period={data.lastWeek}
         prior={data.previousWeek}
         tone="var(--cyan)"
-        headerLink={POCKETSMITH_URL}
+        headerLink={pocketsmithUrl}
+        includeUncategorised={includeUncategorised}
       />
       <PeriodPanel
         title="Last Month"
         period={data.lastMonth}
         prior={data.previousMonth}
         tone="var(--amber)"
+        includeUncategorised={includeUncategorised}
       />
       <AccountsPanel data={data} />
     </>

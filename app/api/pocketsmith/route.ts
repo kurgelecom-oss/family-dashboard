@@ -1,4 +1,10 @@
 import { NextResponse } from "next/server";
+import {
+  DEFAULT_CACHE_SECONDS,
+  SETTING_DEFAULTS,
+  getSetting,
+  loadSettingsSafe,
+} from "../../lib/settings";
 
 // Cached for 30 minutes (legacy caching model — cacheComponents is not enabled
 // in next.config.ts, so `dynamic`/`revalidate` are still honoured in Next 16;
@@ -7,7 +13,10 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-static";
 export const revalidate = 1800;
 
-const CACHE_SECONDS = 1800;
+// Fallback only. The live window comes from CACHE_MINUTES in settings and is
+// resolved per request below; `revalidate` above must stay a static literal
+// because Next requires it to be statically analysable.
+const CACHE_SECONDS = DEFAULT_CACHE_SECONDS;
 
 const BASE_URL = "https://api.pocketsmith.com/v2";
 const USER_ID = 631070;
@@ -15,8 +24,6 @@ const USER_ID = 631070;
 // Server-side only. Never expose as NEXT_PUBLIC_* — this key grants full
 // read/write access to every account in the PocketSmith profile.
 const POCKETSMITH_KEY = process.env.POCKETSMITH_KEY;
-
-const TIME_ZONE = "Australia/Sydney";
 
 // Guard against a malformed Link header pagination loop.
 const MAX_PAGES = 100;
@@ -124,9 +131,9 @@ interface CivilDate {
  * reports the wrong day for the ~5 months Sydney is on AEDT (UTC+11), which
  * would shift the Mon–Sun window by a whole day.
  */
-function sydneyToday(now: Date): CivilDate {
+function sydneyToday(now: Date, timeZone: string): CivilDate {
   const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: TIME_ZONE,
+    timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -187,13 +194,16 @@ interface DateWindow {
    API access
    ──────────────────────────────────────────────────────────────────────── */
 
-async function psFetch<T>(url: string): Promise<{ data: T; link: string | null }> {
+async function psFetch<T>(
+  url: string,
+  cacheSeconds: number = CACHE_SECONDS,
+): Promise<{ data: T; link: string | null }> {
   const response = await fetch(url, {
     headers: {
       "X-Developer-Key": POCKETSMITH_KEY as string,
       Accept: "application/json",
     },
-    next: { revalidate: CACHE_SECONDS },
+    next: { revalidate: cacheSeconds },
   });
 
   if (!response.ok) {
@@ -218,7 +228,7 @@ function nextPageUrl(link: string | null): string | null {
  * and advertises the next page only via the Link header, so stopping at page 1
  * silently truncates any window with more than 100 transactions.
  */
-async function fetchAllPages<T>(firstUrl: string): Promise<T[]> {
+async function fetchAllPages<T>(firstUrl: string, cacheSeconds: number): Promise<T[]> {
   const out: T[] = [];
   const seen = new Set<string>();
   let url: string | null = firstUrl;
@@ -228,7 +238,7 @@ async function fetchAllPages<T>(firstUrl: string): Promise<T[]> {
     if (seen.has(url)) break; // defensive: never re-request the same page
     seen.add(url);
 
-    const { data, link } = await psFetch<T[]>(url);
+    const { data, link } = await psFetch<T[]>(url, cacheSeconds);
     out.push(...data);
     pages += 1;
     url = nextPageUrl(link);
@@ -365,10 +375,11 @@ function summarisePeriod(window: DateWindow, transactions: PsTransaction[]): Per
   };
 }
 
-async function fetchPeriod(window: DateWindow): Promise<PeriodSummary> {
+async function fetchPeriod(window: DateWindow, cacheSeconds: number): Promise<PeriodSummary> {
   const transactions = await fetchAllPages<PsTransaction>(
     `${BASE_URL}/users/${USER_ID}/transactions` +
       `?start_date=${iso(window.start)}&end_date=${iso(window.end)}&per_page=100`,
+    cacheSeconds,
   );
   return summarisePeriod(window, transactions);
 }
@@ -384,7 +395,12 @@ export async function GET() {
   }
 
   try {
-    const today = sydneyToday(new Date());
+    // Settings are the single source of truth. loadSettingsSafe never throws:
+    // a Notion outage degrades to the built-in defaults with a per-key warning.
+    const { settings, cacheSeconds } = await loadSettingsSafe();
+    const timeZone = getSetting(settings, "TIMEZONE", SETTING_DEFAULTS.TIMEZONE);
+
+    const today = sydneyToday(new Date(), timeZone);
     const weekStart = mondayOfWeek(today);
     const weekEnd = addDays(weekStart, 6);
     const startDate = iso(weekStart);
@@ -414,20 +430,25 @@ export async function GET() {
       lastMonth,
       previousMonth,
     ] = await Promise.all([
-      fetchAllPages<PsAccount>(`${BASE_URL}/users/${USER_ID}/accounts`),
-      fetchAllPages<PsCategory>(`${BASE_URL}/users/${USER_ID}/categories`),
+      fetchAllPages<PsAccount>(`${BASE_URL}/users/${USER_ID}/accounts`, cacheSeconds),
+      fetchAllPages<PsCategory>(`${BASE_URL}/users/${USER_ID}/categories`, cacheSeconds),
       fetchAllPages<PsTransaction>(
         `${BASE_URL}/users/${USER_ID}/transactions` +
           `?start_date=${startDate}&end_date=${endDate}&per_page=100`,
+        cacheSeconds,
       ),
       fetchAllPages<PsEvent>(
         `${BASE_URL}/users/${USER_ID}/events?start_date=${startDate}&end_date=${endDate}`,
+        cacheSeconds,
       ),
-      fetchAllPages<PsTransactionAccount>(`${BASE_URL}/users/${USER_ID}/transaction_accounts`),
-      fetchPeriod(lastWeekWindow),
-      fetchPeriod(previousWeekWindow),
-      fetchPeriod(lastMonthWindow),
-      fetchPeriod(previousMonthWindow),
+      fetchAllPages<PsTransactionAccount>(
+        `${BASE_URL}/users/${USER_ID}/transaction_accounts`,
+        cacheSeconds,
+      ),
+      fetchPeriod(lastWeekWindow, cacheSeconds),
+      fetchPeriod(previousWeekWindow, cacheSeconds),
+      fetchPeriod(lastMonthWindow, cacheSeconds),
+      fetchPeriod(previousMonthWindow, cacheSeconds),
     ]);
 
     /* ---- balances -------------------------------------------------------- */
@@ -525,9 +546,14 @@ export async function GET() {
 
     return NextResponse.json({
       generatedAt: new Date().toISOString(),
-      timeZone: TIME_ZONE,
+      timeZone,
       today: iso(today),
-      cacheSeconds: CACHE_SECONDS,
+      cacheSeconds,
+
+      // Settings ride along so the client reads one payload instead of making a
+      // second round-trip to /api/dashboard-settings for values the server has
+      // already resolved.
+      settings,
 
       cash: { accounts: cashAccounts, total: cashTotal },
       debt: { accounts: debtAccounts, total: debtTotal },

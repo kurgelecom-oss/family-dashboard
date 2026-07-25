@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SETTING_DEFAULTS, type SettingsMap, getSetting } from "../lib/settings";
 
 /* ════════════════════════════════════════════════════════════════════════════
    Column B — TODAY / ACTIVE TEST / MONTH · P&L.
@@ -21,7 +22,12 @@ interface TodayStats {
   adSpendWindow: "TODAY" | "MTD";
   adSpendMtd: number;
   contribution: number;
-  noCampaignsLive: boolean;
+  /** Three-state diagnosis resolved server-side. */
+  activityState: "LIVE" | "AWAITING" | "NONE";
+  lookbackDays: number;
+  lookbackHadActivity: boolean;
+  testIsFresh: boolean;
+  testIsAlive: boolean;
 }
 
 interface ActiveTest {
@@ -72,6 +78,8 @@ interface EcomPayload {
   generatedAt: string;
   timeZone: string;
   today: string;
+  /** Resolved server-side from the Notion settings data source. */
+  settings?: SettingsMap;
   todayStats: TodayStats;
   test: ActiveTest | NoTest;
   month: MonthPl;
@@ -129,10 +137,10 @@ function breakevenRoas(revenue: number, cogs: number): number | null {
  * extra ad dollar (red), within 10% above is too thin to call a win (amber),
  * clear of that is green.
  */
-function roasTone(roas: number | null, breakeven: number | null): string {
+function roasTone(roas: number | null, breakeven: number | null, amberBandPct: number): string {
   if (roas === null || breakeven === null) return "var(--text-muted)";
   if (roas < breakeven) return "var(--red)";
-  if (roas < breakeven * 1.1) return "var(--amber)";
+  if (roas < breakeven * (1 + amberBandPct / 100)) return "var(--amber)";
   return "var(--green)";
 }
 
@@ -333,8 +341,19 @@ function LabelledRow({
 
 /* ── Panel 1 — TODAY ──────────────────────────────────────────────────────── */
 
-function TodayPanel({ data }: { data: EcomPayload }) {
+function TodayPanel({ data, settings }: { data: EcomPayload; settings?: SettingsMap }) {
   const t = data.todayStats;
+
+  const labelAwaiting = getSetting(
+    settings,
+    "LABEL_AWAITING_DATA",
+    SETTING_DEFAULTS.LABEL_AWAITING_DATA,
+  );
+  const labelNoCampaigns = getSetting(
+    settings,
+    "LABEL_NO_CAMPAIGNS",
+    SETTING_DEFAULTS.LABEL_NO_CAMPAIGNS,
+  );
 
   return (
     <div className="card" style={{ padding: "10px 12px" }}>
@@ -353,23 +372,26 @@ function TodayPanel({ data }: { data: EcomPayload }) {
           overflow: "hidden",
         }}
       >
-        {t.noCampaignsLive ? (
+        {t.activityState !== "LIVE" ? (
           <>
-            {/* Zero orders AND zero ad spend is not a $0 result — it is an
-                inactive account. Say which one it is. */}
+            {/* AWAITING vs NONE are different diagnoses. Ad spend is settled
+                bank cash and lags Meta by days, so a zero today usually means
+                "not settled yet", not "nothing running". */}
             <div
               style={{
                 fontSize: 24,
                 fontWeight: 800,
-                color: "var(--amber)",
+                color: t.activityState === "AWAITING" ? "var(--text-muted)" : "var(--amber)",
                 lineHeight: 1.2,
                 letterSpacing: "-0.01em",
               }}
             >
-              NO CAMPAIGNS LIVE
+              {t.activityState === "AWAITING" ? labelAwaiting : labelNoCampaigns}
             </div>
             <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
-              no orders and no ad spend logged today
+              {t.activityState === "AWAITING"
+                ? `no orders or settled spend today · activity within ${t.lookbackDays}d`
+                : `nothing in the last ${t.lookbackDays} days and no active test`}
             </div>
           </>
         ) : (
@@ -424,7 +446,13 @@ function TodayPanel({ data }: { data: EcomPayload }) {
 
 /* ── Panel 2 — ACTIVE TEST ────────────────────────────────────────────────── */
 
-function ActiveTestPanel({ test }: { test: ActiveTest | NoTest }) {
+function ActiveTestPanel({
+  test,
+  settings,
+}: {
+  test: ActiveTest | NoTest;
+  settings?: SettingsMap;
+}) {
   if (!test.present) {
     return (
       <div className="card" style={{ padding: "10px 12px" }}>
@@ -499,12 +527,29 @@ function ActiveTestPanel({ test }: { test: ActiveTest | NoTest }) {
    * Staleness. A test can sit in "Live" indefinitely while nobody feeds it, so
    * the status alone is not the truth — the gap since the last entry is. Both
    * thresholds and the day count are computed, never hardcoded.
-   *   > 14 days → the test is not being run at all (red)
-   *   >  2 days → running but behind on entries (amber)
+   *   beyond TEST_STALE_RED_DAYS   → not being run at all (red)
+   *   beyond TEST_STALE_AMBER_DAYS → running but behind on entries (amber)
    */
+  const staleAmberDays = getSetting(
+    settings,
+    "TEST_STALE_AMBER_DAYS",
+    SETTING_DEFAULTS.TEST_STALE_AMBER_DAYS,
+  );
+  const staleRedDays = getSetting(
+    settings,
+    "TEST_STALE_RED_DAYS",
+    SETTING_DEFAULTS.TEST_STALE_RED_DAYS,
+  );
+
+  const amberBandPctTest = getSetting(
+    settings,
+    "BREAKEVEN_AMBER_BAND_PCT",
+    SETTING_DEFAULTS.BREAKEVEN_AMBER_BAND_PCT,
+  );
+
   const stale = test.staleDays;
-  const abandoned = stale !== null && stale > 14;
-  const lagging = stale !== null && stale > 2 && !abandoned;
+  const abandoned = stale !== null && stale > staleRedDays;
+  const lagging = stale !== null && stale > staleAmberDays && !abandoned;
 
   const badgeLabel = abandoned
     ? "Stale"
@@ -615,13 +660,7 @@ function ActiveTestPanel({ test }: { test: ActiveTest | NoTest }) {
           <Metric
             label="ROAS"
             value={roas === null ? "—" : `${roas.toFixed(2)}×`}
-            tone={
-              roas === null
-                ? "var(--text-muted)"
-                : be !== null && roas >= be
-                  ? "var(--green)"
-                  : "var(--red)"
-            }
+            tone={roasTone(roas, be, staleAmberDays >= 0 ? amberBandPctTest : 10)}
           />
           <Metric
             label="Breakeven"
@@ -640,10 +679,15 @@ function ActiveTestPanel({ test }: { test: ActiveTest | NoTest }) {
 
 /* ── Panel 3 — MONTH · P&L ────────────────────────────────────────────────── */
 
-function MonthPanel({ data }: { data: EcomPayload }) {
+function MonthPanel({ data, settings }: { data: EcomPayload; settings?: SettingsMap }) {
   const m = data.month;
   const roas = m.adSpend > 0 ? m.revenue / m.adSpend : null;
   const be = breakevenRoas(m.revenue, m.cogs);
+  const amberBandPct = getSetting(
+    settings,
+    "BREAKEVEN_AMBER_BAND_PCT",
+    SETTING_DEFAULTS.BREAKEVEN_AMBER_BAND_PCT,
+  );
 
   return (
     <div className="card" style={{ padding: "10px 12px" }}>
@@ -726,7 +770,7 @@ function MonthPanel({ data }: { data: EcomPayload }) {
                 fontSize: 18,
                 fontWeight: 700,
                 lineHeight: 1.2,
-                color: roasTone(roas, be),
+                color: roasTone(roas, be, amberBandPct),
                 fontVariantNumeric: "tabular-nums",
               }}
             >
@@ -865,11 +909,13 @@ export default function PanelEcom() {
     );
   }
 
+  const settings = data.settings;
+
   return (
     <>
-      <TodayPanel data={data} />
-      <ActiveTestPanel test={data.test} />
-      <MonthPanel data={data} />
+      <TodayPanel data={data} settings={settings} />
+      <ActiveTestPanel test={data.test} settings={settings} />
+      <MonthPanel data={data} settings={settings} />
     </>
   );
 }

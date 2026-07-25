@@ -1,371 +1,609 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
 
-interface TodoItem {
+import { useEffect, useState } from "react";
+import { SETTING_DEFAULTS, type SettingsMap, getSetting } from "../lib/settings";
+
+/* ════════════════════════════════════════════════════════════════════════════
+   Column C — TODAY / INPUTS / THE CLOCK.
+
+   Reads GET /api/actions. Actionables and time only: this column renders ZERO
+   currency by design. Money lives in column B. If a dollar sign ever appears
+   here, something has been wired to the wrong payload.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+interface ActionItem {
   id: string;
   title: string;
-  priority: "high" | "medium" | "low";
-  context: "personal" | "work" | "family";
-  dueDate?: string;
+  priority: string | null;
+  type: string | null;
+  area: string | null;
+  dueDate: string | null;
+  daysPastDue: number | null;
   completed: boolean;
-  notes?: string;
+  completedDate: string | null;
+  overdue: boolean;
 }
 
-const CONTEXT_COLORS: Record<string, { bg: string; border: string; icon: string }> = {
-  personal: { bg: "rgba(147, 112, 219, 0.1)", border: "#9370db", icon: "👤" },
-  work: { bg: "rgba(0, 212, 255, 0.1)", border: "#00d4ff", icon: "💼" },
-  family: { bg: "rgba(46, 204, 113, 0.1)", border: "#2ecc71", icon: "👨‍👩‍👧‍👦" },
-  asap: { bg: "rgba(255, 99, 71, 0.1)", border: "#ff6347", icon: "🔥" },
-};
-
-// Fallback for any Notion context value not mapped above — prevents a crash
-// when a new Context option is added in Notion.
-const DEFAULT_CONTEXT_COLOR = { bg: "rgba(160, 160, 160, 0.1)", border: "#a0a0a0", icon: "📌" };
-
-// Priority pill styling — mirrors the Notion select colors (High=red,
-// Medium=yellow, Low=green). Keyed by the lowercased Notion option name.
-const PRIORITY_META: Record<string, { label: string; fg: string; bg: string; border: string }> = {
-  high: { label: "HIGH", fg: "#ff6b6b", bg: "rgba(255, 99, 99, 0.15)", border: "rgba(255, 99, 99, 0.4)" },
-  medium: { label: "MED", fg: "#ffc857", bg: "rgba(255, 200, 87, 0.15)", border: "rgba(255, 200, 87, 0.4)" },
-  low: { label: "LOW", fg: "#4ade80", bg: "rgba(74, 222, 128, 0.14)", border: "rgba(74, 222, 128, 0.35)" },
-};
-
-function getUrgencyColor(dueDate?: string): string {
-  if (!dueDate) return "var(--text-secondary)";
-  const due = new Date(dueDate).getTime();
-  const now = new Date().getTime();
-  const daysUntil = Math.ceil((due - now) / (1000 * 60 * 60 * 24));
-
-  if (daysUntil <= 0) return "var(--red)";
-  if (daysUntil <= 1) return "var(--amber)";
-  if (daysUntil <= 3) return "var(--cyan)";
-  return "var(--text-secondary)";
+interface InputItem {
+  id: string;
+  title: string;
+  type: string | null;
+  area: string | null;
+  doneToday: boolean;
+  streak: number;
 }
 
-function formatDueDate(dueDate?: string): string {
-  if (!dueDate) return "";
-  const due = new Date(dueDate);
-  const now = new Date();
-  const daysUntil = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-
-  if (daysUntil <= 0) return "OVERDUE";
-  if (daysUntil === 1) return "Tomorrow";
-  if (daysUntil <= 7) return `${daysUntil}d`;
-  return due.toLocaleDateString("en-AU", { month: "short", day: "numeric" });
+interface ClockTests {
+  completed: number;
+  target: number;
+  lastCompletedDate: string | null;
+  gapFromDate: string;
+  daysSinceLastCompleted: number;
+  everCompleted: boolean;
 }
 
-export default function PanelTodos() {
-  const [todos, setTodos] = useState<TodoItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [focusMode, setFocusMode] = useState(false);
-  const [lastSync, setLastSync] = useState<Date | null>(null);
+interface ActionsPayload {
+  generatedAt: string;
+  timeZone: string;
+  today: string;
+  settings?: SettingsMap;
+  actions: {
+    decisionDue: { name: string; reason: string } | null;
+    ranked: ActionItem[];
+    pendingCount: number;
+    doneToday: number;
+  };
+  inputs: InputItem[];
+  clock: {
+    daysLeftInWeek: number;
+    daysLeftInMonth: number;
+    daysToTractionEnd: number;
+    tractionEndDate: string;
+    yearElapsedPct: number;
+    tests: ClockTests;
+  };
+}
 
-  const fetchTodos = useCallback(async () => {
-    try {
-      const response = await fetch("/api/todos");
-      if (response.ok) {
-        const data = await response.json();
-        setTodos(data);
-        setLastSync(new Date());
-      }
-    } catch (error) {
-      console.error("Error fetching todos:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+const REFRESH_MS = 5 * 60 * 1000;
+const NOTION_URL = "https://app.notion.com/p/38e5429afa9080c98967cfef39103c0c";
 
-  useEffect(() => {
-    fetchTodos();
-    const interval = setInterval(fetchTodos, 8000);
-    return () => clearInterval(interval);
-  }, [fetchTodos]);
+/** Priority stripe colour. Tokens only. */
+function priorityTone(priority: string | null): string {
+  switch ((priority ?? "").toLowerCase()) {
+    case "high":
+      return "var(--red)";
+    case "medium":
+    case "med":
+      return "var(--amber)";
+    case "low":
+      return "var(--cyan)";
+    default:
+      return "var(--text-muted)";
+  }
+}
 
-  const urgentTodos = todos
-    .filter(t => !t.completed)
-    .sort((a, b) => {
-      const priorityOrder = { high: 0, medium: 1, low: 2 };
-      return priorityOrder[a.priority] - priorityOrder[b.priority];
-    });
+/* ── Shared chrome ────────────────────────────────────────────────────────── */
 
-  const displayTodos = focusMode ? urgentTodos.slice(0, 3) : urgentTodos;
-  const completedCount = todos.filter(t => t.completed).length;
-  const completionRate = todos.length > 0 ? Math.round((completedCount / todos.length) * 100) : 0;
-
+/** The existing Notion open-in-new-tab badge, kept as it was. */
+function NotionBadge() {
   return (
-    <div
-      className="card"
+    <a
+      href={NOTION_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      title="Open in Notion"
       style={{
-        padding: "10px 12px",
         display: "flex",
-        flexDirection: "column",
-        gap: "8px",
-        height: "100%",
-        minHeight: 0,
+        alignItems: "center",
+        justifyContent: "center",
+        width: 20,
+        height: 20,
+        borderRadius: 4,
+        background: "rgba(0, 212, 255, 0.15)",
+        border: "1px solid rgba(0, 212, 255, 0.3)",
+        color: "var(--cyan)",
+        textDecoration: "none",
+        fontSize: 12,
+        fontWeight: 600,
+        cursor: "pointer",
+        transition: "all 0.2s ease",
       }}
     >
-      {/* ── Header ── */}
-      <div className="card-header">
-        <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1 }}>
-          <div className="card-title">Action Items</div>
-          <a
-            href="https://app.notion.com/p/38e5429afa9080c98967cfef39103c0c"
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Open in Notion"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 20,
-              height: 20,
-              borderRadius: 4,
-              background: "rgba(0, 212, 255, 0.15)",
-              border: "1px solid rgba(0, 212, 255, 0.3)",
-              color: "var(--cyan)",
-              textDecoration: "none",
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-            }}
-            onMouseOver={e => {
-              e.currentTarget.style.background = "rgba(0, 212, 255, 0.25)";
-              e.currentTarget.style.borderColor = "rgba(0, 212, 255, 0.6)";
-            }}
-            onMouseOut={e => {
-              e.currentTarget.style.background = "rgba(0, 212, 255, 0.15)";
-              e.currentTarget.style.borderColor = "rgba(0, 212, 255, 0.3)";
-            }}
-          >
-            ↗
-          </a>
+      ↗
+    </a>
+  );
+}
+
+function ShellCard({
+  title,
+  badge,
+  badgeClass,
+  message,
+}: {
+  title: string;
+  badge: string;
+  badgeClass: string;
+  message: string;
+}) {
+  return (
+    <div className="card" style={{ padding: "10px 12px" }}>
+      <div className="card-header" style={{ marginBottom: 5 }}>
+        <div className="card-title">{title}</div>
+        <span className={`badge ${badgeClass}`}>{badge}</span>
+      </div>
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 12,
+          color: "var(--text-muted)",
+          textAlign: "center",
+          padding: "0 8px",
+        }}
+      >
+        {message}
+      </div>
+    </div>
+  );
+}
+
+/** A count + label pair for THE CLOCK. Counts only — never currency. */
+function ClockStat({ value, label, tone }: { value: string; label: string; tone?: string }) {
+  return (
+    <div className="stat-cell" style={{ padding: "5px 7px", minWidth: 0 }}>
+      <div
+        style={{
+          fontSize: 20,
+          fontWeight: 700,
+          lineHeight: 1.2,
+          color: tone ?? "var(--text-primary)",
+          fontVariantNumeric: "tabular-nums",
+          letterSpacing: "-0.01em",
+        }}
+      >
+        {value}
+      </div>
+      <div
+        className="stat-sublabel"
+        style={{
+          marginTop: 2,
+          fontSize: 9,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {label}
+      </div>
+    </div>
+  );
+}
+
+/* ── Panel 1 — TODAY ──────────────────────────────────────────────────────── */
+
+function TodayPanel({ data, settings }: { data: ActionsPayload; settings?: SettingsMap }) {
+  const shown = getSetting(settings, "ACTION_ITEMS_SHOWN", SETTING_DEFAULTS.ACTION_ITEMS_SHOWN);
+  const { decisionDue, ranked, pendingCount, doneToday } = data.actions;
+  const visible = ranked.slice(0, shown);
+  const more = Math.max(pendingCount - visible.length, 0);
+
+  return (
+    <div className="card" style={{ padding: "10px 12px" }}>
+      <div className="card-header" style={{ marginBottom: 5 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
+          <div className="card-title">Today</div>
+          <NotionBadge />
         </div>
-        <span className="badge badge-cyan">● {loading ? "Loading…" : "Synced"}</span>
+        <span className="badge badge-cyan">● Synced</span>
       </div>
 
-      {/* ── Stats Row ── */}
       <div
         style={{
           display: "flex",
-          gap: 10,
-          fontSize: 11,
-          color: "var(--text-muted)",
-          paddingBottom: 6,
-          borderBottom: "1px solid var(--border)",
+          flexDirection: "column",
+          gap: 4,
+          flex: 1,
+          minHeight: 0,
+          overflow: "hidden",
         }}
       >
-        <span>
-          <span style={{ color: "var(--cyan)", fontWeight: 600 }}>{displayTodos.length}</span> pending
-        </span>
-        <span>
-          <span style={{ color: "var(--green)", fontWeight: 600 }}>{completedCount}</span> done
-        </span>
-        <span style={{ marginLeft: "auto" }}>
-          <span style={{ color: "var(--cyan)", fontWeight: 600 }}>{completionRate}%</span> complete
-        </span>
-      </div>
-
-      {/* ── Todo Items ── */}
-      <div style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
-        {loading ? (
-          <div style={{ textAlign: "center", padding: "20px 10px", color: "var(--text-secondary)" }}>
-            Loading from Notion…
+        {/* The call to act only. The numbers behind it stay in column B. */}
+        {decisionDue && (
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: "var(--amber)",
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+              lineHeight: 1.3,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+            }}
+            title={decisionDue.reason}
+          >
+            Decision due · {decisionDue.name}
           </div>
-        ) : displayTodos.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "20px 10px", color: "var(--text-secondary)" }}>
-            ✨ All caught up!
+        )}
+
+        {visible.length === 0 ? (
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 13,
+              fontWeight: 700,
+              color: "var(--text-muted)",
+              letterSpacing: "0.04em",
+            }}
+          >
+            NOTHING QUEUED
           </div>
         ) : (
-          displayTodos.map((todo) => {
-            const isExpanded = expandedId === todo.id;
-            const color = CONTEXT_COLORS[todo.context] || DEFAULT_CONTEXT_COLOR;
-            const prio = PRIORITY_META[todo.priority] || PRIORITY_META.medium;
-            const urgencyColor = getUrgencyColor(todo.dueDate);
-            const isUrgent = todo.priority === "high" || (todo.dueDate && new Date(todo.dueDate) < new Date(Date.now() + 86400000));
-
-            return (
+          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+            {visible.map((item) => (
               <div
-                key={todo.id}
-                onClick={() => setExpandedId(isExpanded ? null : todo.id)}
+                key={item.id}
                 style={{
-                  padding: "8px 10px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  background: "var(--bg-inner)",
                   borderRadius: 6,
-                  border: `1px solid ${color.border}`,
-                  background: color.bg,
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                  position: "relative",
-                  overflow: "hidden",
-                }}
-                onMouseOver={e => {
-                  if (!isUrgent) return;
-                  const el = e.currentTarget as HTMLDivElement;
-                  el.style.boxShadow = `0 0 12px ${color.border}80`;
-                  el.style.borderColor = color.border;
-                }}
-                onMouseOut={e => {
-                  const el = e.currentTarget as HTMLDivElement;
-                  el.style.boxShadow = "none";
-                  el.style.borderColor = color.border;
+                  padding: "5px 8px",
+                  borderLeft: `3px solid ${priorityTone(item.priority)}`,
+                  minWidth: 0,
                 }}
               >
-                {/* Animated glow for urgent items */}
-                {isUrgent && (
+                <div style={{ minWidth: 0, flex: 1 }}>
                   <div
                     style={{
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      background: `linear-gradient(90deg, transparent, ${color.border}20, transparent)`,
-                      animation: "shimmer 2s infinite",
-                      pointerEvents: "none",
-                    }}
-                  />
-                )}
-
-                {/* Main content */}
-                <div style={{ display: "flex", alignItems: "flex-start", gap: 8, position: "relative", zIndex: 1 }}>
-                  {/* Content */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        marginBottom: 4,
-                      }}
-                    >
-                      <span style={{ fontSize: 12, color: color.border }}>{color.icon}</span>
-                      <span
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 500,
-                          color: "var(--text-primary)",
-                          textDecoration: todo.completed ? "line-through" : "none",
-                          opacity: todo.completed ? 0.6 : 1,
-                        }}
-                      >
-                        {todo.title}
-                      </span>
-                      {/* Priority pill — color/label mirror the Notion tier */}
-                      <span
-                        style={{
-                          marginLeft: "auto",
-                          flexShrink: 0,
-                          padding: "1px 5px",
-                          borderRadius: 4,
-                          fontSize: 9,
-                          fontWeight: 700,
-                          letterSpacing: "0.04em",
-                          lineHeight: 1.5,
-                          color: prio.fg,
-                          background: prio.bg,
-                          border: `1px solid ${prio.border}`,
-                        }}
-                      >
-                        {prio.label}
-                      </span>
-                    </div>
-
-                    {/* Due date */}
-                    {todo.dueDate && (
-                      <div style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 10 }}>
-                        <span style={{ color: urgencyColor, fontWeight: 600 }}>
-                          {formatDueDate(todo.dueDate)}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Expanded content */}
-                    {isExpanded && todo.notes && (
-                      <div
-                        style={{
-                          marginTop: 8,
-                          paddingTop: 8,
-                          borderTop: `1px solid ${color.border}`,
-                          fontSize: 11,
-                          color: "var(--text-secondary)",
-                          animation: "slideDown 0.2s ease",
-                        }}
-                      >
-                        <div style={{ color: "var(--text-muted)", fontSize: 9, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>
-                          Notes
-                        </div>
-                        {todo.notes}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Drag handle indicator */}
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 2,
-                      opacity: 0.5,
-                      cursor: "grab",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "var(--text-primary)",
+                      lineHeight: 1.25,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
                     }}
                   >
-                    <div style={{ width: 3, height: 3, borderRadius: "50%", background: color.border }} />
-                    <div style={{ width: 3, height: 3, borderRadius: "50%", background: color.border }} />
+                    {item.title}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 9,
+                      color: "var(--text-muted)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    {item.area ?? "—"}
                   </div>
                 </div>
+                {/* Server-computed: One-off past the grace window only. Daily and
+                    Recurring items never carry this flag. */}
+                {item.overdue && <span className="badge badge-red">Overdue</span>}
               </div>
-            );
-          })
+            ))}
+          </div>
         )}
-      </div>
 
-      {/* ── Focus Mode Toggle ── */}
-      {urgentTodos.length > 3 && (
-        <button
-          onClick={() => setFocusMode(!focusMode)}
+        <div
           style={{
-            width: "100%",
-            padding: "6px 8px",
-            borderRadius: 4,
-            border: "1px solid var(--border)",
-            background: focusMode ? "rgba(0, 212, 255, 0.1)" : "transparent",
-            color: focusMode ? "var(--cyan)" : "var(--text-secondary)",
-            fontSize: 11,
-            fontWeight: 600,
-            cursor: "pointer",
-            transition: "all 0.2s ease",
-          }}
-          onMouseOver={e => {
-            e.currentTarget.style.background = "rgba(0, 212, 255, 0.15)";
-            e.currentTarget.style.borderColor = "var(--cyan)";
-          }}
-          onMouseOut={e => {
-            e.currentTarget.style.background = focusMode ? "rgba(0, 212, 255, 0.1)" : "transparent";
-            e.currentTarget.style.borderColor = "var(--border)";
+            borderTop: "1px solid var(--border)",
+            paddingTop: 4,
+            fontSize: 10,
+            color: "var(--text-muted)",
+            flexShrink: 0,
+            whiteSpace: "nowrap",
           }}
         >
-          {focusMode ? "Show All" : "Top 3 Mode"}
-        </button>
-      )}
-
-      {/* ── Animation Styles ── */}
-      <style>{`
-        @keyframes shimmer {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-8px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
+          {more} more pending · {doneToday} done today
+        </div>
+      </div>
     </div>
+  );
+}
+
+/* ── Panel 2 — INPUTS ─────────────────────────────────────────────────────── */
+
+function InputsPanel({ data, settings }: { data: ActionsPayload; settings?: SettingsMap }) {
+  const shown = getSetting(settings, "INPUT_HABITS_SHOWN", SETTING_DEFAULTS.INPUT_HABITS_SHOWN);
+  const visible = data.inputs.slice(0, shown);
+
+  return (
+    <div className="card" style={{ padding: "10px 12px" }}>
+      <div className="card-header" style={{ marginBottom: 5 }}>
+        <div className="card-title">Inputs</div>
+        <span className="badge badge-cyan">{data.inputs.length} tracked</span>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 4,
+          flex: 1,
+          minHeight: 0,
+          overflow: "hidden",
+        }}
+      >
+        {visible.length === 0 ? (
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              textAlign: "center",
+              gap: 4,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: "var(--text-muted)",
+                letterSpacing: "0.04em",
+              }}
+            >
+              NO INPUTS TRACKED
+            </div>
+            <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
+              tag items Daily or Recurring in Notion
+            </div>
+          </div>
+        ) : (
+          visible.map((input) => (
+            <div
+              key={input.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+                background: "var(--bg-inner)",
+                borderRadius: 6,
+                padding: "5px 8px",
+                minWidth: 0,
+              }}
+            >
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "var(--text-primary)",
+                    lineHeight: 1.25,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {input.title}
+                </div>
+                <div
+                  style={{
+                    fontSize: 9,
+                    color: "var(--text-muted)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {input.area ?? "—"} · {input.type ?? "—"}
+                </div>
+              </div>
+
+              {input.doneToday ? (
+                <span
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 700,
+                    color: "var(--green)",
+                    flexShrink: 0,
+                    lineHeight: 1.2,
+                  }}
+                >
+                  ✓
+                </span>
+              ) : (
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    // A broken streak has to be visible, so zero is amber rather
+                    // than a quiet grey.
+                    color: input.streak > 0 ? "var(--green)" : "var(--amber)",
+                    fontVariantNumeric: "tabular-nums",
+                    flexShrink: 0,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {input.streak}d
+                </span>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Panel 3 — THE CLOCK ──────────────────────────────────────────────────── */
+
+function ClockPanel({ data, settings }: { data: ActionsPayload; settings?: SettingsMap }) {
+  const c = data.clock;
+  const gapAmber = getSetting(settings, "TEST_GAP_AMBER_DAYS", SETTING_DEFAULTS.TEST_GAP_AMBER_DAYS);
+  const gapRed = getSetting(settings, "TEST_GAP_RED_DAYS", SETTING_DEFAULTS.TEST_GAP_RED_DAYS);
+
+  const gap = c.tests.daysSinceLastCompleted;
+  const gapTone =
+    gap > gapRed ? "var(--red)" : gap > gapAmber ? "var(--amber)" : "var(--text-secondary)";
+
+  return (
+    <div className="card" style={{ padding: "10px 12px" }}>
+      <div className="card-header" style={{ marginBottom: 5 }}>
+        <div className="card-title">The Clock</div>
+        <span className="badge badge-cyan">{c.yearElapsedPct.toFixed(1)}% of year</span>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 5,
+          flex: 1,
+          minHeight: 0,
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+          <ClockStat value={String(c.daysLeftInWeek)} label="Days left · week" />
+          <ClockStat value={String(c.daysLeftInMonth)} label="Days left · month" />
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+          <ClockStat
+            value={String(c.daysToTractionEnd)}
+            label="Days to traction end"
+            tone="var(--cyan)"
+          />
+          <ClockStat
+            value={`${c.yearElapsedPct.toFixed(0)}%`}
+            label="Year elapsed"
+            tone="var(--amber)"
+          />
+        </div>
+
+        {/* Product tests — counts, live from the Launchpad API. */}
+        <div style={{ borderTop: "1px solid var(--border)", paddingTop: 5, marginTop: "auto" }}>
+          <div
+            style={{
+              fontSize: 9,
+              color: "var(--text-muted)",
+              textTransform: "uppercase",
+              letterSpacing: "0.06em",
+              marginBottom: 2,
+            }}
+          >
+            Product tests
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+            <span
+              style={{
+                fontSize: 26,
+                fontWeight: 800,
+                lineHeight: 1.2,
+                color: c.tests.completed >= c.tests.target ? "var(--green)" : "var(--text-primary)",
+                fontVariantNumeric: "tabular-nums",
+                letterSpacing: "-0.02em",
+              }}
+            >
+              {c.tests.completed} of {c.tests.target}
+            </span>
+            <span style={{ fontSize: 10, color: "var(--text-muted)" }}>complete</span>
+          </div>
+          <div style={{ fontSize: 10, color: gapTone, fontWeight: 600, lineHeight: 1.3 }}>
+            {gap} days since {c.tests.everCompleted ? "last completed test" : "Launchpad go-live"}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Column ───────────────────────────────────────────────────────────────── */
+
+function isRenderable(p: unknown): p is ActionsPayload {
+  const d = p as ActionsPayload | null;
+  return Boolean(d && d.actions && Array.isArray(d.inputs) && d.clock);
+}
+
+export default function PanelTodos() {
+  const [data, setData] = useState<ActionsPayload | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const response = await fetch("/api/actions");
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        if (payload?.error) throw new Error(String(payload.error));
+        if (!isRenderable(payload)) throw new Error("Unexpected payload shape");
+        if (!cancelled) {
+          setData(payload);
+          setError(null);
+        }
+      } catch (e) {
+        // No invented fallback numbers — the panels say what failed.
+        if (!cancelled) {
+          setData(null);
+          setError(e instanceof Error ? e.message : "Unknown error");
+        }
+      }
+    };
+
+    load();
+    const id = setInterval(load, REFRESH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
+
+  if (error) {
+    return (
+      <>
+        {["Today", "Inputs", "The Clock"].map((title) => (
+          <ShellCard
+            key={title}
+            title={title}
+            badge="⚠ Error"
+            badgeClass="badge-red"
+            message={`Action data unavailable — ${error}`}
+          />
+        ))}
+      </>
+    );
+  }
+
+  if (!data) {
+    return (
+      <>
+        {["Today", "Inputs", "The Clock"].map((title) => (
+          <ShellCard
+            key={title}
+            title={title}
+            badge="Loading…"
+            badgeClass="badge-cyan"
+            message="…"
+          />
+        ))}
+      </>
+    );
+  }
+
+  const settings = data.settings;
+
+  return (
+    <>
+      <TodayPanel data={data} settings={settings} />
+      <InputsPanel data={data} settings={settings} />
+      <ClockPanel data={data} settings={settings} />
+    </>
   );
 }

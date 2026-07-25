@@ -1,11 +1,19 @@
 import { NextResponse } from "next/server";
+import {
+  DEFAULT_CACHE_SECONDS,
+  SETTING_DEFAULTS,
+  getSetting,
+  loadSettingsSafe,
+} from "../../lib/settings";
 
 // Cached for 5 minutes (legacy caching model — cacheComponents is not enabled).
 // Same pattern as the other cached routes (app/api/schedule, app/api/habits).
 export const dynamic = "force-static";
 export const revalidate = 300;
 
-const CACHE_SECONDS = 300;
+// Fallback only — the live window is CACHE_MINUTES from settings, resolved per
+// request. `revalidate` above must stay a static literal.
+const CACHE_SECONDS = DEFAULT_CACHE_SECONDS;
 
 /* ────────────────────────────────────────────────────────────────────────────
    Sources of truth — see the reconciliation note in the commit message.
@@ -39,22 +47,16 @@ const POCKETSMITH_BASE = "https://api.pocketsmith.com/v2";
 /** Public read-only API of the ECOM Launchpad's backend. No auth required. */
 const LAUNCHPAD_API = "https://product-test-engine.netlify.app/api";
 
-/** The Launchpad went live on this date; the "days since" counter uses it when
- *  no test has ever run. */
-const LAUNCHPAD_LIVE_DATE = "2026-07-09";
-
 /** Meta charges appear under these payees regardless of category. */
 const META_PAYEE = /facebk|facebook|meta platforms|meta ads/i;
 
 /** Line items that are services, not goods — they carry no COGS. */
 const NON_GOODS = /order protection|priority processing|shipping protection|tip/i;
 
-const MONTH_TARGET = 15000;
 const SPARK_DAYS = 30;
 
-// All day boundaries are resolved in this zone through Intl — never a fixed
-// UTC+10, which is wrong for the ~5 months the zone is on AEDT.
-const TIME_ZONE = "Australia/Sydney";
+// Every day boundary is resolved through Intl with the TIMEZONE setting —
+// never a fixed UTC+10, which is wrong for the ~5 months the zone is on AEDT.
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -68,9 +70,9 @@ interface CivilDate {
   d: number;
 }
 
-function sydneyToday(now: Date): CivilDate {
+function sydneyToday(now: Date, timeZone: string): CivilDate {
   const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: TIME_ZONE,
+    timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -83,11 +85,11 @@ function sydneyToday(now: Date): CivilDate {
   return { y: part("year"), m: part("month"), d: part("day") };
 }
 
-/** The instant of midnight starting the given civil day, in TIME_ZONE. */
-function zoneMidnight(c: CivilDate): number {
+/** The instant of midnight starting the given civil day, in `timeZone`. */
+function zoneMidnight(c: CivilDate, timeZone: string): number {
   const noonUTC = Date.UTC(c.y, c.m - 1, c.d, 12);
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: TIME_ZONE,
+    timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -124,9 +126,9 @@ const daysBetween = (fromISO: string, toISO: string) => {
 };
 
 /** The Sydney civil date an instant falls on. */
-function isoOfInstant(ms: number): string {
+function isoOfInstant(ms: number, timeZone: string): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: TIME_ZONE,
+    timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -235,13 +237,17 @@ function nextPageUrl(link: string | null): string | null {
   return null;
 }
 
-async function fetchMetaSpend(startISO: string, endISO: string): Promise<PsTransaction[]> {
+async function fetchMetaSpend(
+  startISO: string,
+  endISO: string,
+  cacheSeconds: number,
+): Promise<PsTransaction[]> {
   if (!POCKETSMITH_KEY) throw new Error("Missing POCKETSMITH_KEY");
 
   // The user id is resolved from /me rather than hardcoded.
   const meRes = await fetch(`${POCKETSMITH_BASE}/me`, {
     headers: { "X-Developer-Key": POCKETSMITH_KEY, Accept: "application/json" },
-    next: { revalidate: CACHE_SECONDS },
+    next: { revalidate: cacheSeconds },
   });
   if (!meRes.ok) throw new Error(`PocketSmith /me failed: ${meRes.status}`);
   const userId = ((await meRes.json()) as { id: number }).id;
@@ -257,7 +263,7 @@ async function fetchMetaSpend(startISO: string, endISO: string): Promise<PsTrans
     seen.add(url);
     const res: Response = await fetch(url, {
       headers: { "X-Developer-Key": POCKETSMITH_KEY, Accept: "application/json" },
-      next: { revalidate: CACHE_SECONDS },
+      next: { revalidate: cacheSeconds },
     });
     if (!res.ok) throw new Error(`PocketSmith transactions failed: ${res.status}`);
     out.push(...((await res.json()) as PsTransaction[]));
@@ -306,9 +312,9 @@ interface LaunchpadEntry {
   orders: number | null;
 }
 
-async function launchpad<T>(path: string): Promise<T> {
+async function launchpad<T>(path: string, cacheSeconds = CACHE_SECONDS): Promise<T> {
   const res = await fetch(`${LAUNCHPAD_API}${path}`, {
-    next: { revalidate: CACHE_SECONDS },
+    next: { revalidate: cacheSeconds },
     headers: { Accept: "application/json" },
   });
   if (!res.ok) throw new Error(`Launchpad ${path} failed: ${res.status}`);
@@ -344,29 +350,80 @@ export async function GET() {
   }
 
   try {
+    // Settings are the single source of truth. loadSettingsSafe never throws: a
+    // Notion outage degrades to built-in defaults with a per-key warning.
+    const { settings, cacheSeconds } = await loadSettingsSafe();
+    const timeZone = getSetting(settings, "TIMEZONE", SETTING_DEFAULTS.TIMEZONE);
+    const monthTarget = getSetting(
+      settings,
+      "TARGET_MONTHLY_REVENUE",
+      SETTING_DEFAULTS.TARGET_MONTHLY_REVENUE,
+    );
+    const entryWindowLow = getSetting(
+      settings,
+      "TEST_ENTRY_WINDOW_LOW",
+      SETTING_DEFAULTS.TEST_ENTRY_WINDOW_LOW,
+    );
+    const entryWindowHigh = getSetting(
+      settings,
+      "TEST_ENTRY_WINDOW_HIGH",
+      SETTING_DEFAULTS.TEST_ENTRY_WINDOW_HIGH,
+    );
+    const staleAmberDays = getSetting(
+      settings,
+      "TEST_STALE_AMBER_DAYS",
+      SETTING_DEFAULTS.TEST_STALE_AMBER_DAYS,
+    );
+    const staleRedDays = getSetting(
+      settings,
+      "TEST_STALE_RED_DAYS",
+      SETTING_DEFAULTS.TEST_STALE_RED_DAYS,
+    );
+    const lookbackDays = getSetting(
+      settings,
+      "NO_CAMPAIGNS_LOOKBACK_DAYS",
+      SETTING_DEFAULTS.NO_CAMPAIGNS_LOOKBACK_DAYS,
+    );
+    const adSpendSource = getSetting(
+      settings,
+      "AD_SPEND_SOURCE",
+      SETTING_DEFAULTS.AD_SPEND_SOURCE,
+    );
+    const launchpadGoLive = getSetting(
+      settings,
+      "LAUNCHPAD_GO_LIVE_DATE",
+      SETTING_DEFAULTS.LAUNCHPAD_GO_LIVE_DATE,
+    );
+
     const now = new Date();
-    const today = sydneyToday(now);
+    const today = sydneyToday(now, timeZone);
     const todayISO = iso(today);
     const monthStart = { y: today.y, m: today.m, d: 1 };
     const sparkStart = addDays(today, -(SPARK_DAYS - 1));
 
     // Shopify is fetched from whichever is earlier — the month start or the
     // sparkline window — so one request feeds both.
-    const shopifySince = zoneMidnight(sparkStart) < zoneMidnight(monthStart) ? sparkStart : monthStart;
+    const shopifySince =
+      zoneMidnight(sparkStart, timeZone) < zoneMidnight(monthStart, timeZone)
+        ? sparkStart
+        : monthStart;
 
     const token = await getAccessToken();
 
     const [orders, tests, metaTx] = await Promise.all([
-      fetchOrdersSince(token, new Date(zoneMidnight(shopifySince)).toISOString()),
-      launchpad<LaunchpadTest[]>("/tests"),
-      fetchMetaSpend(iso(sparkStart), todayISO),
+      fetchOrdersSince(token, new Date(zoneMidnight(shopifySince, timeZone)).toISOString()),
+      launchpad<LaunchpadTest[]>("/tests", cacheSeconds),
+      fetchMetaSpend(iso(sparkStart), todayISO, cacheSeconds),
     ]);
 
     const running = tests.filter((t) => RUNNING.has(t.status));
     const activeTest = running.sort((a, b) => b.created_at.localeCompare(a.created_at))[0] ?? null;
 
     const entries = activeTest
-      ? await launchpad<LaunchpadEntry[]>(`/entries?test_id=${encodeURIComponent(activeTest.id)}`)
+      ? await launchpad<LaunchpadEntry[]>(
+          `/entries?test_id=${encodeURIComponent(activeTest.id)}`,
+          cacheSeconds,
+        )
       : [];
     const sortedEntries = [...entries].sort((a, b) => a.entry_date.localeCompare(b.entry_date));
 
@@ -376,7 +433,7 @@ export async function GET() {
     const ordersByDay = new Map<string, number>();
 
     for (const o of orders) {
-      const day = isoOfInstant(new Date(o.createdAt).getTime());
+      const day = isoOfInstant(new Date(o.createdAt).getTime(), timeZone);
       const amount = parseFloat(o.totalPriceSet.shopMoney.amount || "0");
       revenueByDay.set(day, (revenueByDay.get(day) ?? 0) + amount);
       cogsByDay.set(day, (cogsByDay.get(day) ?? 0) + orderCogs(o, activeTest));
@@ -419,10 +476,53 @@ export async function GET() {
 
     const testSpend = sortedEntries.reduce((s, e) => s + (e.meta_spend ?? 0), 0);
 
+    /* ---- PANEL 1 activity state -----------------------------------------
+     * Three states, not two. Ad spend is bank-settled cash and lags Meta by
+     * days, so a zero today does NOT mean nothing is running — announcing
+     * "no campaigns" on that basis is wrong.
+     *
+     *   LIVE     — money moved today, OR a Live/Iterating test whose last entry
+     *              is within TEST_STALE_AMBER_DAYS.
+     *   AWAITING — today is zero, but there was activity inside
+     *              NO_CAMPAIGNS_LOOKBACK_DAYS. Today's numbers just haven't
+     *              settled yet.
+     *   NONE     — nothing in the lookback AND no test that is both active and
+     *              fed within TEST_STALE_RED_DAYS. A stale-dead test must not
+     *              block this branch; that was the original bug.
+     */
+    const testStaleDays = sortedEntries.at(-1)
+      ? daysBetween(sortedEntries.at(-1)!.entry_date, todayISO)
+      : null;
+
+    const testIsFresh =
+      activeTest !== null && testStaleDays !== null && testStaleDays <= staleAmberDays;
+    const testIsAlive =
+      activeTest !== null && testStaleDays !== null && testStaleDays <= staleRedDays;
+
+    const activityToday = todayOrders > 0 || todayAdSpend > 0;
+
+    const lookbackStart = iso(addDays(today, -lookbackDays));
+    const activityInLookback = series.some(
+      (d) =>
+        d.date >= lookbackStart &&
+        d.date <= todayISO &&
+        ((revenueByDay.get(d.date) ?? 0) > 0 || (adSpendByDay.get(d.date) ?? 0) > 0),
+    );
+
+    const activityState: "LIVE" | "AWAITING" | "NONE" = activityToday || testIsFresh
+      ? "LIVE"
+      : activityInLookback
+        ? "AWAITING"
+        : testIsAlive
+          ? "AWAITING"
+          : "NONE";
+
     return NextResponse.json({
       generatedAt: now.toISOString(),
-      timeZone: TIME_ZONE,
+      timeZone,
       today: todayISO,
+      settings,
+      cacheSeconds,
 
       /* PANEL 1 */
       todayStats: {
@@ -435,9 +535,14 @@ export async function GET() {
         adSpendWindow: "TODAY" as const,
         adSpendMtd: round2(monthAdSpend),
         contribution: round2(todayRevenue - todayCogs - todayAdSpend),
-        // Zero-because-inactive and zero-because-failing are different
-        // diagnoses; the headline branches on this.
-        noCampaignsLive: todayOrders === 0 && todayAdSpend === 0,
+        // Three-state diagnosis — see the note above. `noCampaignsLive` is
+        // gone deliberately: it conflated "nothing running" with "not settled
+        // yet" and announced the wrong one.
+        activityState,
+        lookbackDays,
+        lookbackHadActivity: activityInLookback,
+        testIsFresh,
+        testIsAlive,
       },
 
       /* PANEL 2 */
@@ -453,8 +558,9 @@ export async function GET() {
               ? daysBetween(sortedEntries.at(-1)!.entry_date, todayISO)
               : null,
             cumulativeSpend: round2(testSpend),
-            entryWindowLow: activeTest.entry_window_low,
-            entryWindowHigh: activeTest.entry_window_high,
+            // Settings win over the test record; both currently agree.
+            entryWindowLow,
+            entryWindowHigh,
             testRevenue: round2(sortedEntries.reduce((s, e) => s + (e.revenue ?? 0), 0)),
             testOrders: sortedEntries.reduce((s, e) => s + (e.orders ?? 0), 0),
             targetCpa: activeTest.target_cpa,
@@ -464,8 +570,8 @@ export async function GET() {
             present: false as const,
             testsComplete: 0,
             testsTarget: 3,
-            sinceDate: LAUNCHPAD_LIVE_DATE,
-            daysSince: daysBetween(LAUNCHPAD_LIVE_DATE, todayISO),
+            sinceDate: launchpadGoLive,
+            daysSince: daysBetween(launchpadGoLive, todayISO),
           },
 
       /* PANEL 3 */
@@ -476,10 +582,11 @@ export async function GET() {
         grossProfit: round2(monthGross),
         adSpend: round2(monthAdSpend),
         contribution: round2(monthGross - monthAdSpend),
-        target: MONTH_TARGET,
-        targetPercent: round2(Math.min((monthRevenue / MONTH_TARGET) * 100, 100)),
+        target: monthTarget,
+        targetPercent: round2(Math.min((monthRevenue / monthTarget) * 100, 100)),
         revenueSource: "Shopify",
         adSpendSource: "PocketSmith · Meta",
+        adSpendSourceKey: adSpendSource,
         dailyContribution: series,
       },
     });
