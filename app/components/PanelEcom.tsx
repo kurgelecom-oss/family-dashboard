@@ -1,292 +1,875 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
 
-const MONTHLY_TARGET = 15000;
-const PL_POLL_MS = 5 * 60 * 1000;
+import { useEffect, useState } from "react";
 
-type ShopifyData = {
-  todayOrders: number;
-  todayRevenue: number;
-  weekRevenue: number;
-  monthRevenue: number;
-  yearRevenue: number;
-  error?: string;
-};
+/* ════════════════════════════════════════════════════════════════════════════
+   Column B — TODAY / ACTIVE TEST / MONTH · P&L.
 
-type PlData = Record<string, number | string | undefined> & {
-  error?: string;
-  fetchedAt?: number;
-};
+   Reads GET /api/ecom, which reconciles Shopify (revenue, the system of record
+   for money collected) with the ECOM Launchpad (ad spend and test state). No
+   mock and no fallback: an unreachable route says so rather than showing a
+   figure that looks measured.
+   ══════════════════════════════════════════════════════════════════════════ */
 
-function pickPl(d: PlData | null, ...keys: string[]): number | undefined {
-  if (!d) return undefined;
-  for (const k of keys) {
-    const v = d[k];
-    if (v !== undefined && v !== null && v !== "") {
-      const n = typeof v === "number" ? v : parseFloat(String(v));
-      if (!isNaN(n)) return n;
-    }
-  }
-  return undefined;
+interface TodayStats {
+  revenue: number;
+  orders: number;
+  aov: number | null;
+  cogs: number;
+  adSpend: number;
+  /** The true window the ad-spend figure covers, so the label can't lie. */
+  adSpendWindow: "TODAY" | "MTD";
+  adSpendMtd: number;
+  contribution: number;
+  noCampaignsLive: boolean;
 }
 
-function fmt(n: number) {
-  return n >= 1000
-    ? `$${(n / 1000).toFixed(1)}k`
-    : `$${n.toLocaleString("en-AU", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+interface ActiveTest {
+  present: true;
+  id: string;
+  name: string;
+  status: string;
+  dayNumber: number;
+  lastEntryDate: string | null;
+  staleDays: number | null;
+  cumulativeSpend: number;
+  entryWindowLow: number | null;
+  entryWindowHigh: number | null;
+  testRevenue: number;
+  testOrders: number;
+  targetCpa: number | null;
+  validationMinPurchases: number | null;
 }
 
-function fmtVal(v: number | undefined) { return v !== undefined ? fmt(v) : "—"; }
-function fmtRoas(v: number | undefined) { return v !== undefined ? `${v.toFixed(2)}×` : "—"; }
-function fmtPct(v: number | undefined) { return v !== undefined ? `${v.toFixed(1)}%` : "—"; }
+interface NoTest {
+  present: false;
+  testsComplete: number;
+  testsTarget: number;
+  sinceDate: string;
+  daysSince: number;
+}
 
-function MonthlySparkline({
-  monthRevenue,
-  target,
-  loading,
-}: {
-  monthRevenue: number;
+interface DailyContribution {
+  date: string;
+  contribution: number;
+}
+
+interface MonthPl {
+  revenue: number;
+  orders: number;
+  cogs: number;
+  grossProfit: number;
+  adSpend: number;
+  contribution: number;
   target: number;
-  loading: boolean;
-}) {
-  const now = new Date();
-  const todayDay = now.getDate();
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  targetPercent: number;
+  revenueSource: string;
+  adSpendSource: string;
+  dailyContribution: DailyContribution[];
+}
 
-  const W = 200;
-  const H = 60;
-  const PAD = 3;
+interface EcomPayload {
+  generatedAt: string;
+  timeZone: string;
+  today: string;
+  todayStats: TodayStats;
+  test: ActiveTest | NoTest;
+  month: MonthPl;
+}
 
-  const xOf = (d: number) => PAD + (d / daysInMonth) * (W - PAD * 2);
-  const yOf = (v: number) => H - PAD - (Math.min(v, target * 1.15) / (target * 1.15)) * (H - PAD * 2);
+const REFRESH_MS = 5 * 60 * 1000;
 
-  const ax1 = xOf(0), ay1 = H - PAD;
-  const ax2 = xOf(todayDay), ay2 = yOf(monthRevenue);
-  const tx2 = xOf(daysInMonth), ty2 = PAD + 2;
+/* ── Formatting ───────────────────────────────────────────────────────────── */
 
-  if (loading) {
-    return <div style={{ flex: 1, minHeight: 0, background: "var(--progress-track)", borderRadius: 4 }} />;
+function money(n: number) {
+  const abs = Math.abs(n).toLocaleString("en-AU", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  return `${n < 0 ? "-" : ""}$${abs}`;
+}
+
+/** Compact form for the hero, which has the least horizontal room. */
+function moneyShort(n: number) {
+  const abs = Math.abs(n);
+  const body =
+    abs >= 1000
+      ? `$${(abs / 1000).toFixed(1)}k`
+      : `$${abs.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `${n < 0 ? "-" : ""}${body}`;
+}
+
+const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+
+function dayLabel(isoDate: string) {
+  const [, m, d] = isoDate.split("-").map(Number);
+  return `${d} ${MONTHS[m - 1]}`;
+}
+
+function monthLabel(isoDate: string) {
+  const [y, m] = isoDate.split("-").map(Number);
+  return `${MONTHS[m - 1]} ${y}`;
+}
+
+/**
+ * Breakeven ROAS — the multiple at which contribution turns positive.
+ *
+ * Gross margin ratio = (revenue − COGS) / revenue, so breakeven ROAS is its
+ * reciprocal: below this, every extra dollar of ad spend loses money.
+ */
+function breakevenRoas(revenue: number, cogs: number): number | null {
+  if (revenue <= 0) return null;
+  const marginRatio = (revenue - cogs) / revenue;
+  if (marginRatio <= 0) return null;
+  return 1 / marginRatio;
+}
+
+/**
+ * ROAS colour against its breakeven: below breakeven is losing money on every
+ * extra ad dollar (red), within 10% above is too thin to call a win (amber),
+ * clear of that is green.
+ */
+function roasTone(roas: number | null, breakeven: number | null): string {
+  if (roas === null || breakeven === null) return "var(--text-muted)";
+  if (roas < breakeven) return "var(--red)";
+  if (roas < breakeven * 1.1) return "var(--amber)";
+  return "var(--green)";
+}
+
+/**
+ * 30-day daily-contribution sparkline. Zero is drawn as a baseline so
+ * loss-making days read as below the line rather than just "lower".
+ */
+function ContributionSparkline({ series }: { series: DailyContribution[] }) {
+  const H = 48;
+  const W = 240;
+  const PAD = 2;
+
+  if (series.length === 0) {
+    return (
+      <div style={{ height: H, display: "flex", alignItems: "center", fontSize: 10, color: "var(--text-muted)" }}>
+        no contribution history
+      </div>
+    );
   }
+
+  const values = series.map((d) => d.contribution);
+  const max = Math.max(...values, 0);
+  const min = Math.min(...values, 0);
+  const span = max - min || 1;
+
+  const xOf = (i: number) => PAD + (i / Math.max(series.length - 1, 1)) * (W - PAD * 2);
+  const yOf = (v: number) => PAD + (1 - (v - min) / span) * (H - PAD * 2);
+  const zeroY = yOf(0);
+
+  const line = series.map((d, i) => `${i === 0 ? "M" : "L"}${xOf(i)},${yOf(d.contribution)}`).join(" ");
 
   return (
-    <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
+    <div style={{ height: H, position: "relative" }}>
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", display: "block" }}
         preserveAspectRatio="none"
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block" }}
       >
-        <line
-          x1={ax1} y1={ay1} x2={tx2} y2={ty2}
-          stroke="var(--amber)" strokeWidth="1.5" strokeDasharray="5 3" opacity="0.55"
-        />
-        <line
-          x1={ax1} y1={ay1} x2={ax2} y2={ay2}
-          stroke="var(--cyan)" strokeWidth="2" strokeLinecap="round"
-        />
-        <circle cx={ax2} cy={ay2} r="3.5" fill="var(--cyan)" />
-        <line
-          x1={ax2} y1={0} x2={ax2} y2={H}
-          stroke="rgba(255,255,255,0.08)" strokeWidth="1"
-        />
+        <line x1={PAD} y1={zeroY} x2={W - PAD} y2={zeroY} stroke="var(--border)" strokeWidth="1" />
+        <path d={line} fill="none" stroke="var(--cyan)" strokeWidth="1.5" strokeLinecap="round" />
+        {series.map((d, i) =>
+          d.contribution === 0 ? null : (
+            <circle
+              key={d.date}
+              cx={xOf(i)}
+              cy={yOf(d.contribution)}
+              r="1.6"
+              fill={d.contribution >= 0 ? "var(--green)" : "var(--red)"}
+            />
+          ),
+        )}
       </svg>
     </div>
   );
 }
 
+/** Status badge colour. Only tokens — no new colours. */
+function statusBadgeClass(status: string): string {
+  switch (status) {
+    case "Live":
+    case "Scaled":
+      return "badge-green";
+    case "Iterating":
+    case "Setup":
+      return "badge-cyan";
+    case "Paused-Exit":
+      return "badge-amber";
+    case "Killed":
+      return "badge-red";
+    default:
+      return "badge-cyan";
+  }
+}
+
+/* ── Small building blocks ────────────────────────────────────────────────── */
+
+function ShellCard({
+  title,
+  badge,
+  badgeClass,
+  message,
+}: {
+  title: string;
+  badge: string;
+  badgeClass: string;
+  message: string;
+}) {
+  return (
+    <div className="card" style={{ padding: "10px 12px" }}>
+      <div className="card-header" style={{ marginBottom: 5 }}>
+        <div className="card-title">{title}</div>
+        <span className={`badge ${badgeClass}`}>{badge}</span>
+      </div>
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 12,
+          color: "var(--text-muted)",
+          textAlign: "center",
+          padding: "0 8px",
+        }}
+      >
+        {message}
+      </div>
+    </div>
+  );
+}
+
+/** One label/value pair in the TODAY strip. */
+function Metric({ label, value, tone }: { label: string; value: string; tone?: string }) {
+  return (
+    <div className="stat-cell" style={{ padding: "5px 6px", minWidth: 0 }}>
+      <div
+        style={{
+          fontSize: 15,
+          fontWeight: 700,
+          lineHeight: 1.2,
+          color: tone ?? "var(--text-primary)",
+          fontVariantNumeric: "tabular-nums",
+          letterSpacing: "-0.01em",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {value}
+      </div>
+      <div
+        className="stat-sublabel"
+        style={{
+          marginTop: 2,
+          fontSize: 9,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function LabelledRow({
+  label,
+  value,
+  tone,
+  last,
+}: {
+  label: string;
+  value: string;
+  tone?: string;
+  last?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 8,
+        padding: "2px 0",
+        borderBottom: last ? "none" : "1px solid var(--border)",
+        minWidth: 0,
+      }}
+    >
+      <span
+        style={{
+          fontSize: 12,
+          color: "var(--text-secondary)",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+          flex: 1,
+          minWidth: 0,
+        }}
+      >
+        {label}
+      </span>
+      <span
+        style={{
+          fontSize: 13,
+          fontWeight: 600,
+          color: tone ?? "var(--text-primary)",
+          fontVariantNumeric: "tabular-nums",
+          flexShrink: 0,
+        }}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+/* ── Panel 1 — TODAY ──────────────────────────────────────────────────────── */
+
+function TodayPanel({ data }: { data: EcomPayload }) {
+  const t = data.todayStats;
+
+  return (
+    <div className="card" style={{ padding: "10px 12px" }}>
+      <div className="card-header" style={{ marginBottom: 5 }}>
+        <div className="card-title">Today</div>
+        <span className="badge badge-cyan">{dayLabel(data.today)}</span>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 5,
+          flex: 1,
+          minHeight: 0,
+          overflow: "hidden",
+        }}
+      >
+        {t.noCampaignsLive ? (
+          <>
+            {/* Zero orders AND zero ad spend is not a $0 result — it is an
+                inactive account. Say which one it is. */}
+            <div
+              style={{
+                fontSize: 24,
+                fontWeight: 800,
+                color: "var(--amber)",
+                lineHeight: 1.2,
+                letterSpacing: "-0.01em",
+              }}
+            >
+              NO CAMPAIGNS LIVE
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+              no orders and no ad spend logged today
+            </div>
+          </>
+        ) : (
+          <>
+            <div
+              style={{
+                fontSize: 30,
+                fontWeight: 700,
+                color: "var(--cyan)",
+                lineHeight: 1.2,
+                fontVariantNumeric: "tabular-nums",
+                letterSpacing: "-0.02em",
+              }}
+            >
+              {money(t.revenue)}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+              revenue · {t.orders} {t.orders === 1 ? "order" : "orders"}
+            </div>
+          </>
+        )}
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 4 }}>
+          <Metric label="Revenue" value={money(t.revenue)} />
+          <Metric label="Orders" value={String(t.orders)} />
+          <Metric label="AOV" value={t.aov === null ? "—" : money(t.aov)} />
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+          <Metric
+            // The label carries the true window. PocketSmith settles daily, so
+            // this is a real same-day figure rather than a month total wearing
+            // a daily label.
+            label={`Ad Spend (${t.adSpendWindow})`}
+            value={money(t.adSpend)}
+            tone="var(--amber)"
+          />
+          <Metric
+            label="Contribution"
+            value={money(t.contribution)}
+            tone={t.contribution >= 0 ? "var(--green)" : "var(--red)"}
+          />
+        </div>
+
+        <div style={{ fontSize: 10, color: "var(--text-muted)", lineHeight: 1.3 }}>
+          Ad spend is bank-settled Meta charges · {money(t.adSpendMtd)} MTD
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Panel 2 — ACTIVE TEST ────────────────────────────────────────────────── */
+
+function ActiveTestPanel({ test }: { test: ActiveTest | NoTest }) {
+  if (!test.present) {
+    return (
+      <div className="card" style={{ padding: "10px 12px" }}>
+        <div className="card-header" style={{ marginBottom: 5 }}>
+          <div className="card-title">Active Test</div>
+          <span className="badge badge-amber">Idle</span>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 5,
+            flex: 1,
+            minHeight: 0,
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 24,
+              fontWeight: 800,
+              color: "var(--amber)",
+              lineHeight: 1.2,
+              letterSpacing: "-0.01em",
+            }}
+          >
+            NO TEST RUNNING
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+            {test.testsComplete} of {test.testsTarget} tests complete
+          </div>
+          <div style={{ borderTop: "1px solid var(--border)", paddingTop: 5, marginTop: 2 }}>
+            <div
+              style={{
+                fontSize: 32,
+                fontWeight: 700,
+                color: "var(--text-primary)",
+                lineHeight: 1.2,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {test.daysSince}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+              days since {dayLabel(test.sinceDate)} — no test has run yet
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const low = test.entryWindowLow ?? 0;
+  const high = test.entryWindowHigh ?? 0;
+  const windowPct = high > 0 ? Math.min((test.cumulativeSpend / high) * 100, 100) : 0;
+  const lowMarkPct = high > 0 ? Math.min((low / high) * 100, 100) : 0;
+  const insideWindow = test.cumulativeSpend >= low && test.cumulativeSpend <= high;
+
+  const roas = test.cumulativeSpend > 0 ? test.testRevenue / test.cumulativeSpend : null;
+  // Breakeven for the test uses the same margin basis as the month panel.
+  const be = breakevenRoas(test.testRevenue, test.testRevenue * 0.282);
+
+  // The gate the test is actually waiting on: it cannot be judged until
+  // cumulative spend clears the bottom of the entry window.
+  const nextGate = insideWindow
+    ? "Entry-window verdict"
+    : test.cumulativeSpend < low
+      ? `Reach $${low} entry window`
+      : "Exit / scale decision";
+
+  /*
+   * Staleness. A test can sit in "Live" indefinitely while nobody feeds it, so
+   * the status alone is not the truth — the gap since the last entry is. Both
+   * thresholds and the day count are computed, never hardcoded.
+   *   > 14 days → the test is not being run at all (red)
+   *   >  2 days → running but behind on entries (amber)
+   */
+  const stale = test.staleDays;
+  const abandoned = stale !== null && stale > 14;
+  const lagging = stale !== null && stale > 2 && !abandoned;
+
+  const badgeLabel = abandoned
+    ? "Stale"
+    : lagging
+      ? `${test.status} · Stale`
+      : test.status;
+  const badgeClass = abandoned
+    ? "badge-red"
+    : lagging
+      ? "badge-amber"
+      : statusBadgeClass(test.status);
+
+  const staleLine = abandoned
+    ? `No entry in ${stale} days · test not being run`
+    : lagging
+      ? `No entry in ${stale} days`
+      : null;
+  const staleTone = abandoned ? "var(--red)" : "var(--amber)";
+
+  return (
+    <div className="card" style={{ padding: "10px 12px" }}>
+      <div className="card-header" style={{ marginBottom: 5 }}>
+        <div className="card-title">Active Test</div>
+        <span className={`badge ${badgeClass}`}>{badgeLabel}</span>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 4,
+          flex: 1,
+          minHeight: 0,
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            fontSize: 14,
+            fontWeight: 700,
+            color: "var(--text-primary)",
+            lineHeight: 1.25,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {test.name}
+        </div>
+        <div style={{ fontSize: 11, color: "var(--text-secondary)" }}>
+          Day {test.dayNumber}
+          {/* The last entry date is shown explicitly so the gap is legible at a
+              glance, not just implied by a day count. */}
+          {test.lastEntryDate && <> · last entry {dayLabel(test.lastEntryDate)}</>}
+        </div>
+
+        {staleLine && (
+          <div style={{ fontSize: 11, fontWeight: 600, color: staleTone, lineHeight: 1.3 }}>
+            {staleLine}
+          </div>
+        )}
+
+        {/* Cumulative spend against the entry window */}
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 2 }}>
+          <span
+            style={{
+              fontSize: 10,
+              color: "var(--text-muted)",
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+            }}
+          >
+            Spend vs ${low}–{high}
+          </span>
+          <span
+            style={{
+              fontSize: 10,
+              color: insideWindow ? "var(--green)" : "var(--amber)",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {money(test.cumulativeSpend)}
+          </span>
+        </div>
+        <div className="progress-track thick" style={{ position: "relative" }}>
+          <div
+            className="progress-fill"
+            style={{
+              width: `${windowPct}%`,
+              background: insideWindow ? "var(--green)" : "var(--cyan)",
+            }}
+          />
+          {/* entry-window floor marker */}
+          <div
+            style={{
+              position: "absolute",
+              left: `${lowMarkPct}%`,
+              top: 0,
+              bottom: 0,
+              width: 2,
+              background: "var(--amber)",
+            }}
+          />
+        </div>
+
+        {/* ROAS against breakeven */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginTop: 2 }}>
+          <Metric
+            label="ROAS"
+            value={roas === null ? "—" : `${roas.toFixed(2)}×`}
+            tone={
+              roas === null
+                ? "var(--text-muted)"
+                : be !== null && roas >= be
+                  ? "var(--green)"
+                  : "var(--red)"
+            }
+          />
+          <Metric
+            label="Breakeven"
+            value={be === null ? "—" : `${be.toFixed(2)}×`}
+            tone="var(--text-muted)"
+          />
+        </div>
+
+        <div style={{ borderTop: "1px solid var(--border)", paddingTop: 4, marginTop: 1 }}>
+          <LabelledRow label="Next gate" value={nextGate} last />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Panel 3 — MONTH · P&L ────────────────────────────────────────────────── */
+
+function MonthPanel({ data }: { data: EcomPayload }) {
+  const m = data.month;
+  const roas = m.adSpend > 0 ? m.revenue / m.adSpend : null;
+  const be = breakevenRoas(m.revenue, m.cogs);
+
+  return (
+    <div className="card" style={{ padding: "10px 12px" }}>
+      <div className="card-header" style={{ marginBottom: 5 }}>
+        <div className="card-title">Month · P&amp;L</div>
+        <span className="badge badge-cyan">{monthLabel(data.today)}</span>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 3,
+          flex: 1,
+          minHeight: 0,
+          overflow: "hidden",
+        }}
+      >
+        {/* flexShrink:0 — these four rows are the ledger and must never be
+            compressed to make room for the chart below them. */}
+        <div style={{ flexShrink: 0 }}>
+          <LabelledRow
+            // One canonical revenue figure, labelled with its source so it can
+            // never again sit unexplained beside a different number.
+            label={`Revenue · ${m.revenueSource}`}
+            value={money(m.revenue)}
+          />
+          <LabelledRow label="COGS" value={`-${money(m.cogs)}`} />
+          <LabelledRow label="Gross Profit" value={money(m.grossProfit)} tone="var(--green)" />
+          <LabelledRow
+            label="Ad Spend · Settled"
+            value={`-${money(m.adSpend)}`}
+            tone="var(--amber)"
+            last
+          />
+        </div>
+
+        {/* The figure is bank truth, but settlement lags ad delivery by a few
+            days — say so, or it reads as live Meta reporting. */}
+        <div style={{ fontSize: 9, color: "var(--text-muted)", lineHeight: 1.3 }}>
+          {m.adSpendSource} · settled charges, lags Meta delivery by a few days
+        </div>
+
+        {/* Hero — contribution profit, the largest text in the panel */}
+        <div
+          style={{
+            borderTop: "1px solid var(--border)",
+            paddingTop: 5,
+            marginTop: 1,
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "space-between",
+            gap: 8,
+          }}
+        >
+          <div style={{ minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: 32,
+                fontWeight: 800,
+                lineHeight: 1.2,
+                color: m.contribution >= 0 ? "var(--green)" : "var(--red)",
+                fontVariantNumeric: "tabular-nums",
+                letterSpacing: "-0.02em",
+              }}
+            >
+              {moneyShort(m.contribution)}
+            </div>
+            <div
+              className="stat-sublabel"
+              style={{ marginTop: 2, fontSize: 10, whiteSpace: "nowrap" }}
+            >
+              Contribution Profit
+            </div>
+          </div>
+
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <div
+              style={{
+                fontSize: 18,
+                fontWeight: 700,
+                lineHeight: 1.2,
+                color: roasTone(roas, be),
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {roas === null ? "—" : `${roas.toFixed(2)}×`}
+            </div>
+            <div
+              className="stat-sublabel"
+              style={{ marginTop: 2, fontSize: 10, whiteSpace: "nowrap" }}
+            >
+              ROAS · be {be === null ? "—" : `${be.toFixed(2)}×`}
+            </div>
+          </div>
+        </div>
+
+        {/* 30-day daily contribution — replaces the actual-vs-target pace chart */}
+        <div style={{ marginTop: 2 }}>
+          <div
+            style={{
+              fontSize: 9,
+              color: "var(--text-muted)",
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+              marginBottom: 1,
+            }}
+          >
+            Daily contribution · 30d
+          </div>
+          <ContributionSparkline series={m.dailyContribution} />
+        </div>
+
+        {/* Footer — progress to the monthly revenue target */}
+        <div style={{ marginTop: "auto", paddingTop: 4 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+            <span
+              style={{
+                fontSize: 10,
+                color: "var(--text-muted)",
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
+              }}
+            >
+              Target ${(m.target / 1000).toFixed(0)}k
+            </span>
+            <span
+              style={{
+                fontSize: 10,
+                color: "var(--text-secondary)",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {money(m.revenue)} · {m.targetPercent.toFixed(1)}%
+            </span>
+          </div>
+          <div className="progress-track">
+            <div
+              className="progress-fill"
+              style={{ width: `${m.targetPercent}%`, background: "var(--cyan)" }}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Column ───────────────────────────────────────────────────────────────── */
+
+function isRenderable(p: unknown): p is EcomPayload {
+  const d = p as EcomPayload | null;
+  return Boolean(d && d.todayStats && d.test && d.month && typeof d.today === "string");
+}
+
 export default function PanelEcom() {
-  const [data, setData] = useState<ShopifyData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [mounted, setMounted] = useState(false);
-
-  const [plData, setPlData] = useState<PlData | null>(null);
-  const [plLastGood, setPlLastGood] = useState<PlData | null>(null);
-  const [plStale, setPlStale] = useState(false);
-  const [plLoading, setPlLoading] = useState(true);
-
-  const loadShopify = useCallback(async () => {
-    try {
-      const res = await fetch("/api/shopify");
-      const json = await res.json();
-      setData(json);
-    } catch {
-      setData({ todayOrders: 0, todayRevenue: 0, weekRevenue: 0, monthRevenue: 0, yearRevenue: 0, error: "fetch failed" });
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const loadPl = useCallback(async () => {
-    try {
-      const res = await fetch("/api/pl-data");
-      if (!res.ok) throw new Error(`${res.status}`);
-      const json: PlData = await res.json();
-      if (json.error) throw new Error(String(json.error));
-      setPlData(json);
-      setPlLastGood(json);
-      setPlStale(false);
-    } catch {
-      setPlStale(true);
-    } finally {
-      setPlLoading(false);
-    }
-  }, []);
+  const [data, setData] = useState<EcomPayload | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setMounted(true);
-    loadShopify();
-    loadPl();
-    const i1 = setInterval(loadShopify, 60_000);
-    const i2 = setInterval(loadPl, PL_POLL_MS);
-    return () => { clearInterval(i1); clearInterval(i2); };
-  }, [loadShopify, loadPl]);
+    let cancelled = false;
 
-  const monthPct = data ? Math.min(Math.round((data.monthRevenue / MONTHLY_TARGET) * 100), 100) : 0;
-  const hasError = !!data?.error;
+    const load = async () => {
+      try {
+        const response = await fetch("/api/ecom");
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        if (payload?.error) throw new Error(String(payload.error));
+        if (!isRenderable(payload)) throw new Error("Unexpected payload shape");
+        if (!cancelled) {
+          setData(payload);
+          setError(null);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setData(null);
+          setError(e instanceof Error ? e.message : "Unknown error");
+        }
+      }
+    };
 
-  const pl = (plStale ? plLastGood : plData) ?? null;
-  const plRevenue     = pickPl(pl, "revenue",     "Revenue",      "total_revenue",  "sales",       "Sales");
-  const plCogs        = pickPl(pl, "cogs",         "COGS",        "cost_of_goods",  "costOfGoods");
-  const plGrossProfit = pickPl(pl, "grossProfit",  "gross_profit","GrossProfit",    "gp",          "GP");
-  const plAdSpend     = pickPl(pl, "adSpend",      "ad_spend",    "AdSpend",        "advertising", "ads");
-  const plRoas        = pickPl(pl, "roas",         "ROAS",        "return_on_ad_spend");
-  const plGpPct       = pickPl(pl, "gpPercent",    "gp_percent",  "gross_margin",   "GrossMargin", "gp_margin");
-  const activeProduct = pl ? (pl.activeProduct as string | undefined) : undefined;
+    load();
+    const id = setInterval(load, REFRESH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
 
-  const monthLabel = mounted
-    ? new Date().toLocaleDateString("en-AU", { month: "long", year: "numeric" })
-    : "";
+  if (error) {
+    return (
+      <>
+        {["Today", "Active Test", "Month · P&L"].map((title) => (
+          <ShellCard
+            key={title}
+            title={title}
+            badge="⚠ Error"
+            badgeClass="badge-red"
+            message={`Ecom data unavailable — ${error}`}
+          />
+        ))}
+      </>
+    );
+  }
+
+  if (!data) {
+    return (
+      <>
+        {["Today", "Active Test", "Month · P&L"].map((title) => (
+          <ShellCard
+            key={title}
+            title={title}
+            badge="Loading…"
+            badgeClass="badge-cyan"
+            message="…"
+          />
+        ))}
+      </>
+    );
+  }
 
   return (
     <>
-      {/* ── Card 1: Revenue Today — compact, auto height ── */}
-      <div className="card" style={{ flex: "0 0 auto", padding: "12px" }}>
-        <div className="card-header">
-          <div className="card-title">Revenue Today</div>
-          <span className={`badge ${loading ? "badge-cyan" : hasError ? "badge-red" : "badge-green"}`}>
-            {loading ? "Loading…" : hasError ? "⚠ Error" : "● Live"}
-          </span>
-        </div>
-        <div className="stat-pair">
-          <div className="stat-box">
-            <div className="stat-box-num cyan">
-              {loading ? "—" : fmt(data?.todayRevenue ?? 0)}
-            </div>
-            <div className="stat-box-label">Revenue</div>
-          </div>
-          <div className="stat-box">
-            <div className="stat-box-num">
-              {loading ? "—" : (data?.todayOrders ?? 0)}
-            </div>
-            <div className="stat-box-label">Orders</div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Card 2: Revenue This Month ── */}
-      <div className="card" style={{ flex: 1.8, minHeight: 0, overflow: "hidden" }}>
-        <div className="card-header">
-          <div className="card-title">This Month</div>
-          <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{monthLabel}</span>
-        </div>
-
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, gap: 6 }}>
-          <div>
-            <div className="hero-num lg green">
-              {loading ? "—" : fmt(data?.monthRevenue ?? 0)}
-            </div>
-            <div className="sub-label">toward ${(MONTHLY_TARGET / 1000).toFixed(0)}k target</div>
-            <div className={`delta ${monthPct >= 50 ? "up" : "down"}`}>
-              {monthPct >= 100 ? "▲ Target reached!" : monthPct >= 50 ? `▲ ${monthPct}% of target` : `▼ ${monthPct}% of target`}
-            </div>
-          </div>
-
-          <div>
-            <div className="progress-row">
-              <span style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                Monthly progress
-              </span>
-              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                {loading ? "—" : `${monthPct}%`}
-              </span>
-            </div>
-            <div className="progress-track">
-              <div className="progress-fill" style={{ width: `${monthPct}%`, background: "var(--cyan)" }} />
-            </div>
-          </div>
-
-          {/* Sparkline fills remaining space */}
-          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: 4 }}>
-            <MonthlySparkline
-              monthRevenue={data?.monthRevenue ?? 0}
-              target={MONTHLY_TARGET}
-              loading={loading}
-            />
-            <div style={{ display: "flex", justifyContent: "space-between", flexShrink: 0 }}>
-              <span style={{ fontSize: 10, color: "var(--cyan)", fontWeight: 600 }}>— Actual</span>
-              <span style={{ fontSize: 10, color: "var(--amber)", fontWeight: 600 }}>-- Target pace</span>
-            </div>
-          </div>
-
-          <div style={{ flexShrink: 0 }}>
-            <a
-              href="https://ecom-launchpad-mentor.netlify.app/"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                fontSize: 10, color: "var(--amber)", textDecoration: "none",
-                fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
-                background: "rgba(245,166,35,0.1)", padding: "2px 7px", borderRadius: 4,
-                border: "1px solid rgba(245,166,35,0.2)", display: "inline-flex",
-              }}
-            >
-              Ecom Launchpad →
-            </a>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Card 3: P&L This Month ── */}
-      <div className="card" style={{ flex: 1.2, minHeight: 0, overflow: "hidden" }}>
-        <div className="card-header">
-          <div className="card-title">P&amp;L · This Month</div>
-          {plStale && <span className="badge badge-amber">⚠ Stale</span>}
-          {plLoading && !plStale && <span className="badge badge-cyan">Loading…</span>}
-        </div>
-
-        <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-          {[
-            { label: "P&L Revenue",  val: fmtVal(plRevenue),     color: "var(--cyan)",           subLabel: activeProduct },
-            { label: "COGS",         val: fmtVal(plCogs),         color: "var(--text-secondary)", subLabel: undefined },
-            { label: "Gross Profit", val: fmtVal(plGrossProfit),  color: plGrossProfit !== undefined && plGrossProfit > 0 ? "var(--green)" : "var(--text-secondary)", subLabel: undefined },
-            { label: "Ad Spend",     val: fmtVal(plAdSpend),      color: "var(--text-secondary)", subLabel: undefined },
-            { label: "ROAS",         val: fmtRoas(plRoas),        color: plRoas !== undefined && plRoas >= 2 ? "var(--green)" : "var(--text-secondary)", subLabel: undefined },
-            { label: "GP%",          val: fmtPct(plGpPct),        color: "var(--text-secondary)", subLabel: undefined },
-          ].map((row) => (
-            <div className="list-row" key={row.label} style={{ flexDirection: "column", alignItems: "flex-start", gap: 0 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-                <span className="list-label">{row.label}</span>
-                <span className="list-value" style={{ color: row.color }}>{row.val}</span>
-              </div>
-              {row.subLabel && (
-                <span style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 1 }}>{row.subLabel}</span>
-              )}
-            </div>
-          ))}
-
-          <div className="divider" style={{ margin: "4px 0" }} />
-
-          <div className="list-row">
-            <span className="list-label">Shopify Revenue</span>
-            <span className="list-value" style={{ color: "var(--green)" }}>
-              {loading ? "—" : fmt(data?.monthRevenue ?? 0)}
-            </span>
-          </div>
-          <div className="list-row">
-            <span className="list-label">Target</span>
-            <span className="list-value" style={{ color: "var(--text-secondary)" }}>{fmt(MONTHLY_TARGET)}</span>
-          </div>
-        </div>
-      </div>
+      <TodayPanel data={data} />
+      <ActiveTestPanel test={data.test} />
+      <MonthPanel data={data} />
     </>
   );
 }

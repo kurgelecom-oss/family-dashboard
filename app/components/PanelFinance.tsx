@@ -204,16 +204,55 @@ function ShellCard({
  * A spending period panel. Panels 1 and 2 are the same component — the only
  * difference is which window and which comparison period get passed in.
  */
+/** The PocketSmith account this column reports on. */
+const POCKETSMITH_URL = "https://my.pocketsmith.com/dashboard/765041-kurgel-pty-ltd";
+
+/**
+ * "Open →" header link.
+ *
+ * Style copied verbatim from the HOMESCHOOL WEEK header link
+ * (PanelHomeschoolWeek.tsx) — same amber token, font size, letter spacing,
+ * padding, radius, border and arrow glyph. That badge is inline-styled rather
+ * than a shared component, so matching it means duplicating the style object;
+ * extracting it would mean editing column D, which is out of scope here.
+ */
+function OpenLink({ href }: { href: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{
+        fontSize: 10,
+        color: "var(--amber)",
+        textDecoration: "none",
+        fontWeight: 700,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        background: "rgba(245,166,35,0.1)",
+        padding: "2px 7px",
+        borderRadius: 4,
+        border: "1px solid rgba(245,166,35,0.2)",
+        display: "inline-flex",
+      }}
+    >
+      Open →
+    </a>
+  );
+}
+
 function PeriodPanel({
   title,
   period,
   prior,
   tone,
+  headerLink,
 }: {
   title: string;
   period: PeriodSummary;
   prior: PeriodSummary;
   tone: string;
+  headerLink?: string;
 }) {
   // The route already reports uncategorised separately; filter defensively so a
   // shape change can never render the same money twice.
@@ -225,7 +264,10 @@ function PeriodPanel({
     <div className="card" style={{ padding: "10px 12px" }}>
       <div className="card-header" style={{ marginBottom: 5 }}>
         <div className="card-title">{title}</div>
-        <span className="badge badge-cyan">{rangeLabel(period.startDate, period.endDate)}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+          <span className="badge badge-cyan">{rangeLabel(period.startDate, period.endDate)}</span>
+          {headerLink && <OpenLink href={headerLink} />}
+        </div>
       </div>
 
       <div
@@ -522,6 +564,7 @@ export default function PanelFinance() {
         period={data.lastWeek}
         prior={data.previousWeek}
         tone="var(--cyan)"
+        headerLink={POCKETSMITH_URL}
       />
       <PeriodPanel
         title="Last Month"
