@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { SETTING_DEFAULTS, type SettingsMap, getSetting } from "../lib/settings";
+import { isPocketSmithPayload } from "../lib/payload-guards";
 
 /* ════════════════════════════════════════════════════════════════════════════
    Left column — LAST WEEK / LAST MONTH / ACCOUNTS.
@@ -486,18 +487,9 @@ function AccountsPanel({ data }: { data: PocketSmithPayload }) {
 
 /* ── Column ───────────────────────────────────────────────────────────────── */
 
-/** Every field the panels read must be present, or we show the error state. */
+/** Delegates to the shared guards so the contract is testable in isolation. */
 function isRenderable(p: unknown): p is PocketSmithPayload {
-  const d = p as PocketSmithPayload | null;
-  return Boolean(
-    d &&
-      d.lastWeek &&
-      d.previousWeek &&
-      d.lastMonth &&
-      d.previousMonth &&
-      Array.isArray(d.accounts) &&
-      typeof d.totalBalance === "number",
-  );
+  return isPocketSmithPayload(p);
 }
 
 export default function PanelFinance() {

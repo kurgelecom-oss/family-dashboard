@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { SETTING_DEFAULTS, type SettingsMap, getSetting } from "../lib/settings";
+import { isEcomPayload } from "../lib/payload-guards";
 
 /* ════════════════════════════════════════════════════════════════════════════
    Column B — TODAY / ACTIVE TEST / MONTH · P&L.
@@ -838,9 +839,9 @@ function MonthPanel({ data, settings }: { data: EcomPayload; settings?: Settings
 
 /* ── Column ───────────────────────────────────────────────────────────────── */
 
+/** Delegates to the shared guards so the contract is testable in isolation. */
 function isRenderable(p: unknown): p is EcomPayload {
-  const d = p as EcomPayload | null;
-  return Boolean(d && d.todayStats && d.test && d.month && typeof d.today === "string");
+  return isEcomPayload(p);
 }
 
 export default function PanelEcom() {

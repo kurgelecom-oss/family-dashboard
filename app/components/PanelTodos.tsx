@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { SETTING_DEFAULTS, type SettingsMap, getSetting } from "../lib/settings";
+import { isActionsPayload } from "../lib/payload-guards";
 
 /* ════════════════════════════════════════════════════════════════════════════
    Column C — TODAY / INPUTS / THE CLOCK.
@@ -525,9 +526,9 @@ function ClockPanel({ data, settings }: { data: ActionsPayload; settings?: Setti
 
 /* ── Column ───────────────────────────────────────────────────────────────── */
 
+/** Delegates to the shared guards so the contract is testable in isolation. */
 function isRenderable(p: unknown): p is ActionsPayload {
-  const d = p as ActionsPayload | null;
-  return Boolean(d && d.actions && Array.isArray(d.inputs) && d.clock);
+  return isActionsPayload(p);
 }
 
 export default function PanelTodos() {
