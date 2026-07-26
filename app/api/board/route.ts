@@ -16,6 +16,23 @@ export const dynamic = "force-dynamic";
 const CACHE_FAIL = "no-store";
 const SWR_SECONDS = 300;
 
+/**
+ * Make `?refresh=1` a distinct key in Netlify's edge cache.
+ *
+ * Netlify's Next adapter keys cached routes on `__nextDataReq` and `_rsc` only — every
+ * other query parameter is excluded. Without this header the CDN answers `?refresh=1`
+ * from the cached plain `/api/board` entry, the request never reaches the origin, and the
+ * Refresh control is a silent no-op in production while working perfectly under
+ * `netlify dev`, which does no edge caching. Verified against the deployed URL: before
+ * this header, `?refresh=1` returned `cache-status: "Netlify Edge"; hit` with a stale
+ * `X-Board-Cache: miss` and an advancing `age`.
+ *
+ * Set on every response from this route, not just the refresh one: the CDN derives the
+ * key from the response it stores, so the *cached* entry is the one that has to declare
+ * the variance.
+ */
+const NETLIFY_VARY = "query=refresh";
+
 // Origin-side cap. force-dynamic runs the handler on every CDN miss, so the downstream
 // Cache-Control alone does not bound how often Notion is queried. This module-level entry
 // restores that bound: eight Notion queries per 300s per warm server instance, however many
@@ -395,7 +412,11 @@ export async function GET(request: Request) {
   if (payload.errors.length === SOURCES.length) {
     return NextResponse.json(payload, {
       status: 503,
-      headers: { "Cache-Control": CACHE_FAIL, "X-Board-Cache": "bypass" },
+      headers: {
+        "Cache-Control": CACHE_FAIL,
+        "X-Board-Cache": "bypass",
+        "Netlify-Vary": NETLIFY_VARY,
+      },
     });
   }
 
@@ -407,6 +428,7 @@ export async function GET(request: Request) {
     headers: {
       "Cache-Control": force ? CACHE_FAIL : cacheControlFor(cached),
       "X-Board-Cache": force ? "refresh" : hit ? "hit" : "miss",
+      "Netlify-Vary": NETLIFY_VARY,
     },
   });
 }

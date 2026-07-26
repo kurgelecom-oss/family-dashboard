@@ -275,6 +275,19 @@ a slow older read cannot clobber a fresher result and silently undo the refresh.
 the origin — the one thing the control exists to do. Hence `no-store` on that response only.
 The success path for plain `/api/board` is unchanged.
 
+**`Netlify-Vary: query=refresh` is required, and is not optional polish.** Netlify's Next
+adapter keys cached routes on `__nextDataReq` and `_rsc` only; every other query parameter
+is excluded from the edge cache key. Without this header the CDN answers `?refresh=1` from
+the stored plain `/api/board` entry, the origin is never reached, and the control is a
+**silent no-op in production** — while working perfectly under `netlify dev`, which does no
+edge caching. This was not predicted; it was found by fetching the deployed URL, which
+returned `cache-status: "Netlify Edge"; hit` with an advancing `age` and a frozen
+`X-Board-Cache: miss` for every query string tried, including unique cache-busting ones.
+The header is set on **every** response from the route, not just the refresh one, because
+the CDN derives the key from the response it stores. Anything that later changes this
+route's response headers must preserve it, and must re-verify against production rather
+than local — the two disagree here, and local is the one that lies.
+
 **Consequence, accepted.** This is an unauthenticated endpoint that forces eight Notion
 queries on demand, so the origin request cap holds only for traffic that does not ask to
 bypass it. Accepted: `/board` is a family dashboard behind no login, the same as every other
