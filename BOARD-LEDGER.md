@@ -955,6 +955,12 @@ that the retired source "is STILL being read in production" and named two fixes:
 named in `errors` rather than passing silently. BOARD-SPEC says the source "must not be
 read", and by the letter of that line the reader should still go. Carried, reduced.
 
+> **CLOSED later the same day — see "Retired source no longer read anywhere" below.** The
+> `ansar-homeschool` entry was deleted from `CATEGORIES` in
+> `time-allocation-board/netlify/functions/get-schedule.js` (commit `a559daa`), so the
+> query is no longer issued at all. This paragraph is left as originally written rather
+> than rewritten, so the sequence stays legible.
+
 **NOTE for future work — a data source ID is not a page ID.** `588f40ab…` does not resolve
 as `app.notion.com/p/<id>`; its database page is `8479d6fd68f942d68d9751bff2716c8e`. To get
 the real page URL, fetch `collection://<id>`. (tk's note; not re-derived here.) This cost
@@ -995,3 +1001,79 @@ subagent's, never written here; the actual line at the OPEN entry above claims o
 the *layer key* is absent, which is true). **Third consecutive documentation commit where
 the gate found false statements in already-checked prose.** The pattern is now the finding:
 prose about verified things drifts from the verification faster than code does.
+
+### 2026-07-26 — Retired source no longer read anywhere
+
+**BOARD-SPEC.md:37 — "`588f40ab-4078-4767-982c-b50f9cd83f71` is RETIRED. Must not be read."
+Now satisfied in the strong sense: the query is not issued at all.** Previously the source
+was archived in Notion, which stopped retired *data* being served but left the read firing
+and 404-ing on every request. That gap is closed.
+
+**Changed — read on disk.** `time-allocation-board/netlify/functions/get-schedule.js`,
+commit `a559daa`: the `{ key: "ansar-homeschool", dataSourceId: "588f40ab-…" }` element was
+removed from the module-level `CATEGORIES` array, **8 entries → 7, with a 3-line comment
+left in place of the removed element** — a substitution, not a bare deletion, and the diff
+is `-1 / +3`. One of those comment lines asserts that canonical homeschool data now comes
+from the Weekly Schedule via `/api/board`; that is true per this ledger's DATA SOURCES
+section, but it is a comment, not something `a559daa` verified. No function was modified:
+`queryDataSource()`, `mapPageToBlock()`, `plainText()` and `exports.handler` are all
+generic, iterating `CATEGORIES`, so removing the element removes the read entirely.
+`node --check` passes. The id was referenced in exactly **one** place in that repo's code.
+
+**Scope of the zero-hit grep — this is one repo, not all of them.** `grep -rn "588f40ab"`
+over the **`time-allocation-board`** working tree (excluding `.git`) now returns **zero**
+hits. *Git history still contains it and always will — history is immutable; the claim is
+about the working tree.* It does **not** discharge the still-unticked DATA SOURCES box at
+the top of this file, which is about *this* repo: family-dashboard's working tree holds
+**12** occurrences across 3 files — `BOARD-LEDGER.md` 10 (six added by the previous entry,
+more by this one), `BOARD-SPEC.md` 1, `.claude/agents/board-reviewer.md` 1. All prose,
+every one of them declaring the source retired. **Zero in code** — re-grepped across
+`*.ts/tsx/js/mjs/json`, 0 hits. That box stays unticked and its stale "appears 3×"
+parenthetical gets staler with each entry; see the housekeeping note in the preceding
+Findings entry.
+
+**Verified — fetched, not inferred.** `https://time-allocation-board.netlify.app/.netlify/
+functions/get-schedule` after the deploy landed: **HTTP 200, 110 blocks, `errors: []`**.
+The response's `categories` array now lists seven keys — `taylan-work, taylan-personal,
+taylan-ecom, nihal-home, nihal-personal, nihal-ecom, ayah-homeschool` — with
+`ansar-homeschool` absent. Neither the string `ansar-homeschool` nor `588f40ab` appears
+anywhere in the response body. Note the difference from the previous reading: block count
+is unchanged at 110 (it was already 110 once the source was trashed), but `errors` went
+from one entry naming the Notion 404 to **empty**, because there is no longer a query to
+fail. *That empty `errors` array is the actual evidence the read is gone — a 404 means it
+was still being attempted.*
+
+**Left in place deliberately, flagged not fixed.** `time-allocation-board/index.html:223`
+still declares the display category `{ key:"ansar-homeschool", label:"Ansar · Homeschool",
+short:"AH", color:"#eab308" }`. It is a legend entry, not a data-source read — it contains
+no id and issues no query — so it does not bear on the BOARD-SPEC line. It is now an orphan
+that would render a label with no blocks behind it, on a page that cannot be reached:
+`https://time-allocation-board.netlify.app/` and `/index.html` both return **301** to
+`https://kurgel-dashboard.netlify.app/board` (fetched this pass). Out of scope for a change
+scoped to removing the read.
+
+**Do not read that as "the site 301s every path" — it does not, and this entry originally
+said it did.** `/.netlify/functions/get-schedule` returns **HTTP 200** — fetched this pass,
+and it is the very URL used above to prove the fix landed. Netlify does not apply redirect
+rules to `/.netlify/functions/*`, as recorded two entries above. The `netlify.toml` rule is
+`from = "/*"`, `status = 301`, `force = true`, and its target is a **different host**, not a
+same-site path. Page paths are unreachable; function paths are not.
+
+**Not re-verified this pass:** the `/*` → `/board` 301 and `/api/board` were not re-fetched
+after this deploy. The change touches only one array element in one function and cannot
+affect either, but that is reasoning, not a measurement — recorded as such rather than
+asserted.
+
+**board-reviewer on this entry → 2 VIOLATIONS, 1 NOT MET; all three fixed before commit.**
+(a) "on a page nobody can reach: that site 301s every path to `/board`" — false, and
+falsified by the entry's own evidence: the function URL fetched nine lines earlier returns
+200, and this ledger already explains twice that Netlify exempts `/.netlify/functions/*`
+from redirect rules. The narrow claim (index.html unreachable) is true; the universal was
+not. (b) The zero-hit grep was run in `time-allocation-board` but written unqualified as
+"the working tree … every file", which reads as discharging the DATA SOURCES box in *this*
+repo — where the id in fact appears 12 times in prose. Now scoped and reconciled.
+(c) "Nothing else was touched" described `a559daa` as a pure deletion; it is `-1 / +3`, a
+substitution leaving a 3-line comment. **Fourth consecutive commit where every number and
+every fetched fact was sound and the failures were all in the connective prose.** The
+lesson has stopped being incidental: on this work, the sentence joining two verified facts
+is less reliable than either fact, and it is where review time should go.
