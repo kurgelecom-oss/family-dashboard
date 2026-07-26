@@ -112,9 +112,9 @@ export default function PanelHomeschoolWeek() {
   return (
     <div className="card" style={{ flex: "0 0 auto" }}>
       <div className="card-header">
-        <div className="card-title">Homeschool Week</div>
+        <div className="card-title">Time Allocation Board</div>
         <a
-          href="/week"
+          href="https://kurgel-dashboard.netlify.app/board"
           target="_blank"
           rel="noopener noreferrer"
           style={{
