@@ -220,26 +220,36 @@ against production must cite the fetched URL and what was found in the response 
 
 ## CUTOVER
 
-- [ ] `/week` redirects to `/board` — **not done.** Production
-      `https://kurgel-dashboard.netlify.app/week` returns **HTTP 200, 0 redirects**, 10,590
-      bytes, still serving its own page. Deliberate: `/week` is unchanged and still working
-      (0 commits in this work touch `app/week/`), so nothing has been broken — but the
-      cutover has not begun
-- [ ] Nav updated: family-dashboard — `TopNav.tsx` still lists "Homeschool Week" → `/week`;
-      no `/board` entry in any of the five repos
-- [ ] Nav updated: ansar-habits-tracker
-- [ ] Nav updated: time-allocation-board
-- [ ] Nav updated: ecom-launchpad
-- [ ] Nav updated: link-board
+- [x] `/week` redirects to `/board` — production `https://kurgel-dashboard.netlify.app/week`
+      → **HTTP 308**, `Location: https://kurgel-dashboard.netlify.app/board`. Framework
+      redirect, not client-side: `next.config.ts` `redirects()` with `permanent: true`
+      (Next emits 308, not 301, to preserve the request method). `app/week/page.tsx` is
+      deliberately **not deleted** — redirects are checked before the filesystem, so the
+      route still exists on disk and is unreachable
+- [x] Nav updated: family-dashboard — `app/components/TopNav.tsx`, 6 entries → 5
+- [x] Nav updated: ansar-habits-tracker — `app/components/TopNav.tsx`
+- [x] Nav updated: time-allocation-board — `index.html`
+- [x] Nav updated: ecom-launchpad — `index.html`
+- [x] Nav updated: link-board — `index.html`
 - [x] `/board` verified by fetching the deployed production URL — **first production
       verification in this work.** `https://kurgel-dashboard.netlify.app/board` → **HTTP
       200**, 17,228 bytes. All nine required strings present in the server-sent HTML:
       Taylan (2), Nihal (2), Ansar (4), Work (1), Personal (2), Ecom (2), Home (3), Ayah (1),
       Homeschool (2) — confirmed independently by the prod-verifier subagent. Production
       `/api/board` → **HTTP 200**, 140 blocks, taylan 50 / nihal 60 / ansar 30, `errors: []`
-- [ ] Cutover verified by fetching production, never self-reported — `/board` itself is now
-      production-verified (above), but *cutover* is not: the redirect and the five navs do
-      not exist, so there is nothing yet to verify
+      — **counts superseded 2026-07-26 by the cutover.** Removing the "Homeschool Week" nav
+      entry dropped two of them: production now serves Home (2) and Homeschool (1). The
+      box's conclusion still holds — all nine strings are still present and still
+      server-rendered — but read the numbers above as the pre-cutover reading, not current
+- [x] Cutover verified by fetching production, never self-reported — every surface fetched
+      live on 2026-07-26 after all five deploys landed. `/week` → **HTTP 308**, `location:
+      /board` (relative, as served); `https://time-allocation-board.netlify.app/` → **HTTP
+      301** → `https://kurgel-dashboard.netlify.app/board` (absolute). The **five
+      nav-bearing surfaces** all return **HTTP 200** with a nav containing
+      `kurgel-dashboard.netlify.app/board` exactly once and **zero** links to `/week` or
+      `time-allocation-board.netlify.app` (grep scoped to the `<nav class="topnav">`
+      block). The sixth surface, `time-allocation-board.netlify.app`, is a 301 with no
+      body — there is no nav on it to grep, by design. Counts below in Findings
 
 ---
 
@@ -689,3 +699,101 @@ diff." **Production:** `/board` 200 with 9/9 strings, `/api/board` 200 with 140 
 `errors: []`, `?refresh=1` forwarding to origin, `/week` 200 unchanged. Commits `d37fab3` and
 `4b9f9e7` are pushed and deployed. **`/board` is production-verified for the first time;
 CUTOVER remains entirely undone.**
+
+### 2026-07-26 — CUTOVER executed across five repos
+
+**All five CUTOVER boxes now tick, and every one is backed by a production fetch.**
+
+**What shipped.** One commit per repo, all `chore: cut over to unified /board`:
+family-dashboard `f2c5633`, ansar-habits-tracker `2924bf1`, time-allocation-board
+`25e042d`, ecom-launchpad `7ebac82`, link-board `cfa8772`. Two changes only —
+`TopNav.tsx` / `index.html` nav lists (6 entries → 5: "Homeschool Week" removed, "Time
+Allocation Board" repointed from `time-allocation-board.netlify.app` to
+`kurgel-dashboard.netlify.app/board`, holding its old position), and the two redirects.
+
+**Production verification, fetched after all five deploys landed:**
+
+| URL | HTTP | Nav correct |
+|---|---|---|
+| `https://kurgel-dashboard.netlify.app/` | 200 | yes |
+| `https://kurgel-dashboard.netlify.app/board` | 200 | yes |
+| `https://kurgel-dashboard.netlify.app/week` | **308 → /board** | n/a (redirect) |
+| `https://ansar-habits-tracker.netlify.app/` | 200 | yes |
+| `https://ecom-launchpad-mentor.netlify.app/` | 200 | yes |
+| `https://luxury-kringle-cf4171.netlify.app/` | 200 | yes |
+| `https://time-allocation-board.netlify.app/` | **301 → /board** | n/a (retired) |
+
+"Nav correct" = the `<nav class="topnav">` block contains
+`kurgel-dashboard.netlify.app/board` exactly once and `kurgel-dashboard.netlify.app/week`
+and `time-allocation-board.netlify.app` zero times each. Greps were **scoped to the nav
+block**, not the whole page — see the link-board note below for why that distinction is
+load-bearing.
+
+**The edge agreed with local this time — but that was not assumable.** The
+`Netlify-Vary` amendment records the edge silently disagreeing with local, and concludes
+"local is the one that lies". So the local `next start` 308 was treated as a smoke test
+only; the 308 above is the edge's own, through `@netlify/plugin-nextjs`. Both redirects
+landed on the first poll, ~90s after push.
+
+**`/board`'s served HTML shows `0 blocks` — this is the pre-hydration shell, not a
+regression.** `app/board/page.tsx` is a client component: curl receives layer headings
+with `0 blocks` / `No blocks` and the real counts arrive after hydration. Production
+`/api/board` at the same moment: **HTTP 200, 140 blocks, taylan 50 / nihal 60 / ansar 30,
+`errors: []`** — byte-identical to the pre-cutover reading. This is exactly the
+client-rendered ambiguity `prod-verifier` is told to name rather than resolve by
+assumption; on this pass it read the shell literally and described Ayah and Homeschool as
+"empty layers". They are not. **Anyone verifying block counts must use a browser** (as the
+STRUCTURE boxes did, via Playwright) — curl can only prove the labels are server-rendered.
+
+**Three things deliberately left undone, all outside the cutover's stated scope:**
+
+1. `app/components/PanelHomeschoolWeek.tsx:117` still has `href="/week"` with
+   `target="_blank"`. It resolves — via the new 308 — but a card titled "Homeschool Week"
+   now opens the full three-person board in a new tab. Flagged by board-reviewer as a
+   regression this cutover *caused* rather than one it inherited. Not fixed: changing it
+   was not in scope and the right fix (relabel? remove the card? point it at `/board`
+   in-tab?) is a product decision.
+2. `link-board/index.html` `DEFAULT_LINKS` still contains a link **card** for
+   `https://time-allocation-board.netlify.app/`. Not the nav, so the nav check passes; it
+   is the one whole-page residual hit across all six surfaces. It still works — that host
+   now 301s to `/board` — but it is user-facing and stale.
+3. `TopNav.tsx:14` still comments `// "/week/" and "/week" are the same page` about an
+   entry this commit removed. `normPath()` is still used and correct; only the example is
+   stale. Left alone to keep the nav byte-identical across the five copies.
+
+**The retired data source is STILL being read in production. The cutover did not stop it.**
+This entry originally claimed the opposite; the claim was wrong and board-reviewer caught
+it. **Netlify does not apply redirect rules to `/.netlify/functions/*`** — those paths are
+internal and bypass the rule table, `force = true` included. Fetched after the redirect
+was live: `https://time-allocation-board.netlify.app/.netlify/functions/get-schedule` →
+**HTTP 200**, 116 blocks, **6 of them `ansar-homeschool`**, sourced from
+`588f40ab-4078-4767-982c-b50f9cd83f71` at
+`time-allocation-board/netlify/functions/get-schedule.js:10`. For contrast, an ordinary
+path on the same host — `/api/schedule` — correctly returns **301** to `/board`. That
+function is the only code reader of the retired id across all five repos, and it is live.
+**Open. Not fixed by this work and not attempted:** the fix is either a
+`/.netlify/functions/*` rule in `time-allocation-board/netlify.toml` or deleting
+`get-schedule.js`, and the cutover instruction for that repo was "change nothing else".
+Pre-existing — this commit neither caused it nor cured it.
+
+**Verification run for this pass:** `npx tsc --noEmit` → exit 0. `npm run build` → exit 0.
+board-reviewer on the code diff → **0 VIOLATIONS**, 2 NOT MET (the `PanelHomeschoolWeek`
+link above, and "cutover not yet production-verified" — since satisfied). prod-verifier on
+`/board` → **PASS**, 5/5 required strings server-rendered (Taylan 2, Nihal 2, Ansar 4,
+Ayah 1, Homeschool 1), both must-be-absent strings confirmed gone from the served markup.
+
+**board-reviewer on this ledger entry → 1 VIOLATION, 3 NOT MET — all four were real, and
+this entry was corrected before it was committed.** It caught a false claim in this very
+Findings section (the retired-source paragraph above, which originally asserted the
+opposite of what production returns), the `/week` `Location` recorded as absolute when the
+wire says relative, "all six surfaces 200" when the sixth is a 301 with no body, and the
+`/board` box's now-stale string counts. Recording this because the gate earning its keep
+on a *documentation* commit is the point: the numbers in a ledger are as capable of being
+wrong as the code, and nothing here is self-reported.
+
+**Two open observations, neither ticked and neither fixed:** production `/api/board`
+returns bare `cache-control: public` with `cache-status: "Netlify Edge"; hit` — the origin
+does emit the computed `s-maxage` (`route.ts`), so the edge is consuming and stripping it
+rather than the code being wrong, but no box in this ledger has ever checked that header
+against production. And `https://kurgel-dashboard.netlify.app/week/` (trailing slash)
+double-hops: 308 → `/week` → 308 → `/board`. It resolves; it is two round trips.
