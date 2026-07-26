@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { getTodayDate, getWeekStart } from "../lib/supabase";
+import { getTodayDate } from "../lib/supabase";
 import WeekProgressStrip from "../components/WeekProgressStrip";
 
 // ─── Theme (mirrors Header.tsx so /week matches the dashboard) ──────────────
@@ -13,13 +13,28 @@ function getAutoTheme(): "day" | "night" {
 
 // ANSAR FC scoring + habit state now live in WeekProgressStrip.tsx
 
+// ─── Calendar-date maths ────────────────────────────────────────────────────
+// A "YYYY-MM-DD" here is a calendar date, not an instant. Anchor every one of
+// them at UTC midnight and read them back with UTC accessors, so the result is
+// identical no matter what timezone the browser (or the build machine) is in.
+// The old helpers built local noon and read back via toISOString(), which drifts
+// a whole day east of UTC+12.
+function dateToUTC(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
+}
 function dayNameOf(dateStr: string) {
-  return new Date(dateStr + "T12:00:00").toLocaleDateString("en-AU", { weekday: "long" });
+  return dateToUTC(dateStr).toLocaleDateString("en-AU", { weekday: "long", timeZone: "UTC" });
 }
 function addDays(dateStr: string, n: number) {
-  const d = new Date(dateStr + "T12:00:00");
-  d.setDate(d.getDate() + n);
+  const d = dateToUTC(dateStr);
+  d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().split("T")[0];
+}
+// Monday of the week containing dateStr.
+function weekStartOf(dateStr: string) {
+  const dow = dateToUTC(dateStr).getUTCDay(); // 0=Sun,1=Mon,...,6=Sat
+  return addDays(dateStr, dow === 0 ? -6 : 1 - dow);
 }
 
 // ─── Weekly calendar config ─────────────────────────────────────────────────
@@ -75,9 +90,17 @@ export default function WeekPage() {
   const [events, setEvents] = useState<GridEvent[]>([]);
   const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
 
-  const weekStart = getWeekStart();
-  const weekDates = [0, 1, 2, 3, 4, 5, 6].map(i => addDays(weekStart, i));
-  const todayIdx = weekDates.indexOf(getTodayDate());
+  // This route is statically prerendered, so anything derived from `new Date()`
+  // during render is frozen at BUILD time — and hydration does not repair
+  // mismatched inline styles, so the "today" highlight stayed on the build day
+  // (shipped Sat 25 Jul, still lit on Sun 26 Jul). `today` therefore starts null
+  // and is only ever filled in on the client, then re-checked every 60s so the
+  // board rolls over at midnight on its own. The TV never needs a redeploy.
+  const [today, setToday] = useState<string | null>(null);
+
+  const weekStart = today ? weekStartOf(today) : null;
+  const weekDates = weekStart ? [0, 1, 2, 3, 4, 5, 6].map(i => addDays(weekStart, i)) : [];
+  const todayIdx = today ? weekDates.indexOf(today) : -1;
 
   const loadSchedule = useCallback(async () => {
     try {
@@ -95,7 +118,7 @@ export default function WeekPage() {
       const res = await fetch("/api/calendar");
       if (!res.ok) return;
       const data = (await res.json()) as { events?: ApiEvent[] };
-      const ws = getWeekStart();
+      const ws = weekStartOf(getTodayDate());
       const dates = [0, 1, 2, 3, 4, 5, 6].map(i => addDays(ws, i));
       const out: GridEvent[] = [];
       (data.events ?? []).forEach(e => {
@@ -130,11 +153,18 @@ export default function WeekPage() {
     };
     applyTheme();
 
+    // Client-only "today". Re-checked on the same 60s beat as the theme so an
+    // always-on display advances at midnight without a reload or a redeploy.
+    // setToday with an unchanged string is a no-op re-render in React.
+    const applyToday = () => setToday(getTodayDate());
+    applyToday();
+
     loadSchedule();
     loadCalendar();
     const id = setInterval(() => { loadCalendar(); }, 60_000);
     const themeId = setInterval(applyTheme, 60_000);
-    return () => { clearInterval(id); clearInterval(themeId); };
+    const dateId = setInterval(applyToday, 60_000);
+    return () => { clearInterval(id); clearInterval(themeId); clearInterval(dateId); };
   }, [loadSchedule, loadCalendar]);
 
   // Entries for one day column: recurring (days[]) OR one-off (date), by start time.
