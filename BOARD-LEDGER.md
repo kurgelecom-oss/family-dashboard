@@ -10,17 +10,28 @@ against production must cite the fetched URL and what was found in the response 
 
 ## ROUTE
 
-- [ ] Route `/board` exists in family-dashboard
+- [x] Route `/board` exists in family-dashboard — `app/board/page.tsx`; `netlify dev`
+      `GET http://localhost:8888/board` → **HTTP 200**, 22,699 bytes; listed in the build
+      output as `○ /board`
 - [ ] `/board` replaces `/week` entirely (no remaining dependency on `/week` rendering)
+      — **not done, and not attempted.** `/week` still renders itself, does not redirect,
+      and `app/components/PanelHomeschoolWeek.tsx:117` still links to it. CUTOVER work
 
 ## STRUCTURE
 
-- [ ] Three collapsible person sections render: Taylan, Nihal, Ansar
-- [ ] Sections are genuinely collapsible (expand/collapse works, not static headings)
-- [ ] Taylan shows exactly: Work, Personal, Ecom
-- [ ] Nihal shows exactly: Home, Personal, Ecom, Ayah
-- [ ] Ansar shows exactly: Homeschool
-- [ ] No layer appears under a person who does not own it
+- [x] Three collapsible person sections render: Taylan, Nihal, Ansar — verified in a real
+      browser (Playwright, 1920×1080): 3 `<section>` elements in that order
+- [x] Sections are genuinely collapsible (expand/collapse works, not static headings)
+      — clicked the Taylan header: `aria-expanded` `true`→`false`, its layer headings went
+      4→0 (h3 count), caret `▾`→`▸`; clicking again restored it. State is `useState` only:
+      `localStorage` empty and `sessionStorage` holds only Next's own dev debug key
+- [x] Taylan shows exactly: Work, Personal, Ecom — with 17 / 16 / 17 blocks
+- [x] Nihal shows exactly: Home, Personal, Ecom, Ayah — with 21 / 13 / 26 / 0 blocks
+- [x] Ansar shows exactly: Homeschool — 30 blocks
+- [x] No layer appears under a person who does not own it — 8 `<h3>` layer headings total
+      across the three sections, matching the spec table exactly; blocks are filtered on
+      person **and** layer, so a mislabelled block surfaces in the "could not be placed"
+      list rather than leaking into another person's section
 
 ## DATA SOURCES
 
@@ -74,10 +85,14 @@ against production must cite the fetched URL and what was found in the response 
 - [x] `date` is non-null only for one-off Weekly Schedule rows — **0 of 140** non-null
       today, because all 9 Weekly Schedule rows still have `Date = null`. Correct, and the
       same figure as before the change
-- [ ] A row with a `Date` and no `Days` yields a block — **logic proven, not live.** No
-      such row exists in Notion today, so the branch has zero live coverage. Exercised
-      only on synthetic rows against transcribed logic (25/25 assertions). Cannot be
-      ticked on a real payload until such a row exists. See Findings
+- [x] A row with a `Date` and no `Days` yields a block — **proven live 2026-07-26.** A
+      temporary row (`Entry` "TEMP DATE TEST", `Date` 2026-07-29 (Wed), `Start` "10:00",
+      `End` "10:30", **`Days` empty**) was created in `63550d99-…` via the Notion API. The
+      payload went 140 → **141** blocks and returned exactly one dated block:
+      `{person:"ansar", layer:"homeschool", day:"", date:"2026-07-29", start:"10:00",
+      end:"10:30", startMin:600, endMin:630, title:"TEMP DATE TEST", notes:""}`. The row was
+      then deleted and the payload returned to 140 with 0 dated. Superseded the synthetic
+      25/25 logic test, which stands but is no longer the only evidence. See Findings
 - [x] `startMin` / `endMin` present on every block, integer minutes or `null` — 140/140
       carry both keys; 0 out-of-range values
 - [x] 24-hour `"14:00"` parses — → `840`; `"08:00"` → `480`, observed in the live payload
@@ -87,8 +102,13 @@ against production must cite the fetched URL and what was found in the response 
       valid string was wrongly rejected
 - [x] `start` / `end` unchanged as display strings — passed through verbatim; the parsed
       values live only in the new fields
-- [ ] Renderers sort on `startMin`/`endMin`, never on the display strings — **unenforceable
-      today.** No renderer exists. Carried forward as a live constraint on the first one
+- [x] Renderers sort on `startMin`/`endMin`, never on the display strings — `app/board/page.tsx`
+      `byStart` compares `startMin` only. Verified in the rendered DOM: the Ansar Monday
+      column reads 9:00am, 9:05am, 9:35am, 9:50am, 10:25am, 10:40am, 11:20am in document
+      order
+- [x] Null `startMin` sorts last — `byStart` returns nulls after all timed blocks; the one
+      untimed block ("Flexible") is additionally labelled `· untimed` on the block so its
+      position is explained rather than merely happening
 - [x] All eight sources failing returns HTTP 503, uncached — observed under an invalid
       token via `netlify dev`: `HTTP/1.1 503 Service Unavailable`, `cache-control:
       no-store`, `blocks: []`, all 8 layers named in `errors` (`Notion API 401
@@ -99,14 +119,81 @@ against production must cite the fetched URL and what was found in the response 
       Follows from the `errors.length === SOURCES.length` gate, but inference, not
       measurement. Same gap as the previous pass
 
+## ORIGIN CACHE (AMENDMENT 2026-07-26)
+
+- [x] Single module-level entry, 300s TTL — `CACHE_TTL_MS = 300_000`. Observed:
+      `X-Board-Cache: miss` on the first request, `hit` on the next
+- [x] Notion queried at most once per 300s per warm instance while a payload is cached
+      — proved by a stale hit: after the TEMP row was **deleted** from Notion, the very
+      next request still returned 141 blocks with `X-Board-Cache: hit`. Only a server
+      restart produced 140. A cache that were not real could not have done that
+- [x] Concurrent requests coalesce onto one refresh — `inFlight` assigned synchronously
+      before the promise chain can settle. Code-verified by the board-reviewer; **not**
+      load-tested
+- [x] The 503 path never populates the cache — three sequential requests under an invalid
+      token all returned `HTTP 503` / `Cache-Control: no-store` / `X-Board-Cache: bypass`.
+      Had the failure been cached, the second would have been a hit
+- [x] `s-maxage` carries the entry's remaining TTL, not a flat 300 — observed `s-maxage=300`
+      on a cold miss and `s-maxage=292` on a hit 8s later. This is what stops the module
+      and CDN windows composing in series. See Findings
+- [ ] Cap holds during a total outage — **it does not, by design.** Nothing is cached, so
+      sequential requests each re-query all eight sources. Recorded in BOARD-SPEC as an
+      accepted consequence of never caching a failure
+
+## MANUAL REFRESH (AMENDMENT 2026-07-26)
+
+- [x] `?refresh=1` bypasses the in-memory entry — local: `X-Board-Cache: refresh` with
+      `Cache-Control: no-store`, where the same URL without it returned `hit`
+- [x] It repopulates the cache rather than merely bypassing — the request immediately
+      after a refresh returned `X-Board-Cache: hit`, so the entry was rewritten, not emptied
+- [x] A forced refresh does not adopt an in-flight load — `refresh(force)` skips the
+      `inFlight` early return; loads carry a monotonic `seq` and only a later one may write
+      the cache. Code-verified by the board-reviewer across both completion orderings.
+      **Not** load-tested under a real overlap
+- [x] Two concurrent forced refreshes both reach the origin — both returned
+      `X-Board-Cache: refresh`; payload stayed 140 blocks, `errors: []`
+- [x] Visible Refresh control on `/board` — calls `/api/board?refresh=1` exactly once per
+      press (observed via a `window.fetch` wrapper), shows `Refreshing…` with
+      `disabled=true` and `aria-busy=true` while in flight (captured with a MutationObserver),
+      and the `loaded HH:MM:SS` stamp advanced 16:24:56 → 16:25:06
+- [x] **`?refresh=1` reaches the origin in production** — `cache-status: "Netlify Durable";
+      fwd=bypass` and `"Netlify Edge"; fwd=miss`, `X-Board-Cache: refresh`, on two
+      consecutive production requests. This required `Netlify-Vary: query=refresh`; it was
+      **broken in production before that fix and passing locally**. See Findings
+- [ ] A manual refresh also clears the CDN copy — **it does not.** The refresh response is
+      what the user sees, but the plain `/api/board` edge entry keeps serving its cached
+      copy until it expires, so the page's next background poll can briefly show older
+      data. Bounded by the same 300s. See Findings
+
+## PREBUILD ICLOUD CLEANUP
+
+- [x] `scripts/clean-icloud-dupes.sh` removes `* <digit>.*` files from the build output
+- [x] Wired so `npm run build` always runs it first — npm `prebuild`; observed firing ahead
+      of `next build` on every build in this pass
+- [x] Proven on planted duplicates — `.next/probe 2.txt` and `.next/types/probe 2.ts` were
+      both named and deleted, then the build succeeded
+- [x] Proven on real duplicates — a later build removed 3 that iCloud had created on its
+      own (`.next/build/56416d4ae4ce586f 2.js`, `… .js 2.map`, `package 2.json`)
+- [x] `distDir` unchanged — the directory is a script argument defaulting to `.next`;
+      `next.config.ts` still sets no `distDir`
+- [x] Script is tracked — `.gitignore` negation added, since `/scripts/*` would otherwise
+      have left it untracked and failed the Netlify build at `prebuild` with exit 127
+- [x] Safe on a clean checkout — exits 0 with a message when the output dir is absent, which
+      is the CI case
+
 ## PARITY WITH /week
 
-- [ ] Schedule renders from Notion on `/board`
-- [ ] ANSAR FC strip: points today
-- [ ] ANSAR FC strip: week total out of 56
-- [ ] ANSAR FC strip: day streak
-- [ ] ANSAR FC strip: four tier thresholds
-- [ ] Edit in Notion link present and correct
+- [x] Schedule renders from Notion on `/board` — 140 blocks across 7 populated layers,
+      each in a 7-column Mon–Sun grid
+- [x] ANSAR FC strip: points today — rendered inside the Ansar section, read `0`
+- [x] ANSAR FC strip: week total out of 56 — label `Week total · /56`, read `53`
+- [x] ANSAR FC strip: day streak — read `6 🔥`
+- [x] ANSAR FC strip: four tier thresholds — `Training Ground ❌ · 0+`, `Reserves ⚠️ · 26+`,
+      `Bench ✅ · 34+`, `First Team 🏆 · 42+`
+- [x] Edit in Notion link present and correct — `Edit in Notion ↗` →
+      `https://app.notion.com/p/39b5429afa9081b285dcdeb7fea6a781`
+- [x] No fourth `scoreDay` created — exactly one definition repo-wide (`app/lib/scoring.ts:74`);
+      `/board` reuses `WeekProgressStrip`, which imports it. `/board` defines no scoring
 
 ## SCORING
 
@@ -121,20 +208,38 @@ against production must cite the fetched URL and what was found in the response 
 
 ## STYLE
 
-- [ ] No hardcoded hex in any file touched by this work
-- [ ] All colours resolve through `globals.css` tokens
-- [ ] `--cyan` remains `#00d4ff`
+- [ ] No hardcoded hex in any file touched by this work — **true of everything written for
+      `/board`, false repo-wide.** `app/board/page.tsx` and `app/api/board/route.ts` contain
+      **0** hex, `rgb()`, `rgba()` and `hsl()` literals. The pre-existing violations in
+      `PanelHabits.tsx` (`#a78bfa` at `:49` and `:210`, non-token `rgba()` at `:188-189`)
+      and `WeekProgressStrip.tsx` (`rgba()` at `:157`) are untouched and still stand, and
+      `WeekProgressStrip` is now rendered by `/board` — so the box stays unticked
+- [x] All colours resolve through `globals.css` tokens — in `/board`'s own markup: 13
+      distinct `var(--…)` tokens used, every one defined in `globals.css` in both themes
+- [x] `--cyan` remains `#00d4ff` — `globals.css:19`, unchanged by this work
 
 ## CUTOVER
 
-- [ ] `/week` redirects to `/board`
-- [ ] Nav updated: family-dashboard
+- [ ] `/week` redirects to `/board` — **not done.** Production
+      `https://kurgel-dashboard.netlify.app/week` returns **HTTP 200, 0 redirects**, 10,590
+      bytes, still serving its own page. Deliberate: `/week` is unchanged and still working
+      (0 commits in this work touch `app/week/`), so nothing has been broken — but the
+      cutover has not begun
+- [ ] Nav updated: family-dashboard — `TopNav.tsx` still lists "Homeschool Week" → `/week`;
+      no `/board` entry in any of the five repos
 - [ ] Nav updated: ansar-habits-tracker
 - [ ] Nav updated: time-allocation-board
 - [ ] Nav updated: ecom-launchpad
 - [ ] Nav updated: link-board
-- [ ] `/board` verified by fetching the deployed production URL
-- [ ] Cutover verified by fetching production, never self-reported
+- [x] `/board` verified by fetching the deployed production URL — **first production
+      verification in this work.** `https://kurgel-dashboard.netlify.app/board` → **HTTP
+      200**, 17,228 bytes. All nine required strings present in the server-sent HTML:
+      Taylan (2), Nihal (2), Ansar (4), Work (1), Personal (2), Ecom (2), Home (3), Ayah (1),
+      Homeschool (2) — confirmed independently by the prod-verifier subagent. Production
+      `/api/board` → **HTTP 200**, 140 blocks, taylan 50 / nihal 60 / ansar 30, `errors: []`
+- [ ] Cutover verified by fetching production, never self-reported — `/board` itself is now
+      production-verified (above), but *cutover* is not: the redirect and the five navs do
+      not exist, so there is nothing yet to verify
 
 ---
 
@@ -386,3 +491,201 @@ BOARD-SPEC.md:5-6 exists to prevent, and it survived a first read.
 self-contradicting amendment above — fixed), then re-run clean: "No spec violations found in
 this diff." Everything here is local. **Nothing is production-verified and no CUTOVER box is
 ticked.**
+
+### 2026-07-26 — origin cache, live date proof, and the `/board` renderer
+
+**The dated branch is no longer a latent claim — it was proven against real Notion data.**
+A temporary row was written to `63550d99-…` through the Notion API: `Entry` "TEMP DATE TEST",
+`Date` 2026-07-29 (a Wednesday), `Start` "10:00", `End` "10:30", and **`Days` deliberately
+left empty** — precisely the row shape that produced no block and no error before the
+amendment. The payload went 140 → 141 and carried exactly one dated block:
+`day:""`, `date:"2026-07-29"`, `startMin:600`, `endMin:630`. The row was then archived
+(`in_trash: true`) and the payload returned to 140 with 0 dated and no "TEMP" title
+remaining. **Nothing about this was faked and nothing was left behind in Notion.** Worth
+noting the row also proves the parser is shape-agnostic: "10:00" is 24-hour text sitting in
+the *Weekly Schedule*, which normally stores 12-hour, and it parsed to 600 regardless.
+
+**The delete is what proved the cache, by accident and then on purpose.** Immediately after
+archiving the row, `/api/board` still returned 141 blocks with `X-Board-Cache: hit`. The
+data was gone from Notion and still on the board. Only restarting the server produced 140.
+That is the origin cache doing exactly its job, and it is stronger evidence than any header
+— a cache that were not really holding could not have served a row that no longer existed.
+The corollary is the operational one: **after editing Notion, the board can be up to 300s
+stale per warm instance, and a hard refresh will not clear it.** Nothing short of the TTL
+expiring or the instance recycling will.
+
+**`force-static` → `force-dynamic` cost an origin request cap; the module cache buys it
+back, but not everywhere.** While a payload is cached the origin queries Notion at most once
+per 300s per warm instance no matter how many requests arrive, and concurrent requests on a
+cold entry coalesce onto one refresh instead of each firing eight queries. Two honest holes
+remain, both recorded in BOARD-SPEC rather than glossed: the cap is **per instance**, so N
+warm instances mean up to N refreshes per window; and **during a total outage there is no cap
+at all**, because the 503 path is forbidden from writing the cache and `inFlight` only
+coalesces concurrent requests. The origin therefore hammers Notion hardest exactly when
+Notion is least able to answer. That is the accepted price of never caching a failure — a
+negative cache would bound it and would also pin the outage, which is the thing the 503
+exists to prevent.
+
+**Two 300s caches in series would have been 900s of staleness, not 300.** The first draft
+served a cache hit with a flat `s-maxage=300`. A CDN filling from an entry already 299s old
+would then hold it a further 300s fresh plus 300s stale-while-revalidate — worst-case client
+age ~900s, where the pre-cache behaviour was ~600s. The in-memory cache would have been
+buying an origin request cap with a full extra TTL of staleness, and the amendment claimed
+it "introduces no new staleness". Fixed in the code rather than by softening the sentence:
+`cacheControlFor` sets `s-maxage` to the entry's **remaining** TTL, so the CDN's fresh window
+ends when the origin entry does, whenever it filled. Observed: `s-maxage=300` cold,
+`s-maxage=292` on a hit 8s later. Worst case is back to ~600s.
+
+**`import type` from a route handler into a client component is safe, and was checked rather
+than assumed.** `app/board/page.tsx` imports `Block` and `BoardPayload` from
+`app/api/board/route.ts` so the renderer's shape cannot drift from the reader's. The import
+is type-only and erased at compile time, but the spec's "token never client-side" rule is
+absolute and a bundler edge case here would be severe, so the built output was grepped: **0**
+hits in `.next/static` for the token value, its 24-char prefix, the literal `NOTION_TOKEN`,
+`api.notion.com`, `data_sources` and `fetchSource`. The board's own client chunk was located
+by a string unique to the page, confirming the grep target was the right file and not empty.
+
+**`Category` was being silently dropped, and the board-reviewer caught it.** BOARD-SPEC's
+RULES line names `Category` as one of the five Weekly Schedule fields "the renderer must
+handle", and `/week` colour-codes every entry by it. The first draft of `BlockCard` rendered
+emoji, title, times, date and notes/detail — and discarded `category` without a word. Now
+rendered as an uppercase label. All 30 Ansar blocks carry one; the seven layer sources carry
+none.
+
+**The failure UI was verified under real failure, not by reading the code.** With an invalid
+token the page renders two alert regions — one naming all eight failed layers with their
+`Notion API 401 Unauthorized` messages, one naming the HTTP 503 — plus a "failed to load"
+badge on each of the eight layer headings, while all three person sections still render. The
+empty-layer text deliberately says an empty layer and a failed one look identical here and
+points at the banner, because they genuinely are indistinguishable by block count: that is
+the `nihal-ayah` lesson from the previous pass turned into copy on the page.
+
+**The "Not changed" list in an amendment has now been wrong twice, on the same clause.** The
+previous amendment's first draft claimed the success-path cache was unchanged while moving
+the caching mechanism. This amendment's first draft listed "the 300s success-path
+`Cache-Control`" as unchanged while replacing that exact header with a computed one. Both
+were caught by the board-reviewer, neither by re-reading. The list is the part of an
+amendment most likely to be copied forward and least likely to be re-derived. BOARD-SPEC now
+says so explicitly and instructs the next author to re-derive it from the code.
+
+**`.next` keeps growing duplicate files that break `tsc`.** Files such as
+`.next/types/routes.d 2.ts` and `.next/types/cache-life.d 2.ts` appeared twice during this
+session and each time made `npx tsc --noEmit` fail with `TS2300`/`TS6200` duplicate-identifier
+errors that have nothing to do with the source. The " 2"/" 3" suffix pattern is macOS
+file-duplication, and the repo lives under `~/Documents`, so an iCloud/Finder sync is the
+likely cause. Deleting them restores exit 0. **This is environmental, not a code defect.**
+
+**Superseded 2026-07-26 by the prebuild hook** — `scripts/clean-icloud-dupes.sh` now removes
+them before every build. That treats the symptom, not the cause; see the next Findings entry.
+
+**`app/api/todos/route.ts` still has no cache.** Unchanged from the previous pass: it fetches
+`api.notion.com` and exports neither `revalidate` nor `dynamic`. Pre-existing, out of scope,
+and still the sole reason the repo-wide "300s cache set on every Notion read" box is unticked.
+
+**Verification run for that pass:** `npx tsc --noEmit` → exit 0. `npm run build` → exit 0,
+`/board` present as `○`, `/api/board` still `ƒ`. `netlify dev` → `/board` **HTTP 200**;
+`/api/board` HTTP 200, 140 blocks, `errors: []`, 30 with `category`; TEMP-row run 141 blocks
+with 1 dated, then 140 after deletion; invalid-token run HTTP 503 ×3, all
+`X-Board-Cache: bypass`. Browser verification (Playwright, 1920×1080 and 1024×768): 3
+sections, 8 layers, collapse/expand works, sort order correct, Ayah empty state, ANSAR FC
+strip complete, Edit in Notion link present, no horizontal page scroll at iPad width, 52px
+collapse targets, `localStorage` empty. board-reviewer on the diff: 2 VIOLATIONS + 1 NOT MET,
+all fixed; a third VIOLATION introduced by the first fix, also fixed; final re-run clean —
+"No spec violations found in this diff." **Everything here is local. Nothing is
+production-verified, no CUTOVER box is ticked, and the deployed CDN rewrites cache headers,
+so the header values observed above are not evidence about production.**
+
+### 2026-07-26 — manual refresh, prebuild cleanup, and the first production verification
+
+**The refresh button shipped broken to production and passed every local test.** This is the
+most important thing in this entry. `?refresh=1` worked perfectly under `netlify dev` —
+`X-Board-Cache: refresh`, `no-store`, cache repopulated, two concurrent refreshes both
+reaching the origin. In production it did nothing at all. Netlify's Next adapter keys cached
+routes on `__nextDataReq` and `_rsc` only, so **every other query parameter is excluded from
+the edge cache key**; the CDN answered `?refresh=1` from the stored plain `/api/board` entry
+and the origin was never reached. The deployed response said so plainly once looked at:
+`cache-status: "Netlify Edge"; hit`, an `age` advancing 37 → 49 → 50 → 81 → 280 across
+requests, and a frozen `X-Board-Cache: miss` — identical for unique cache-busting query
+strings and unchanged by a `Cache-Control: no-cache` request header. Fixed with
+`Netlify-Vary: query=refresh` on every response from the route; Netlify **merged** it into
+its own list rather than replacing it, giving
+`query=__nextDataReq|_rsc|refresh`. Re-verified against production:
+`cache-status: "Netlify Durable"; fwd=bypass` + `"Netlify Edge"; fwd=miss`,
+`X-Board-Cache: refresh`, on two consecutive requests. **`netlify dev` does no edge caching,
+so it cannot see this class of bug** — it is not a weaker version of production, it is a
+different system. BOARD-SPEC's "verified by fetching the deployed production URL, never
+self-reported" earned its keep here.
+
+**A manual refresh does not clear the CDN copy, and is not meant to.** The user sees the
+refresh response immediately, but the plain `/api/board` edge entry keeps serving its cached
+copy until it expires, so the page's next background poll can briefly show data older than
+what the button just displayed. Bounded by the same 300s already accepted everywhere else.
+Recorded rather than fixed: purging it would mean disabling CDN caching for the route, a
+larger change than the control warrants.
+
+**A forced refresh must not coalesce, and the first draft did.** `refresh()` returned any
+in-flight load, so pressing Refresh while the page's own 300s poll was mid-flight would have
+adopted a read that *started before the press* — returning pre-edit data, re-priming the
+shared entry with it for a full TTL, and stamping the response `X-Board-Cache: refresh`. The
+button would have appeared to work while leaving the user exactly where they started, which
+is worse than no button. Caught by the board-reviewer, not by testing: the window is real but
+narrow, and every manual test happened to fall outside it. Forced loads now always start
+their own read, which means two loads can overlap, so each carries a monotonic `seq` and only
+a later one may write the cache — otherwise a slow older read could silently undo the refresh.
+
+**Concurrent forced refreshes cost 8 Notion queries each, by design.** Two at once means 16.
+That is the accepted price of not coalescing, and it is bounded by how often a human presses
+a button. The endpoint is unauthenticated, like every route in this repo, so the origin cap
+holds only for traffic that does not ask to bypass it — stated in BOARD-SPEC rather than
+discovered later.
+
+**The prebuild hook works, and caught real duplicates on its first live run.** Planted probes
+(`.next/probe 2.txt`, `.next/types/probe 2.ts`) were both named and deleted before
+`next build` started. A later build then removed **3 duplicates iCloud had created on its
+own** — `.next/build/56416d4ae4ce586f 2.js`, `… .js 2.map`, `package 2.json` — without being
+prompted. `distDir` is untouched: the directory is a script argument defaulting to `.next`.
+
+**The repo living under `~/Documents` is the root cause, and relocating it is a separate
+future job.** macOS syncs `~/Documents` to iCloud Drive, which duplicates files it catches
+mid-write using Finder's " 2" naming. `.next` is rewritten on every build and dev run, so it
+is where this lands, and a duplicated `.d.ts` is not inert — `tsc` compiles
+`.next/types/routes.d 2.ts` alongside the original and fails with TS2300/TS2428/TS6200
+naming identifiers nobody wrote, in files nobody edited. **The prebuild hook treats the
+symptom only.** The real fix is moving the repo out of `~/Documents` or excluding it from
+iCloud sync, which touches every checkout, worktree and tool path on this machine and is
+therefore explicitly **out of scope here and deferred as its own job**. Until then the hook
+keeps builds green, and anyone hitting phantom duplicate-identifier errors from a *dev*
+server (which does not run `prebuild`) should run `sh scripts/clean-icloud-dupes.sh` by hand.
+
+**`.gitignore` needed a second negation or the deploy would have died.** `/scripts/*` would
+have left `clean-icloud-dupes.sh` untracked while `package.json`'s `prebuild` shipped, and
+Netlify's build would have failed at `prebuild` with exit 127 — a deploy broken by a file
+that exists locally and nowhere else. Flagged by the board-reviewer before the commit and
+staged explicitly.
+
+**Production numbers match local exactly.** `https://kurgel-dashboard.netlify.app/api/board`
+→ **HTTP 200**, **140 blocks**, **taylan 50 / nihal 60 / ansar 30**, **`errors: []`**, 0 dated,
+1 null `startMin`, 30 with `category`. `/board` → **HTTP 200**, 17,228 bytes, all nine
+required strings in the server-sent HTML (Taylan 2, Nihal 2, Ansar 4, Work 1, Personal 2,
+Ecom 2, Home 3, Ayah 1, Homeschool 2), independently confirmed by the prod-verifier subagent.
+Two of those counts want reading carefully: "Home" is 3 literal matches of which only one is
+the standalone Nihal layer label — the other two are inside "Homeschool" — and "Ansar" is 4
+because the topnav and the FC card title also carry it. Both are genuine passes; neither is
+4 layers named Home.
+
+**`/week` is untouched and still live.** **HTTP 200**, 10,590 bytes, **0 redirects**, still
+serving its own page with its own heading. Zero commits in this entire body of work touch
+`app/week/`. `/board` exists alongside it; nothing has been cut over and nothing has been
+broken.
+
+**Verification run for this pass:** `npx tsc --noEmit` → exit 0. `npm run build` → exit 0
+with `prebuild` firing first. `netlify dev` → cold `miss`, then `hit`, `?refresh=1` →
+`refresh` + `no-store`, then `hit` (repopulated); `?refresh=0` correctly *not* treated as a
+bypass; two concurrent forced refreshes both `refresh`, 140 blocks, `errors: []`. Browser:
+Refresh button issues exactly one `/api/board?refresh=1`, shows `Refreshing…` /
+`disabled=true` / `aria-busy=true` in flight, `loaded` stamp advances. board-reviewer: 1
+VIOLATION (forced refresh coalescing — fixed), then clean, "No spec violations found in this
+diff." **Production:** `/board` 200 with 9/9 strings, `/api/board` 200 with 140 blocks and
+`errors: []`, `?refresh=1` forwarding to origin, `/week` 200 unchanged. Commits `d37fab3` and
+`4b9f9e7` are pushed and deployed. **`/board` is production-verified for the first time;
+CUTOVER remains entirely undone.**
