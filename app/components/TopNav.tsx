@@ -6,9 +6,8 @@ import { useEffect, useState } from "react";
 const LINKS = [
   { label: "Family Dashboard",      href: "https://kurgel-dashboard.netlify.app/" },
   { label: "ECOM Launchpad",        href: "https://ecom-launchpad-mentor.netlify.app/" },
-  { label: "Homeschool Week",       href: "https://kurgel-dashboard.netlify.app/week" },
   { label: "Ansar · ANSAR FC",      href: "https://ansar-habits-tracker.netlify.app/" },
-  { label: "Time Allocation Board", href: "https://time-allocation-board.netlify.app/" },
+  { label: "Time Allocation Board", href: "https://kurgel-dashboard.netlify.app/board" },
   { label: "Link Board",            href: "https://luxury-kringle-cf4171.netlify.app/" },
 ];
 
