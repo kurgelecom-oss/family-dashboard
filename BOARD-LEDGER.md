@@ -24,24 +24,38 @@ against production must cite the fetched URL and what was found in the response 
 
 ## DATA SOURCES
 
-- [ ] `taylan-work` wired to `7e90f275-70d4-480a-b504-b8be3444b7f5`
-- [ ] `taylan-personal` wired to `2b062576-79ee-4b7a-8acd-805aaf044f8b`
-- [ ] `taylan-ecom` wired to `cd0e72dd-fb69-4599-95be-202ee1446770`
-- [ ] `nihal-home` wired to `52767310-b8e8-4827-bf66-ae08a9a68120`
-- [ ] `nihal-personal` wired to `e959c33a-968e-4da3-a1f5-f10e65acc094`
-- [ ] `nihal-ecom` wired to `dc07abb4-803e-4058-95f2-10dd473402fa`
-- [ ] `nihal-ayah` wired to `a2d13dcd-ce40-4899-b211-bba55eed3b50`
-- [ ] `ansar-homeschool` wired to `63550d99-ab80-4c2d-914d-d7df6d2f95a9`
+- [x] `taylan-work` wired to `7e90f275-70d4-480a-b504-b8be3444b7f5` — 17 blocks
+- [x] `taylan-personal` wired to `2b062576-79ee-4b7a-8acd-805aaf044f8b` — 16 blocks
+- [x] `taylan-ecom` wired to `cd0e72dd-fb69-4599-95be-202ee1446770` — 17 blocks
+- [x] `nihal-home` wired to `52767310-b8e8-4827-bf66-ae08a9a68120` — 21 blocks
+- [x] `nihal-personal` wired to `e959c33a-968e-4da3-a1f5-f10e65acc094` — 13 blocks
+- [x] `nihal-ecom` wired to `dc07abb4-803e-4058-95f2-10dd473402fa` — 26 blocks
+- [x] `nihal-ayah` wired to `a2d13dcd-ce40-4899-b211-bba55eed3b50` — queried OK, **0 rows**
+      (source is empty, not failing: it is absent from `errors`)
+- [x] `ansar-homeschool` wired to `63550d99-ab80-4c2d-914d-d7df6d2f95a9` — 9 rows → 30 blocks
 - [ ] `588f40ab-4078-4767-982c-b50f9cd83f71` appears nowhere in the repo (grep proves zero hits)
+      — cannot be ticked as written: it appears 3× as prose (`BOARD-SPEC.md:37`,
+      `BOARD-LEDGER.md:35`, `.claude/agents/board-reviewer.md:39`), all of them declaring it
+      retired. **Zero hits in code.** See Findings 2026-07-26 (/api/board).
 
 ## RULES
 
-- [ ] All Notion reads are server-side only
+- [x] All Notion reads are server-side only — all 7 files touching `api.notion.com` are
+      route handlers or `app/lib/settings.ts`; no `"use client"` file references
+      `NOTION_TOKEN` or `api.notion.com`
 - [ ] Token never reaches the client bundle (verified by grepping the built output)
-- [ ] 300s cache set on every Notion read
-- [ ] Renderer handles layer shape: `Block`/title, `Day` single-select, `Start`, `End`, `Notes`
-- [ ] Renderer handles Weekly Schedule shape: `Entry`, `Days` multi-select, `Category`, `Detail`, `Emoji`
-- [ ] Both shapes proven against real responses, not assumed
+      — **not attempted.** No production build was run and no build output was grepped.
+      Server-side-only (above) is a source-level check, not this one.
+- [ ] 300s cache set on every Notion read — **false as written.**
+      `/api/board` has it (`route.ts:5-6`), as do `settings`, `schedule`, `habits`,
+      `actions`. `app/api/todos/route.ts` reads `api.notion.com` with **no** `revalidate`
+      or `dynamic` export. Pre-existing, outside this change set. See Findings.
+- [x] Renderer handles layer shape: `Block`/title, `Day` single-select, `Start`, `End`, `Notes`
+      — handled in the API mapper (`app/api/board/route.ts` `mapRow`). No renderer exists yet.
+- [x] Renderer handles Weekly Schedule shape: `Entry`, `Days` multi-select, `Category`, `Detail`, `Emoji`
+      — same mapper; `Days` fans one row out to one block per day. No renderer exists yet.
+- [x] Both shapes proven against real responses, not assumed — live fetch of all 8 sources,
+      140 blocks, plus a property-shape probe of every source before the mapper was written
 
 ## PARITY WITH /week
 
@@ -144,3 +158,90 @@ with `git check-ignore` that `get-ms-token.js` and the three `.sql` files remain
 sha256 `fb737767…c06fd` matching in both repos. `npx tsc --noEmit` → exit 0 in
 family-dashboard and exit 0 in ansar-habits-tracker. All local only — nothing here is
 production-verified, and no CUTOVER item is ticked.
+
+### 2026-07-26 — `/api/board`, one normalised payload from eight Notion sources
+
+**All eight sources answered. 140 blocks.** Per person: taylan 50, nihal 60, ansar 30.
+Per layer: `taylan-work` 17, `taylan-personal` 16, `taylan-ecom` 17, `nihal-home` 21,
+`nihal-personal` 13, `nihal-ecom` 26, `nihal-ayah` **0**, `ansar-homeschool` 30.
+`errors` was `[]`. Fetched from `netlify dev` at `http://localhost:8888/api/board`,
+HTTP 200. Local only — no production URL has been fetched and no CUTOVER box is ticked.
+
+**`nihal-ayah` is empty, not broken.** It returns 0 rows and contributes 0 blocks, and it
+is correctly absent from `errors`. An empty layer and a failed layer look identical in a
+block count and are distinguished only by the `errors` array — worth remembering when the
+renderer decides what to show for a layer with nothing in it.
+
+**The seven layer sources are 1 row → 1 block; ansar fans out.** Layer block counts equal
+their row counts exactly. The Weekly Schedule's 9 rows expand to 30 blocks via the `Days`
+multi-select (Mon 7, Tue 7, Wed 7, Thu 7, Fri 2). Both shapes go through one `mapRow`.
+
+**Start/End formats differ between the shapes and are NOT normalised.** Layer sources
+store 24h (`"14:00"`); the Weekly Schedule stores 12h (`"9:05am"`). The route passes both
+through verbatim. Any board renderer that sorts or positions blocks by time must parse
+both, or the two will not sort against each other. This is a deliberate choice — picking
+one display format is the renderer's call, not the reader's — but it is a live trap.
+
+**Failure path exercised for real, not assumed.** A second run with a deliberately invalid
+`NOTION_TOKEN` returned HTTP 200 with `blocks: []` and all eight layers named in `errors`
+(`Notion API 401 Unauthorized`). So "never fail the whole payload" holds at both extremes:
+all-succeed and all-fail. *Partial* failure — one source down, seven up — was not directly
+observed; it follows from `Promise.allSettled` plus the per-source error entries, but it is
+inference, not measurement.
+
+**`force-static` means a token-less build serves an empty board as a success.** Because the
+route is `dynamic = "force-static"` with `revalidate = 300`, the payload is prerendered. If
+`NOTION_TOKEN` is missing from the *build* environment, what gets baked and served for 300s
+is exactly the invalid-token response above: HTTP 200, `blocks: []`, eight errors. A fully
+empty board returned as a success. The `errors` array is the only thing distinguishing that
+from a genuinely empty week — the renderer must not ignore it.
+
+**Notion `rich_text` truncation, found by the board-reviewer and fixed.** The first draft of
+`plainText` read `rich_text[0].plain_text` only. Notion splits a rich_text value into a new
+chunk at every formatting boundary, so bolding one word inside a note would have silently
+truncated it at the first fragment. Now joins all chunks, matching `titleText`. A scan of
+all 366 `rich_text` fields across the eight sources found **0** multi-chunk values today, so
+the bug was latent and the fix is a no-op on current data — the payload after the fix is
+byte-identical to the payload before it. The same defect still exists at
+`app/api/schedule/route.ts:52-56`; not touched, out of scope for this pass.
+
+**One-off dated Weekly Schedule entries are dropped — latent parity gap.** The Weekly
+Schedule carries a `Date` property for one-off occurrences. `/api/schedule` reads it
+(`route.ts:51`) and `/week` renders those rows (`app/week/page.tsx:176`). `/api/board` does
+not: the normalised block shape specified for this work is
+`person, layer, day, start, end, title, notes` plus optional `category, detail, emoji` —
+there is no `date` field, and a row with no `Days` value yields no block and no error.
+**All 9 ansar rows currently have `Date = null`, so 0 rows are dropped today.** But `/board`
+cannot reach PARITY with `/week` on this payload without either adding `date` to the block
+shape or handling those rows another way. Flagged rather than fixed: widening the frozen
+block shape is a scope decision, not an implementation detail. Raised by the board-reviewer
+as a VIOLATION of the PARITY line.
+
+**`300s cache set on every Notion read` is false repo-wide.** `app/api/todos/route.ts`
+fetches `api.notion.com` and exports neither `revalidate` nor `dynamic`. Pre-existing and
+outside this change set, so it was left alone — but the ledger box stays unticked, because
+as written it is a claim about every Notion read, not just this one.
+
+**The retired-source box cannot be ticked as written.** `588f40ab-4078-4767-982c-b50f9cd83f71`
+appears 3× in the repo — `BOARD-SPEC.md:37`, `BOARD-LEDGER.md:35`,
+`.claude/agents/board-reviewer.md:39` — every one of them prose declaring it retired, two of
+them the very instruments that enforce the ban. Zero occurrences in code, which is the thing
+that actually matters. The box demands "grep proves zero hits", which will never be true
+while the spec names the id it is banning. Left unticked rather than quietly redefined.
+
+**Data source ids are pinned in code, not read from env.** `SOURCES` in
+`app/api/board/route.ts` hardcodes all eight ids. BOARD-SPEC.md fixes the owner→layer→id
+mapping, and a mistyped env var would silently attach a layer to the wrong person — a
+failure that produces a plausible-looking board rather than an error. Verified by the
+board-reviewer in both directions against the spec table.
+
+**Pagination added although nothing needs it yet.** Every source returns `has_more: false`
+at `page_size: 100`; the largest is 26 rows. The route still pages through (`MAX_PAGES` 10)
+because a silent 100-row truncation would look exactly like a genuinely short week.
+
+**Verification run for this pass:** `npx tsc --noEmit` → exit 0, before and after the
+rich_text fix. `netlify dev` → `/api/board` HTTP 200, 140 blocks, `errors: []`; invalid-token
+run HTTP 200, `blocks: []`, 8 errors. board-reviewer run on the diff: 1 VIOLATION (PARITY /
+dropped dated entries — flagged, not fixed), 1 NOT MET (rich_text truncation — fixed), DATA
+SOURCES / SCORING / STYLE reported CLEAN. Everything here is local. Nothing is
+production-verified.

@@ -51,7 +51,10 @@ Running state lives in `BOARD-LEDGER.md`. This file does not get ticked.
 
 ## SCORING
 
-- One shared `scoreDay` function in `app/lib/`. Three copies exist today and must collapse to it:
+- `scoreDay` lives in `app/lib/scoring.ts` and is mirrored byte-identically at
+  ansar-habits-tracker `app/lib/scoring.ts`. Drift is prevented by
+  `scripts/check-scoring-sync.sh`, which must exit 0. A single physical shared file is
+  explicitly out of scope. Three copies existed before and have collapsed to it:
   - `app/components/WeekProgressStrip.tsx`
   - `app/components/PanelHabits.tsx`
   - ansar-habits-tracker `app/page.tsx`
@@ -67,3 +70,35 @@ Running state lives in `BOARD-LEDGER.md`. This file does not get ticked.
 - `/week` redirects to `/board`.
 - Nav updated in all five repos.
 - Verified by fetching the deployed production URL, never self-reported.
+
+---
+
+## AMENDMENTS
+
+Deliberate changes to this frozen spec. Each entry states what changed and why. An
+amendment is made on its own, never as a side effect of implementation.
+
+### 2026-07-26 — SCORING: mirroring sanctioned, single physical file ruled out of scope
+
+**Changed.** The SCORING section previously required "One shared `scoreDay` function in
+`app/lib/`", singular. It now specifies `app/lib/scoring.ts` mirrored byte-identically
+into ansar-habits-tracker, with `scripts/check-scoring-sync.sh` as the anti-drift
+mechanism, and states that a single physical shared file is explicitly out of scope.
+
+**Why.** The scoring collapse landed on 2026-07-26 and could not satisfy the original
+wording. family-dashboard and ansar-habits-tracker are two separate repositories with no
+shared package between them. One physical file across both would require publishing a
+module to a registry or adding a git submodule — infrastructure neither repo has, and a
+larger change than the scoring work it would be serving. What shipped instead is two
+byte-identical files whose sha256 hashes are compared by `scripts/check-scoring-sync.sh`.
+That script is tracked in both repos and must exit 0.
+
+The conflict was flagged at the time rather than papered over — see BOARD-LEDGER.md,
+Findings 2026-07-26, "Open spec conflict — `scoreDay` is mirrored, not shared", which
+left it deliberately unresolved and named the two ways out: amend the spec, or extract a
+real shared package. This amendment takes the first. The second remains available if a
+shared package ever exists for other reasons; nothing here forecloses it.
+
+**Not changed.** Canonical logic is still ansar-habits-tracker's — `homeschool_session`
+alone awards 5. `WEEKLY_MAX` is still 56 and the tier thresholds are still 42 / 34 / 26 / 0.
+This amendment relaxes *where the function lives*, not *what it computes*.

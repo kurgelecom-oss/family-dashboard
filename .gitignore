@@ -9,6 +9,9 @@
 
 # next.js
 /.next/
+# Stale build output left behind by a previous run — same shape as /.next/, and
+# `git add -A` would otherwise sweep the whole of it into a commit.
+/.next.stale/
 /out/
 
 # production
