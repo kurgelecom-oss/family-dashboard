@@ -45,6 +45,10 @@ next-env.d.ts
 # Carries no credentials — it only compares two file hashes. Must be tracked so
 # both repos ship the same check.
 !/scripts/check-scoring-sync.sh
+# Carries no credentials — it deletes iCloud duplicate files from .next. Must be
+# tracked: `npm run build` runs it via prebuild, so an untracked copy would break
+# the Netlify build with "No such file or directory" the moment it deployed.
+!/scripts/clean-icloud-dupes.sh
 
 # Local Netlify folder
 .netlify

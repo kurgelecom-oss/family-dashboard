@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "sh scripts/clean-icloud-dupes.sh",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"

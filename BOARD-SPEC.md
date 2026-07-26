@@ -184,3 +184,105 @@ cached lifetime seen by clients is unchanged at 300s.
 **Not changed.** The degrade-a-layer-at-a-time behaviour stands: `Promise.allSettled` and
 the per-source `errors` entries are untouched, partial failure is still HTTP 200, and the
 cache lifetime on the success path is still 300s.
+
+### 2026-07-26 — RULES: origin-side request cap restored by a module-level cache
+
+**Changed.** `/api/board` holds a single in-memory payload with a 300 second TTL at module
+scope. **While a payload is cached**, Notion is queried at most once per 300s per warm
+server instance, however many requests reach the origin. Concurrent requests arriving on a
+cold or expired entry coalesce onto one refresh rather than each firing their own. **The
+total-failure path must never populate the cache**; partial failure may, being a real board
+with a named gap rather than an outage.
+
+On the success path `s-maxage` carries what remains of the in-memory entry's TTL, not a
+flat 300. The two caches sit in series, and a flat value would let the CDN hold an
+already-old payload for a further full window.
+
+**Why.** This restores the cap the previous amendment gave up. That amendment moved the
+route to `force-dynamic` so the 503 could be uncacheable, and recorded the consequence:
+"every CDN miss, eviction or cold edge region runs all eight queries at the origin; the cap
+is whatever the CDN delivers." A downstream `Cache-Control` bounds what clients and the CDN
+re-request; it cannot bound what the origin does on a miss. An in-process entry can, and it
+is orthogonal to the 503 — the failure path simply declines to write it. Both properties now
+hold at once, which is why the earlier tradeoff no longer needs accepting.
+
+**Consequence, stated honestly.** Three limits, none of them hidden:
+
+1. *The cap is per instance, not global.* Serverless instances are created and discarded, so
+   N warm instances mean up to N refreshes per 300s, and a cold start always pays a full
+   fetch. This is a real bound on one instance's behaviour, not a global rate limit on
+   Notion traffic, and must not be described as one.
+2. *During a total outage there is no cap at all.* The 503 path is forbidden from writing the
+   cache, so nothing is ever cached to serve from, and `inFlight` coalesces only
+   *concurrent* requests. Sequential requests during an outage each run all eight queries —
+   the origin fires hardest exactly when Notion is least able to answer. This is the direct
+   and accepted cost of never caching a failure: a negative cache would bound the traffic
+   but would also pin the outage, which is the thing the 503 exists to prevent.
+3. *Staleness is unchanged, but only because `s-maxage` is computed.* Serving a hit with a
+   flat `s-maxage=300` would put the two 300s windows in series and push worst-case client
+   age to ~900s. Passing the entry's remaining TTL instead holds the total at the ~600s the
+   CDN already permitted before this cache existed.
+
+**Diagnostics.** Responses carry `X-Board-Cache: hit | miss | bypass` so the cap can be
+observed rather than asserted. `bypass` is the 503 path, which is never served from cache
+and never writes to it.
+
+**Not changed.** `force-dynamic`, the 503 total-failure guard, `Cache-Control: no-store` on
+that 503, the 300s success-path cache *lifetime*, `Promise.allSettled`, and the per-source
+`errors` entries are all as the previous amendment left them.
+
+The success-path `Cache-Control` **header** is not on that list: the previous amendment
+pinned its literal value at `public, s-maxage=300, stale-while-revalidate=300`, and this
+one computes `s-maxage` instead, so that literal no longer holds. The lifetime it expresses
+is unchanged; the string is not. Called out because the first draft of this amendment listed
+the header itself as unchanged — the same clause, and the same mistake, as the first draft of
+the amendment before it. Twice now the "Not changed" list has been carried forward without
+being re-read against the diff. Anyone amending this file again should re-derive that list
+from the code rather than copy it.
+
+### 2026-07-26 — RULES: `?refresh=1` bypasses the origin cache; `/board` exposes it
+
+**Changed.** `GET /api/board?refresh=1` skips the in-memory entry, re-reads all eight Notion
+sources, and **repopulates** the cache with the result. `/board` carries a visible **Refresh**
+control that calls it and re-renders. The refresh response itself is `Cache-Control: no-store`
+and reports `X-Board-Cache: refresh`.
+
+**Why.** The 300s origin cache has no manual exit. Once an entry is warm the only ways out
+are waiting for the TTL or recycling the instance, and **a browser reload does neither** —
+the staleness is at the origin, so reloading re-fetches the same cached payload. This was
+not theoretical: during the previous pass a row was deleted from Notion and `/api/board` kept
+serving it, 141 blocks with `X-Board-Cache: hit`, until the server was restarted. Somebody
+editing Notion and looking at the board needs a way to say "now", and restarting a serverless
+instance is not one.
+
+**Repopulates, does not merely bypass.** The refresh writes the entry it fetched, so one
+person pressing Refresh re-primes the board for every other viewer on that instance rather
+than buying a private fresh copy and leaving the shared entry stale.
+
+**A forced refresh does not coalesce, and that is the point.** Ordinary requests adopt a
+load already in flight — the data is as fresh as anything they would fetch themselves. A
+forced one must not: `/board` re-fetches on every mount and polls every 300s, so a load that
+began before the button was pressed very likely predates the Notion edit the user is trying
+to see. Adopting it would return pre-edit data, re-prime the shared entry with it for a full
+TTL, and stamp the response `X-Board-Cache: refresh` — the control appearing to work while
+leaving the user exactly where they started. A forced refresh therefore always starts its
+own read, which means a forced and an ordinary load can run concurrently and finish out of
+order. Each load carries a sequence number and only a **later** one may write the cache, so
+a slow older read cannot clobber a fresher result and silently undo the refresh.
+
+**Not cacheable, deliberately.** `?refresh=1` is a distinct URL and could not poison plain
+`/api/board`, but a CDN-cached refresh response would mean the second press never reaches
+the origin — the one thing the control exists to do. Hence `no-store` on that response only.
+The success path for plain `/api/board` is unchanged.
+
+**Consequence, accepted.** This is an unauthenticated endpoint that forces eight Notion
+queries on demand, so the origin request cap holds only for traffic that does not ask to
+bypass it. Accepted: `/board` is a family dashboard behind no login, the same as every other
+route in this repo, and the button is the point. If the endpoint is ever abused or the app
+gains auth, rate-limiting the bypass is the follow-up — not a reason to withhold the control.
+
+**Not changed.** Re-derived from the code rather than carried forward: `force-dynamic`
+(`route.ts`), the 503 total-failure guard and its `no-store`, the 300s TTL and the computed
+`s-maxage` on the plain success path, the rule that a total failure never populates the
+cache, `Promise.allSettled`, and the per-source `errors` entries. A `?refresh=1` request
+that ends in total failure is still a 503 and still writes nothing.

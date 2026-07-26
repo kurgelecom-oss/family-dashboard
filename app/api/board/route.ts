@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-// Rendered per request; the 300s cache is declared per response instead (CACHE_OK below).
+// Rendered per request; the 300s cache is declared per response instead (cacheControlFor).
 //
 // This was `force-static` + `revalidate = 300`. It cannot stay that way and also honour
 // BOARD-SPEC's "total failure must be 503 and must not be cached": force-static prerenders
@@ -12,10 +12,16 @@ import { NextResponse } from "next/server";
 // `dynamic` segment config still applies.
 export const dynamic = "force-dynamic";
 
-// Success: cached 300s, stale served while revalidating. Total failure: never cached, so a
-// credential outage cannot outlive its own cause.
-const CACHE_OK = "public, s-maxage=300, stale-while-revalidate=300";
+// Total failure: never cached, so a credential outage cannot outlive its own cause.
 const CACHE_FAIL = "no-store";
+const SWR_SECONDS = 300;
+
+// Origin-side cap. force-dynamic runs the handler on every CDN miss, so the downstream
+// Cache-Control alone does not bound how often Notion is queried. This module-level entry
+// restores that bound: eight Notion queries per 300s per warm server instance, however many
+// requests arrive. Deliberately module scope, not a request-scoped memo — the point is to
+// survive between requests.
+const CACHE_TTL_MS = 300_000;
 
 const NOTION_TOKEN = process.env.NOTION_TOKEN;
 
@@ -264,7 +270,8 @@ async function fetchSource(source: SourceDef): Promise<Block[]> {
   throw new Error(`Exceeded ${MAX_PAGES} pages`);
 }
 
-export async function GET() {
+/** Query all eight sources once. Never rejects — failures land in `errors`. */
+async function loadBoard(): Promise<BoardPayload> {
   // All eight in flight at once. Settled, not raced: one dead source must not take the
   // other seven down with it — the board degrades a layer at a time, never wholesale.
   const results = await Promise.allSettled(SOURCES.map(fetchSource));
@@ -284,19 +291,122 @@ export async function GET() {
     }
   });
 
-  const payload: BoardPayload = { blocks, errors };
+  return { blocks, errors };
+}
+
+/**
+ * The one cached payload, or null when cold or expired.
+ *
+ * `seq` is the sequence number of the load that produced it. A forced refresh can run
+ * alongside an ordinary one, so two loads may be in flight and may finish out of order;
+ * `seq` stops the slower, older read from overwriting the newer one's result.
+ */
+let cached: { payload: BoardPayload; expiresAt: number; seq: number } | null = null;
+
+/** Monotonic, so ordering never depends on a clock that can tie or go backwards. */
+let loadSeq = 0;
+
+/**
+ * The refresh currently in progress, or null.
+ *
+ * Without this, N requests arriving together on a cold cache would each fire eight Notion
+ * queries — "at most once per 300s" would hold only for requests that arrive after the
+ * first one has already finished. Coalescing onto a single promise makes the bound true
+ * under concurrency, which is exactly when a cache is most needed.
+ */
+let inFlight: Promise<BoardPayload> | null = null;
+
+/**
+ * Success-path Cache-Control, with `s-maxage` set to what is LEFT of the in-memory entry's
+ * TTL rather than a flat 300.
+ *
+ * The two caches are in series. A flat `s-maxage=300` on a payload already 299s old would
+ * let the CDN hold it 300s more, so worst-case age at the client would be the module TTL
+ * plus the CDN TTL — the in-memory cache would be buying an origin-side request cap with
+ * up to 300s of extra staleness. Handing the CDN only the remaining lifetime keeps the
+ * total the same as before the cache existed: at most 300s fresh, plus the unchanged
+ * stale-while-revalidate window.
+ */
+function cacheControlFor(entry: { expiresAt: number } | null): string {
+  const remaining = entry ? Math.max(0, Math.ceil((entry.expiresAt - Date.now()) / 1000)) : 0;
+  return `public, s-maxage=${remaining}, stale-while-revalidate=${SWR_SECONDS}`;
+}
+
+/**
+ * Load the board, optionally forcing a genuinely new read.
+ *
+ * `force` exists because coalescing is wrong for a manual refresh. An ordinary request is
+ * happy to adopt a load already running — the data is as fresh as anything it would fetch
+ * itself. A `?refresh=1` request is not: `/board` polls every 300s and re-fetches on every
+ * mount, so a load started *before* the button was pressed is very likely to predate the
+ * Notion edit the user is trying to see. Adopting it would return pre-edit data, re-prime
+ * the shared entry with it for a full TTL, and report `X-Board-Cache: refresh` while doing
+ * so — the button appearing to work while leaving the user in exactly the state it exists
+ * to escape. So a forced refresh always starts its own read.
+ */
+function refresh(force = false): Promise<BoardPayload> {
+  if (!force && inFlight) return inFlight;
+
+  const seq = ++loadSeq;
+
+  const run: Promise<BoardPayload> = loadBoard()
+    .then((payload) => {
+      // A total failure must never be cached. Caching it would pin an outage in memory for
+      // 300s past its cause and starve the retry that would clear it — the same trap the
+      // 503 exists to escape, just moved from the CDN into the process. Partial failure IS
+      // cached: it is a real board with a named gap, not an outage.
+      //
+      // The seq check matters only when a forced read overlaps an ordinary one: whichever
+      // started later wins, so a slow older read cannot clobber a fresher result and
+      // silently undo the refresh.
+      if (payload.errors.length < SOURCES.length && (cached === null || seq > cached.seq)) {
+        cached = { payload, expiresAt: Date.now() + CACHE_TTL_MS, seq };
+      }
+      return payload;
+    })
+    .finally(() => {
+      // Only clear the slot if it is still ours — a forced refresh may have replaced it.
+      if (inFlight === run) inFlight = null;
+    });
+
+  inFlight = run;
+  return run;
+}
+
+export async function GET(request: Request) {
+  // ?refresh=1 — the manual override for "I just changed Notion and want to see it now".
+  // Without it the only ways out of a warm entry are waiting up to 300s or recycling the
+  // instance, and a browser reload does neither: the staleness is at the origin, not in
+  // the browser cache. Skips the read, not the write — refresh() repopulates `cached`, so
+  // one person pressing Refresh re-primes the board for everyone on that instance.
+  const force = new URL(request.url).searchParams.get("refresh") === "1";
+
+  // Read `cached` once: refresh() reassigns it, so re-reading below could see a different
+  // entry than the one the freshness check passed on.
+  const entry = cached;
+  const hit = !force && entry !== null && entry.expiresAt > Date.now();
+  const payload = entry !== null && hit ? entry.payload : await refresh(force);
 
   // Every source down is an outage, not an empty week. Returning 200 here makes a dead
   // token indistinguishable from a genuinely empty board to anything that does not read
-  // `errors`, so it is a 503 — and an uncached one, so it clears the moment Notion or the
-  // credential recovers. `errors` is still populated: the 503 body names every failure.
-  // Partial failure is untouched — one surviving source is still a 200.
-  if (errors.length === SOURCES.length) {
+  // `errors`, so it is a 503 — and an uncached one, at both layers, so it clears the moment
+  // Notion or the credential recovers. `errors` is still populated: the 503 body names
+  // every failure. Partial failure is untouched — one surviving source is still a 200.
+  if (payload.errors.length === SOURCES.length) {
     return NextResponse.json(payload, {
       status: 503,
-      headers: { "Cache-Control": CACHE_FAIL },
+      headers: { "Cache-Control": CACHE_FAIL, "X-Board-Cache": "bypass" },
     });
   }
 
-  return NextResponse.json(payload, { headers: { "Cache-Control": CACHE_OK } });
+  // A forced refresh is never itself cacheable. `?refresh=1` is a distinct URL, so caching
+  // it could not poison plain `/api/board` — but a CDN-cached refresh response would mean
+  // the second press of the button never reaches the origin, which is the one thing the
+  // button exists to do. The in-memory entry it just wrote is still shared with everyone.
+  return NextResponse.json(payload, {
+    headers: {
+      "Cache-Control": force ? CACHE_FAIL : cacheControlFor(cached),
+      "X-Board-Cache": force ? "refresh" : hit ? "hit" : "miss",
+    },
+  });
 }
