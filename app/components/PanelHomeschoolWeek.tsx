@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { getTodayDate, getWeekStart } from "../lib/supabase";
+import { getTodayDate } from "../lib/supabase";
 
 // ─── Compact Homeschool Week widget (peek at Nihal's /week schedule) ─────────
 // Shows today's current time block + the next upcoming event. Reuses the exact
@@ -15,10 +15,11 @@ type ScheduleEntry = {
   start: string; end: string; category: string; detail: string; emoji: string;
 };
 
-function addDays(dateStr: string, n: number) {
-  const d = new Date(dateStr + "T12:00:00");
-  d.setDate(d.getDate() + n);
-  return d.toISOString().split("T")[0];
+// "YYYY-MM-DD" is a calendar date, not an instant — anchor it at UTC midnight so
+// the weekday it reports is the same in every timezone.
+function dayIdxOf(dateStr: string): number {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7; // 0 = Monday
 }
 
 // "6:45am" / "7:00pm" / "12:15am" → minutes since midnight; unparseable → end of day
@@ -31,10 +32,16 @@ function parseMinutes(s: string): number {
   return h * 60 + parseInt(m[2] ?? "0", 10);
 }
 
-// Minutes since midnight in AEST (matches Header.tsx / week theme handling: UTC + 10)
-function aestNowMinutes(): number {
-  const now = new Date();
-  return ((now.getUTCHours() + 10) % 24) * 60 + now.getUTCMinutes();
+// Minutes since midnight in Melbourne. Intl resolves AEST/AEDT for us, so this
+// stays correct across the October and April switches — the old hardcoded
+// UTC + 10 was a full hour wrong for roughly half the year.
+function melbourneNowMinutes(): number {
+  const parts = new Intl.DateTimeFormat("en-AU", {
+    timeZone: "Australia/Melbourne", hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(new Date());
+  const h = Number(parts.find(p => p.type === "hour")!.value) % 24; // some ICU builds emit 24 for midnight
+  const m = Number(parts.find(p => p.type === "minute")!.value);
+  return h * 60 + m;
 }
 
 function entryLabel(e: ScheduleEntry): string {
@@ -44,7 +51,12 @@ function entryLabel(e: ScheduleEntry): string {
 
 export default function PanelHomeschoolWeek() {
   const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
-  const [nowMin, setNowMin] = useState<number>(aestNowMinutes());
+  // `/` is statically prerendered, so anything read from the clock during render
+  // is frozen at BUILD time and hydration will not repair it. Both the date and
+  // the time cursor therefore start null and are only ever filled in on the
+  // client, then re-read every 60s so the always-on TV advances on its own.
+  const [nowMin, setNowMin] = useState<number | null>(null);
+  const [today, setToday] = useState<string | null>(null);
 
   const loadSchedule = useCallback(async () => {
     try {
@@ -58,29 +70,28 @@ export default function PanelHomeschoolWeek() {
   }, []);
 
   useEffect(() => {
+    // Refresh schedule + date + "now" cursor every 60s so the always-on TV stays
+    // current, and rolls over at midnight without a reload or a redeploy.
+    const tick = () => { setNowMin(melbourneNowMinutes()); setToday(getTodayDate()); };
+    tick();
     loadSchedule();
-    // Refresh schedule + "now" cursor every 60s so the always-on TV stays current
-    const id = setInterval(() => { loadSchedule(); setNowMin(aestNowMinutes()); }, 60_000);
+    const id = setInterval(() => { loadSchedule(); tick(); }, 60_000);
     return () => clearInterval(id);
   }, [loadSchedule]);
 
   // Today's entries (recurring day-name prefix match OR one-off date), time-sorted
-  const weekStart = getWeekStart();
-  const weekDates = [0, 1, 2, 3, 4, 5, 6].map(i => addDays(weekStart, i));
-  const todayIdx = weekDates.indexOf(getTodayDate());
-  const todayKey = todayIdx >= 0 ? DAY_KEYS[todayIdx] : "";
-  const todayDate = todayIdx >= 0 ? weekDates[todayIdx] : null;
+  const todayKey = today ? DAY_KEYS[dayIdxOf(today)] : "";
 
-  const todayEntries = todayIdx < 0 ? [] : schedule
+  const todayEntries = !today ? [] : schedule
     .filter(e =>
-      e.days.some(d => d.slice(0, 3) === todayKey) || e.date === todayDate
+      e.days.some(d => d.slice(0, 3) === todayKey) || e.date === today
     )
     .sort((a, b) => parseMinutes(a.start) - parseMinutes(b.start));
 
-  const nowBlock = todayEntries.find(e =>
+  const nowBlock = nowMin === null ? undefined : todayEntries.find(e =>
     nowMin >= parseMinutes(e.start) && nowMin < parseMinutes(e.end)
   );
-  const nextBlock = todayEntries.find(e => parseMinutes(e.start) > nowMin);
+  const nextBlock = nowMin === null ? undefined : todayEntries.find(e => parseMinutes(e.start) > nowMin);
 
   const rowStyle: React.CSSProperties = {
     display: "flex", alignItems: "baseline", gap: 8, minWidth: 0,

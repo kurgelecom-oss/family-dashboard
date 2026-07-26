@@ -24,6 +24,19 @@ type CalEvent = {
   isOrganizer?: boolean;
 };
 
+// Graph returns calendarView times in UTC but with NO offset in the string
+// (e.g. "2026-07-26T21:30:00.0000000") because of the Prefer header below. That
+// is not valid ISO-8601, so every consumer had to carry its own defensive
+// "append Z" parser — and an earlier attempt to "fix" it by appending +10:00
+// instead shifted every timed event 10h and mis-fired the banners. Normalise
+// once, here, so the field named startISO actually is an ISO string.
+function toISO(graphDateTime: string): string {
+  const s = graphDateTime.trim();
+  const hasOffset = /(?:Z|[+-]\d{2}:?\d{2})$/.test(s);
+  const d = new Date(hasOffset ? s : s + "Z");
+  return Number.isNaN(d.getTime()) ? s : d.toISOString();
+}
+
 async function getAccessToken(refreshToken: string): Promise<string> {
   const clientId     = process.env["MS_CAL_CLIENT_ID"];
   const clientSecret = process.env["MS_CAL_CLIENT_SECRET"];
@@ -111,8 +124,8 @@ export async function GET() {
         events.push({
           id:       `${account.key}-${e.id}`,
           subject:  e.subject ?? "(No title)",
-          startISO: e.start.dateTime,
-          endISO:   e.end.dateTime,
+          startISO: toISO(e.start.dateTime),
+          endISO:   toISO(e.end.dateTime),
           isAllDay: e.isAllDay ?? false,
           account:  account.key,
           email:    account.email,
