@@ -26,12 +26,13 @@ export default function Dashboard() {
         <div className="dashboard-col">
           <PanelTodos />
         </div>
-        {/* Column 4 — Homeschool Week peek (compact) + Calendar + Ansar Habits. */}
+        {/* Column 4 — Calendar + Homeschool Week peek (compact) + Ansar Habits.
+            Order matters on mobile too, where the columns stack vertically. */}
         <div className="dashboard-col">
-          <PanelHomeschoolWeek />
           <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
             <PanelCalendar />
           </div>
+          <PanelHomeschoolWeek />
           <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
             <PanelHabits />
           </div>

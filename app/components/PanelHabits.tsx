@@ -68,9 +68,12 @@ function addDays(dateStr: string, n: number) {
 }
 
 const BLOCKS = [
-  { id: "pre",    label: "Pre-School", color: "var(--amber)" },
-  { id: "school", label: "Homeschool", color: "var(--cyan)" },
-  { id: "arvo",   label: "Evening",    color: "#a78bfa" },
+  // `id` is the data key (Notion Block select -> BLOCK_MAP in /api/habits, plus
+  // the scoring math here and in WeekProgressStrip). Only `label` is displayed,
+  // so renaming a label never touches stored data.
+  { id: "pre",    label: "Morning Habits", color: "var(--amber)" },
+  { id: "school", label: "Homeschool",     color: "var(--cyan)" },
+  { id: "arvo",   label: "Evening",        color: "#a78bfa" },
 ];
 
 export default function PanelHabits() {
