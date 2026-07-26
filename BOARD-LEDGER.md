@@ -909,3 +909,89 @@ scope; (d) "the only in-repo evidence of that hostname is the nav entries of the
 five* surfaces" when ecom-launchpad's own `index.html:1200` carries it too. Second
 consecutive documentation commit where the gate found a false statement in prose that had
 already been checked once — the numbers in a ledger are as capable of being wrong as code.
+
+### 2026-07-26 — Notion synced, retired source archived, cutover closed out
+
+**Reported by tk, not observed from here.** Everything in this paragraph is Notion-UI state
+that cannot be checked from a shell, and none of it was independently verified this
+session. **Notion after-cutover work COMPLETE**: WHATS NEXT updated with both a status
+panel and a full change-log entry; both Build Pipelines now carry a superseding notice at
+the top — naming locked, "Homeschool Week" retired permanently, Layer 2 is the Time
+Allocation Board. Data source `588f40ab-4078-4767-982c-b50f9cd83f71` ("Ansar · Homeschool",
+parent page `8479d6fd68f942d68d9751bff2716c8e`) **moved to Trash**. It held 6 placeholder
+rows only — "Homeschool prep", 09:00–09:30, **Mon–Sat**, no detail, no notes. Checked
+against the live Weekly Schedule `63550d99-ab80-4c2d-914d-d7df6d2f95a9` first, and judged:
+**no unique content lost.**
+
+**One gap in that judgement, worth recording rather than smoothing over.** The live Weekly
+Schedule covers 09:00–11:20 **Mon–Thu** in full, plus Friday flex and debrief — confirmed
+against the live payload: Mon 7, Tue 7, Wed 7, Thu 7, Fri 2, **Sat 0, Sun 0**. The retired
+source's rows ran **Mon–Sat**. Mon–Sat is not covered by Mon–Thu + Fri, so on the entry's
+own two statements the **Saturday** row has no counterpart. The rows were placeholders with
+no detail and no notes, so this is very likely immaterial — but "no unique content lost"
+does not follow from the comparison as stated, and the Trash is reversible if it matters.
+
+**The archive is corroborated by observed behaviour, not only by the action being
+reported.** Earlier today the last code reader of that source —
+`time-allocation-board/netlify/functions/get-schedule.js` — was still live, returning
+**HTTP 200 with 116 blocks, 6 of them `ansar-homeschool`**, because Netlify does not apply
+redirect rules to `/.netlify/functions/*`. Re-fetched after the Trash: **HTTP 200, 110
+blocks**, **zero** `ansar-homeschool`, with the layer now surfacing in `errors`:
+
+    Notion API 404 … Could not find data_source with ID:
+    588f40ab-4078-4767-982c-b50f9cd83f71
+
+**That corroborates 6 blocks, not 6 rows.** A single row with a multi-select `Day` spanning
+Mon–Sat produces the identical 116 → 110 delta — and one repeated title across six days is
+exactly that shape. The block count is evidence; the row count remains tk's report.
+**`/api/board` is unaffected**, as it must be — it reads `63550d99`: **HTTP 200, 140
+blocks, `errors: []`**, taylan 50 / nihal 60 / ansar 30, homeschool 30.
+
+**The open item is narrowed, not closed.** "CUTOVER executed across five repos" recorded
+that the retired source "is STILL being read in production" and named two fixes: a
+`/.netlify/functions/*` rule in `time-allocation-board/netlify.toml`, or deleting
+`get-schedule.js`. **Neither was done.** The read is still issued on every request — it now
+404s. What ended is the *consequence*: retired data is no longer served, and the failure is
+named in `errors` rather than passing silently. BOARD-SPEC says the source "must not be
+read", and by the letter of that line the reader should still go. Carried, reduced.
+
+**NOTE for future work — a data source ID is not a page ID.** `588f40ab…` does not resolve
+as `app.notion.com/p/<id>`; its database page is `8479d6fd68f942d68d9751bff2716c8e`. To get
+the real page URL, fetch `collection://<id>`. (tk's note; not re-derived here.) This cost
+time once; it should not cost it twice.
+
+**Housekeeping — the "appears 3×" parentheticals are stale.** The DATA SOURCES box and the
+Findings line that repeat it both say the retired id "appears 3× in the repo —
+`BOARD-SPEC.md:37`, `BOARD-LEDGER.md:35`, `.claude/agents/board-reviewer.md:39`". That was
+already wrong (`BOARD-LEDGER.md:35` does not contain it) and this entry adds more prose
+occurrences. Current counts: **BOARD-LEDGER 3, BOARD-SPEC 1, board-reviewer.md 1** before
+this entry. **Zero in code** — re-grepped across `*.ts/tsx/js/mjs/json`, 0 hits — so the ban
+itself holds and the box stays correctly unticked; only the parenthetical is wrong. The
+Notion archive changes nothing about a repo-grep box.
+
+**STILL OPEN, carried forward:**
+
+- **`/api/board` returns no `ayah` layer key at all.** Re-confirmed live: blocks with
+  `layer == "ayah"` = **0**, layer set exactly `work, personal, ecom, home, homeschool`.
+  Read the grep carefully — the literal string `ayah` **does** appear 9× in the payload,
+  every one of them block *title* text (`Ayah Bedtime` ×7, `Ayah Playgroup` ×2), and all 9
+  sit under **`nihal/home`**, none under any other layer; no non-title field contains it.
+  So a future reader grepping for `ayah` will get hits and should not read them as a layer.
+  The substance is unchanged: BOARD-SPEC lists Ayah under Nihal, the `/board` shell renders
+  "Nihal · 4 layers", the API carries 3 (ecom 26, home 21, personal 13). Still needs
+  deciding whether an empty layer should render as an onboarding placeholder.
+- **Nihal has not been told the TV numbers went up** because `WeekProgressStrip` picked up
+  canonical scoring. The change is live and unannounced.
+
+**board-reviewer on this entry → 4 VIOLATIONS, 3 NOT MET; the entry was rewritten from
+scratch before commit.** It caught: Notion-UI state stated flatly as though observed;
+"no unique content lost" contradicted by the entry's own Mon–Sat vs Mon–Thu+Fri comparison;
+6 blocks presented as corroborating 6 rows; an open item called CLOSED when only its
+consequence had ended; the stale "3×" parenthetical; and two errors in the `ayah` line —
+it attributed the 9 title hits to `nihal/home` **and** `nihal/personal` when all 9 are
+`nihal/home`, and it "corrected" an earlier Findings line by quoting words that appear
+nowhere in this file (the false "the string does not occur anywhere in the payload" was a
+subagent's, never written here; the actual line at the OPEN entry above claims only that
+the *layer key* is absent, which is true). **Third consecutive documentation commit where
+the gate found false statements in already-checked prose.** The pattern is now the finding:
+prose about verified things drifts from the verification faster than code does.
