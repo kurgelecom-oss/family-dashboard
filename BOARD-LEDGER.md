@@ -13,9 +13,16 @@ against production must cite the fetched URL and what was found in the response 
 - [x] Route `/board` exists in family-dashboard — `app/board/page.tsx`; `netlify dev`
       `GET http://localhost:8888/board` → **HTTP 200**, 22,699 bytes; listed in the build
       output as `○ /board`
-- [ ] `/board` replaces `/week` entirely (no remaining dependency on `/week` rendering)
-      — **not done, and not attempted.** `/week` still renders itself, does not redirect,
-      and `app/components/PanelHomeschoolWeek.tsx:117` still links to it. CUTOVER work
+- [x] `/board` replaces `/week` entirely (no remaining dependency on `/week` rendering)
+      — **done 2026-07-26, superseding the earlier "not done, and not attempted" text on
+      this line.** All three grounds that kept it unticked are now false: production
+      `https://kurgel-dashboard.netlify.app/week` → **HTTP 308** → `/board` (fetched, not
+      inferred); `app/components/PanelHomeschoolWeek.tsx:117` now reads
+      `href="https://kurgel-dashboard.netlify.app/board"` with its card title relabelled
+      "Time Allocation Board" (commit `de311d3`); and no surface nav links to `/week`.
+      `app/week/page.tsx` remains on disk deliberately — redirects are checked before the
+      filesystem, so it is unreachable rather than deleted. See CUTOVER and Findings
+      2026-07-26, "CUTOVER complete — final production sweep"
 
 ## STRUCTURE
 
@@ -219,6 +226,14 @@ against production must cite the fetched URL and what was found in the response 
 - [x] `--cyan` remains `#00d4ff` — `globals.css:19`, unchanged by this work
 
 ## CUTOVER
+
+**COMPLETE — 2026-07-26.** Every box below is ticked. The two behavioural claims — the
+redirect and the cutover verification — are backed by direct fetches of deployed URLs.
+The five "Nav updated" boxes cite files on disk, because that is what they assert; the
+*deployed* nav is verified separately by the last box and by the Findings sweep. One of
+them cannot be fetch-verified even in principle: time-allocation-board now serves a
+57-byte 301 body, so it has no nav to fetch. Final verification sweep recorded in
+Findings, "CUTOVER complete — final production sweep".
 
 - [x] `/week` redirects to `/board` — production `https://kurgel-dashboard.netlify.app/week`
       → **HTTP 308**, `Location: https://kurgel-dashboard.netlify.app/board`. Framework
@@ -797,3 +812,100 @@ does emit the computed `s-maxage` (`route.ts`), so the edge is consuming and str
 rather than the code being wrong, but no box in this ledger has ever checked that header
 against production. And `https://kurgel-dashboard.netlify.app/week/` (trailing slash)
 double-hops: 308 → `/week` → 308 → `/board`. It resolves; it is two round trips.
+
+### 2026-07-26 — CUTOVER complete — final production sweep
+
+**Production verified by direct fetch. No local checks, no inference.** Seven URLs fetched
+live:
+
+| URL | HTTP | Redirect target | Nav |
+|---|---|---|---|
+| `https://kurgel-dashboard.netlify.app/board` | 200 | — | correct |
+| `https://kurgel-dashboard.netlify.app/week` | **308** | `…/board` | n/a (6-byte body) |
+| `https://kurgel-dashboard.netlify.app/` | 200 | — | correct |
+| `https://ansar-habits-tracker.netlify.app/` | 200 | — | correct |
+| `https://time-allocation-board.netlify.app/` | **301** | `…/board` | n/a (57-byte body) |
+| `https://luxury-kringle-cf4171.netlify.app/` | 200 | — | correct |
+| `https://ecom-launchpad-mentor.netlify.app/` | 200 | — | correct |
+
+**Scoped to the `<nav class="topnav">` block**, all five nav-bearing surfaces carry
+`kurgel-dashboard.netlify.app/board` exactly once and **zero** references to `/week` or
+`time-allocation-board.netlify.app`. Whole-body the `/board` count is higher on two
+surfaces and legitimately so: `/` = 2 (nav + the `PanelHomeschoolWeek` card link added by
+`de311d3`) and link-board = 3 (nav :456, `DEFAULT_LINKS` :561, `RETIRED_URLS` :585); the
+other three = 1. For `/week` and the retired host, whole-body across all seven pages there
+are exactly **three** hits, none of them a link — see the stale-prose item below.
+
+**ACCEPTANCE CRITERION MET — `/board` connects to Ansar Dashboard.** Both legs verified in
+production, neither assumed:
+- `scripts/check-scoring-sync.sh` → **exit 0**; both copies hash
+  `fb737767648d8e3be1ac18076eba29b8b17fa56907ead32fd959fa4c13bc06fd`, `RESULT: IN SYNC`.
+- Leg 1: `/board` (200, 17,137 B) contains `ansar-habits-tracker.netlify.app` ×1.
+- Leg 2: `https://ansar-habits-tracker.netlify.app/` (200, 23,104 B) contains
+  `kurgel-dashboard.netlify.app/board` ×1, line 66.
+
+**FRAGILE LINK — the ecom-launchpad production URL is not recorded anywhere in its own
+repo.** `https://ecom-launchpad-mentor.netlify.app/` is correct — confirmed by fetching it
+and matching identity markers (`<title>ECOM Launchpad — THE ENGINE v2</title>`, plus
+`THE ENGINE` ×5, `Setup Guide` ×13, `Graveyard` ×29, `ecom_currentTest` ×8). But
+`~/ecom-launchpad` has **no `netlify.toml` and no `.netlify/state.json`** — the repo holds
+only `.git`, `CLAUDE.md` and `index.html`. The hostname appears nowhere that binds the repo
+to the site: the only occurrences are nav entries — its own at `index.html:1200` and the
+matching ones on the other five surfaces — which are just links, not deploy configuration.
+If those nav entries are ever edited wrongly, nothing in the repo contradicts them. Treat
+the URL as unpinned until the repo records it.
+
+**link-board sync was silently broken, and the cutover work exposed it.** `mergeDefaults`
+threw `TypeError: Cannot read properties of undefined (reading 'replace')` on **every**
+load: the dedupe predicate called `normalizeUrl(l.url)` unguarded, and the live list holds
+an image-only card (`Failure Mode: Incorrect Product Launch`) with no `url` — `url` is
+genuinely optional, the server validator requires "a url **or** an image". `loadLinks()`
+was catching it and falling back to the cached copy, so cloud sync had been dead. Guard
+added in **`3593f55`** — *not* `cfa8772`, which is the nav-only cutover commit and contains
+no guard (verified: `git show 3593f55 | grep -c "l.url &&"` → 2, same on `cfa8772` → 0).
+Reproduced against the real `/api/links` payload before and after.
+
+The card fix is **client-side migration, not a data fix.** The cloud blob still stores
+`https://time-allocation-board.netlify.app/`; a `RETIRED_URLS` rewrite in `mergeDefaults`
+repoints it on load, so each device self-heals and the entry keeps its position rather than
+a second card being appended. The stored copy stays stale until something performs a write
+with the token in `localStorage`. Verified idempotent against the live payload: 7 cloud
+entries → 10 merged, exactly one "Time Allocation Board" card at `/board`, zero references
+to the old host, image-only card preserved.
+
+**OPEN — `/api/board` returns no `ayah` layer key at all, not an empty one.** BOARD-SPEC
+lists Ayah under Nihal. The response contains layers `work, personal, ecom, home,
+homeschool` and **no `ayah` key whatsoever** — Ayah is absent from the payload, not
+present-with-zero-rows. The `/board` shell still renders "Nihal · 4 layers" while the API
+carries 3 for her (ecom 26, home 21, personal 13). Needs a decision: should an empty layer
+render as an onboarding placeholder, or be omitted? **Not fixed this job.** Related but
+distinct from the DATA SOURCES box, which records `nihal-ayah` as *queried OK, 0 rows* —
+that is about the source; this is about the shape of the response.
+
+**OPEN — stale `/week` prose in the nav active-state comments.** `link-board/index.html:539`
+(`// … "/week/" and "/week"`) and `ecom-launchpad/index.html:1207` (`// … so "/week" ==
+"/week/".`). Both are comments, neither is a link, and `normPath()` itself is still correct
+and still used. Left in place deliberately to keep the five nav copies byte-identical;
+fixing them means touching all five.
+
+**Caution for anyone re-verifying `/board` with curl.** The served HTML is a pre-hydration
+shell — `app/board/page.tsx` is a client component, block counts render as `0 blocks` /
+`No blocks`, and the counts arrive after hydration from `/api/board` (200, 140 blocks,
+taylan 50 / nihal 60 / ansar 30, `errors: []`). Labels are server-rendered and greppable;
+**counts are not**. React also splits the text (`>0<!-- --> block`), so a literal
+`grep -F "0 blocks"` returns nothing. prod-verifier on `/board` → **PASS**, 5/5 required
+strings server-rendered: Taylan 2, Nihal 2, Ansar 4, Ayah 1, Homeschool 1.
+
+**board-reviewer on this ledger entry → 2 VIOLATIONS, 2 NOT MET. All four were real and all
+four were corrected before commit.** It caught: (a) a blanket "every box is backed by a
+direct fetch" header when five of the eight cite files on disk and one — time-allocation-
+board — can never be fetch-verified, since it now serves a 57-byte 301 body with no nav;
+(b) the **ROUTE** box 800 lines above still reading "not done, and not attempted" while
+this entry declared CUTOVER complete, so a reader working top-down was told the cutover
+had never started — now ticked with its three grounds individually refuted; (c) an
+unqualified "five surfaces carry the /board link exactly once" that is true nav-scoped but
+false whole-body, where the very next sentence introduces whole-body as the contrasting
+scope; (d) "the only in-repo evidence of that hostname is the nav entries of the *other
+five* surfaces" when ecom-launchpad's own `index.html:1200` carries it too. Second
+consecutive documentation commit where the gate found a false statement in prose that had
+already been checked once — the numbers in a ledger are as capable of being wrong as code.
