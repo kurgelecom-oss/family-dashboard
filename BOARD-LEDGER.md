@@ -43,19 +43,61 @@ against production must cite the fetched URL and what was found in the response 
 - [x] All Notion reads are server-side only — all 7 files touching `api.notion.com` are
       route handlers or `app/lib/settings.ts`; no `"use client"` file references
       `NOTION_TOKEN` or `api.notion.com`
-- [ ] Token never reaches the client bundle (verified by grepping the built output)
-      — **not attempted.** No production build was run and no build output was grepped.
-      Server-side-only (above) is a source-level check, not this one.
-- [ ] 300s cache set on every Notion read — **false as written.**
-      `/api/board` has it (`route.ts:5-6`), as do `settings`, `schedule`, `habits`,
-      `actions`. `app/api/todos/route.ts` reads `api.notion.com` with **no** `revalidate`
-      or `dynamic` export. Pre-existing, outside this change set. See Findings.
+- [x] Token never reaches the client bundle (verified by grepping the built output)
+      — **tested 2026-07-26.** `npm run build` (exit 0), then `grep -rlF "$NOTION_TOKEN"`:
+      **0 files in `.next/static`** (the client bundles), 0 in `.next/server`, 0 across the
+      whole `.next` tree. Also 0 hits for the token's 24-char prefix, 0 for the literal
+      string `NOTION_TOKEN` anywhere in `.next/static`, and 0 for any `NEXT_PUBLIC_*NOTION*`.
+      Grep proven capable by positive control — the identical grep does find the value in
+      `.env.local` — and scope confirmed non-empty: `.next/static` holds 15 JS files, 976K.
+      The token value was never printed. See Findings.
+- [ ] 300s cache set on every Notion read — **still false as written.**
+      `/api/board` has it (`route.ts:13-18` — now `force-dynamic` plus a per-response
+      `Cache-Control: public, s-maxage=300, stale-while-revalidate=300`, observed on the
+      wire), as do `settings`, `schedule`, `habits`, `actions`. `app/api/todos/route.ts`
+      reads `api.notion.com` with **no** `revalidate` and **no** `dynamic` export — a
+      known defect, pre-existing and out of scope for this change set, deliberately left
+      untouched. The box is a claim about *every* Notion read, so it stays unticked until
+      that route is fixed. See Findings.
 - [x] Renderer handles layer shape: `Block`/title, `Day` single-select, `Start`, `End`, `Notes`
       — handled in the API mapper (`app/api/board/route.ts` `mapRow`). No renderer exists yet.
 - [x] Renderer handles Weekly Schedule shape: `Entry`, `Days` multi-select, `Category`, `Detail`, `Emoji`
       — same mapper; `Days` fans one row out to one block per day. No renderer exists yet.
 - [x] Both shapes proven against real responses, not assumed — live fetch of all 8 sources,
       140 blocks, plus a property-shape probe of every source before the mapper was written
+
+## BLOCK SHAPE (AMENDMENTS 2026-07-26)
+
+- [x] `date: string | null` present on every block, `"YYYY-MM-DD"` — 140/140 blocks carry
+      the key; `dateStart` slices to 10 chars so a timestamped Notion value cannot shift
+      the calendar day
+- [x] `date` is non-null only for one-off Weekly Schedule rows — **0 of 140** non-null
+      today, because all 9 Weekly Schedule rows still have `Date = null`. Correct, and the
+      same figure as before the change
+- [ ] A row with a `Date` and no `Days` yields a block — **logic proven, not live.** No
+      such row exists in Notion today, so the branch has zero live coverage. Exercised
+      only on synthetic rows against transcribed logic (25/25 assertions). Cannot be
+      ticked on a real payload until such a row exists. See Findings
+- [x] `startMin` / `endMin` present on every block, integer minutes or `null` — 140/140
+      carry both keys; 0 out-of-range values
+- [x] 24-hour `"14:00"` parses — → `840`; `"08:00"` → `480`, observed in the live payload
+- [x] 12-hour `"9:05am"` parses — → `545`, observed in the live payload
+- [x] Unparseable → `null`, never `0` — 1 null `startMin` (`"Flexible"`), 9 null `endMin`
+      (all empty strings). Every null traced to a genuinely absent or non-time value; no
+      valid string was wrongly rejected
+- [x] `start` / `end` unchanged as display strings — passed through verbatim; the parsed
+      values live only in the new fields
+- [ ] Renderers sort on `startMin`/`endMin`, never on the display strings — **unenforceable
+      today.** No renderer exists. Carried forward as a live constraint on the first one
+- [x] All eight sources failing returns HTTP 503, uncached — observed under an invalid
+      token via `netlify dev`: `HTTP/1.1 503 Service Unavailable`, `cache-control:
+      no-store`, `blocks: []`, all 8 layers named in `errors` (`Notion API 401
+      Unauthorized`)
+- [x] Success path returns HTTP 200 with a 300s cache — observed: `HTTP/1.1 200 OK`,
+      `cache-control: public, s-maxage=300, stale-while-revalidate=300`
+- [ ] Partial failure (some sources down) still returns HTTP 200 — **not observed.**
+      Follows from the `errors.length === SOURCES.length` gate, but inference, not
+      measurement. Same gap as the previous pass
 
 ## PARITY WITH /week
 
@@ -245,3 +287,102 @@ run HTTP 200, `blocks: []`, 8 errors. board-reviewer run on the diff: 1 VIOLATIO
 dropped dated entries — flagged, not fixed), 1 NOT MET (rich_text truncation — fixed), DATA
 SOURCES / SCORING / STYLE reported CLEAN. Everything here is local. Nothing is
 production-verified.
+
+### 2026-07-26 — normalised block shape widened; total failure now 503
+
+Implements the three BOARD-SPEC amendments of the same date. The two open items the
+previous pass flagged and declined to fix — dropped dated entries, and un-normalised
+Start/End — are the first two of them.
+
+**Payload is unchanged in size: still 140 blocks, `errors: []`.** Per the live `netlify dev`
+fetch at `http://localhost:8888/api/board`, HTTP 200. **0 of 140** blocks have a non-null
+`date`, **1** has a null `startMin`, **9** have a null `endMin`. The block count matching
+the previous pass exactly is the expected result, not a coincidence: no Weekly Schedule row
+carries a `Date`, so the new fan-out branch adds nothing today.
+
+**Every null is a real null — the parser rejects nothing valid.** The single null `startMin`
+is the literal string `"Flexible"` on `ansar/homeschool` "Flex/Catch-up — Friday". All nine
+null `endMin` are empty strings. Both were checked individually rather than counted, because
+a parser that silently returned `null` for valid input would produce exactly the same
+summary figures. `"14:00"` → 840 and `"9:05am"` → 545 were confirmed in the live payload,
+and no block has a `startMin` outside 0–1439.
+
+**`null` is deliberately not `0`.** An untimed block coerced to `0` would sort to the top of
+its day as though it began at midnight. Keeping `null` forces the renderer to decide where
+untimed blocks go, rather than being silently wrong.
+
+**The `date` branch has zero live coverage and is not ticked as if it did.** All 9 Weekly
+Schedule rows still have `Date = null`, so the code path that turns a dated row into a block
+never executed against real data. It was exercised only on synthetic rows against logic
+transcribed from the route — 25/25 assertions, covering 24h and 12h parsing, `12:00am` → 0,
+`12:00pm` → 720, rejection of `"25:00"` / `"9:75pm"` / `"0:30am"`, `dateStart` slicing a
+`+10:00` timestamp to the right calendar day, and the four day/date combinations. That is a
+test of the logic, **not** of the wiring: it cannot prove `mapRow` calls it correctly. The
+ledger box stays unticked until a real dated row exists.
+
+**A row with both `Days` and a `Date` yields both.** Recurring blocks (`date: null`) plus one
+dated block (`day: ""`). This mirrors `/week`, which places an entry when its `days[]`
+matches *or* its `date` equals the column (`app/week/page.tsx:172-179`) — a row with both
+appears in both places there too. Untested against real data for the same reason as above.
+
+**The sort keys exist because string sort is wrong, and that was demonstrated, not asserted.**
+Sorting `["2pm", "9:05am", "14:00", "08:00"]` by `startMin` gives
+`08:00, 9:05am, 2pm, 14:00`; sorting the same list as strings gives
+`08:00, 14:00, 2pm, 9:05am` — 2pm and 14:00 are the same instant and land three positions
+apart. Any renderer sorting on the display strings will look plausible and be wrong.
+
+**`force-static` had to go, and that is a real tradeoff, not a free fix.** The 503 is
+unimplementable under a prerendered route: `force-static` bakes one response at build time
+and a baked response cannot be conditionally uncacheable. The route is now `force-dynamic`
+with the 300s cache declared per response. `npm run build` confirms the change took effect —
+`/api/board` is listed as `ƒ (Dynamic)` where it was `○ (Static)`. **What was lost:** under
+`force-static` the origin itself would not re-query Notion within 300s no matter what sat in
+front of it, capping Notion traffic at 8 requests per 300s. Now every CDN miss, eviction or
+cold edge region runs all eight queries at the origin. The lifetime clients see is still
+300s; the origin-side cap is gone. Recorded in BOARD-SPEC as accepted.
+
+**Both response paths were observed on the wire, not reasoned about.** Success:
+`HTTP/1.1 200 OK`, `cache-control: public, s-maxage=300, stale-while-revalidate=300`.
+Total failure, forced with a deliberately invalid `NOTION_TOKEN` through `netlify dev`:
+`HTTP/1.1 503 Service Unavailable`, `cache-control: no-store`, `blocks: []`, all eight
+layers named in `errors` with `Notion API 401 Unauthorized`. This is the same scenario that
+previously returned HTTP 200 and would have been cached for 300s. **Still local** — the
+Netlify CDN rewrites cache headers in production (`netlify-cdn-cache-control`), and no
+production URL has been fetched, so the deployed header values remain unverified.
+
+**Partial failure is still inference.** One source down and seven up was not induced. It
+follows from `errors.length === SOURCES.length` gating the 503, but it has never been
+measured. Unchanged from the previous pass.
+
+**Token-in-bundle: tested, and it is clean.** `npm run build` (exit 0), then
+`grep -rlF "$NOTION_TOKEN" .next` → **0 files**, in `.next/static`, `.next/server`, and the
+tree as a whole. Also 0 for the token's 24-char prefix, 0 for the literal `NOTION_TOKEN` in
+`.next/static`, and 0 for any `NEXT_PUBLIC_*NOTION*`. A zero-hit grep proves nothing on its
+own, so it was controlled both ways: the identical grep does find the value in `.env.local`
+(so the grep works), and `.next/static` contains 15 JS files totalling 976K (so the target
+is not empty). The token value was never printed to the terminal. This is the first time
+this box has been tested rather than assumed — it is now ticked.
+
+**`app/api/todos/route.ts` has no cache — known defect, out of scope, still open.** It
+fetches `api.notion.com` and exports neither `revalidate` nor `dynamic`, so it is uncached
+on every request. Pre-existing, untouched by this change set, and deliberately not fixed
+here: it is not `/board` work and folding it in would widen the diff past what the
+amendments authorise. The "300s cache set on every Notion read" box therefore stays
+**unticked**, because as written it is a claim about every Notion read repo-wide, not just
+this route. Carried forward from the previous pass, unresolved.
+
+**The first draft of the 503 amendment contradicted its own diff, and the board-reviewer
+caught it.** As written, it claimed the success-path cache was "unchanged" and that the
+all-failed case was the only change — while the same diff moved the caching mechanism from
+build-time prerender to a response header. The spec denied a change it was making. Fixed by
+amending the spec text to state the mechanism move and its accepted consequence explicitly,
+not by reverting the code. Worth recording because it is the exact failure mode
+BOARD-SPEC.md:5-6 exists to prevent, and it survived a first read.
+
+**Verification run for this pass:** `npm run build` → exit 0, `/api/board` now `ƒ (Dynamic)`.
+`npx tsc --noEmit` → exit 0. `netlify dev` → `/api/board` HTTP 200, 140 blocks, 0 dated,
+1 null `startMin`, `errors: []`; invalid-token run HTTP 503 with `no-store`, `blocks: []`,
+8 errors. Synthetic logic test 25/25. board-reviewer on the diff: 1 VIOLATION (the
+self-contradicting amendment above — fixed), then re-run clean: "No spec violations found in
+this diff." Everything here is local. **Nothing is production-verified and no CUTOVER box is
+ticked.**

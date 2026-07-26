@@ -1,9 +1,21 @@
 import { NextResponse } from "next/server";
 
-// Cached for 5 minutes (legacy caching model — cacheComponents is not enabled).
-// Same pattern as app/api/schedule/route.ts.
-export const dynamic = "force-static";
-export const revalidate = 300;
+// Rendered per request; the 300s cache is declared per response instead (CACHE_OK below).
+//
+// This was `force-static` + `revalidate = 300`. It cannot stay that way and also honour
+// BOARD-SPEC's "total failure must be 503 and must not be cached": force-static prerenders
+// the handler and caches the result, so a build without NOTION_TOKEN baked the all-eight-
+// failed payload and served it as HTTP 200 for 300s (observed — see BOARD-LEDGER Findings
+// 2026-07-26). A baked response cannot be conditionally uncacheable. Rendering per request
+// and setting Cache-Control per response keeps the same 300s lifetime on the success path
+// while letting the failure path opt out. cacheComponents is not enabled, so the legacy
+// `dynamic` segment config still applies.
+export const dynamic = "force-dynamic";
+
+// Success: cached 300s, stale served while revalidating. Total failure: never cached, so a
+// credential outage cannot outlive its own cause.
+const CACHE_OK = "public, s-maxage=300, stale-while-revalidate=300";
+const CACHE_FAIL = "no-store";
 
 const NOTION_TOKEN = process.env.NOTION_TOKEN;
 
@@ -21,7 +33,7 @@ interface SourceDef {
 //
 // `shape` selects how a row is read:
 //   "layer"  — Block/title, Day single-select, Start, End, Notes
-//   "weekly" — Entry/title, Days multi-select, Start, End, Notes, Category, Detail, Emoji
+//   "weekly" — Entry/title, Days multi-select, Date, Start, End, Notes, Category, Detail, Emoji
 const SOURCES: readonly SourceDef[] = [
   { person: "taylan", layer: "work", id: "7e90f275-70d4-480a-b504-b8be3444b7f5", shape: "layer" },
   { person: "taylan", layer: "personal", id: "2b062576-79ee-4b7a-8acd-805aaf044f8b", shape: "layer" },
@@ -36,13 +48,23 @@ const SOURCES: readonly SourceDef[] = [
 /**
  * One block on the board. `category`, `detail` and `emoji` only ever come from the
  * Weekly Schedule shape, so they are optional and absent on the seven layer sources.
+ *
+ * `start`/`end` are the original display strings and are deliberately not normalised —
+ * layer sources store "14:00", the Weekly Schedule stores "9:05am". `startMin`/`endMin`
+ * are the parsed equivalents and are what renderers must sort and position on.
  */
 export interface Block {
   person: string;
   layer: string;
+  /** Recurring weekday, e.g. "Mon". Empty on a one-off block, which is placed by `date`. */
   day: string;
+  /** "YYYY-MM-DD" for a one-off dated occurrence; null on recurring and all layer sources. */
+  date: string | null;
   start: string;
   end: string;
+  /** Minutes from midnight, or null when the display string is absent or unparseable. */
+  startMin: number | null;
+  endMin: number | null;
   title: string;
   notes: string;
   category?: string;
@@ -95,21 +117,74 @@ function multiSelectNames(prop: NotionProp): string[] {
 }
 
 /**
- * Maps one Notion row to one block per day it occurs on, for either shape.
+ * The calendar-date half of a Notion date property, as "YYYY-MM-DD".
+ *
+ * Notion returns either a bare date ("2026-07-29") or a full timestamp with an offset
+ * ("2026-07-29T09:00:00.000+10:00"). Slicing to 10 keeps the calendar date exactly as
+ * entered and never shifts it across a timezone boundary — the same treatment
+ * `/api/schedule` gives the field (route.ts:51), so /board and /week agree on the day.
+ */
+function dateStart(prop: NotionProp): string | null {
+  const value = (prop as { date?: { start?: string } | null } | undefined)?.date;
+  return value?.start?.slice(0, 10) ?? null;
+}
+
+/**
+ * A display time as minutes from midnight, or null if it cannot be read.
+ *
+ * Handles both shapes' formats: 24-hour "14:00" (layer sources) and 12-hour "9:05am" /
+ * "9am" / "12:30 PM" (Weekly Schedule). Out-of-range values ("25:00", "9:75pm") are
+ * rejected rather than wrapped, because a silently wrong sort key is worse than an
+ * absent one. null is never coerced to 0 — "no time given" must stay distinguishable
+ * from midnight, or untimed blocks would sort to the top of the day as if they were.
+ */
+function parseMinutes(raw: string): number | null {
+  const s = raw.trim();
+  if (!s) return null;
+
+  const twelve = s.match(/^(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\.?$/i);
+  if (twelve) {
+    const h = parseInt(twelve[1], 10);
+    const min = parseInt(twelve[2] ?? "0", 10);
+    if (h < 1 || h > 12 || min > 59) return null;
+    return ((h % 12) + (twelve[3].toLowerCase() === "p" ? 12 : 0)) * 60 + min;
+  }
+
+  const twentyFour = s.match(/^(\d{1,2}):(\d{2})$/);
+  if (twentyFour) {
+    const h = parseInt(twentyFour[1], 10);
+    const min = parseInt(twentyFour[2], 10);
+    if (h > 23 || min > 59) return null;
+    return h * 60 + min;
+  }
+
+  return null;
+}
+
+/**
+ * Maps one Notion row to the blocks it occurs as, for either shape.
  *
  * The layer shape carries a single-select `Day`, so it yields exactly one block. The
- * Weekly Schedule carries a multi-select `Days`, so a row spanning Mon–Thu fans out
- * into four blocks. A row with no day at all yields nothing — it cannot be placed.
+ * Weekly Schedule carries a multi-select `Days`, so a row spanning Mon–Thu fans out into
+ * four, and additionally a `Date` for a one-off occurrence.
+ *
+ * Recurring and one-off are independent, matching how /week places an entry — it shows a
+ * row in a column when its `days[]` matches *or* its `date` equals that column's calendar
+ * date (app/week/page.tsx:172-179). So a row with both yields its recurring blocks *and*
+ * one dated block; a row with only a `Date` yields just the dated block, where before it
+ * yielded nothing at all. The dated block carries `day: ""` because its placement comes
+ * from `date`, not from a weekday name. A row with neither cannot be placed and yields
+ * nothing.
  */
 function mapRow(page: NotionPage, source: SourceDef): Block[] {
   const props = page.properties ?? {};
 
-  const days =
-    source.shape === "weekly"
-      ? multiSelectNames(props.Days)
-      : [selectName(props.Day)].filter(Boolean);
+  const weekly = source.shape === "weekly";
+  const days = weekly ? multiSelectNames(props.Days) : [selectName(props.Day)].filter(Boolean);
+  // Only the Weekly Schedule has a Date property; the seven layer sources never do.
+  const date = weekly ? dateStart(props.Date) : null;
 
-  if (days.length === 0) return [];
+  if (days.length === 0 && date === null) return [];
 
   // `Block` on layer sources, `Entry` on the Weekly Schedule. Falling back to whichever
   // property is actually the title keeps a renamed column from emptying the board.
@@ -119,20 +194,25 @@ function mapRow(page: NotionPage, source: SourceDef): Block[] {
     Object.values(props).map(titleText).find((t) => t !== null) ??
     "Untitled";
 
-  // Start/End are free text in Notion and are NOT normalised here: layer sources store
-  // "14:00", the Weekly Schedule stores "9:05am". Passing them through verbatim keeps
-  // this route a reader — deciding a single display format is the renderer's call.
+  const start = plainText(props.Start);
+  const end = plainText(props.End);
+
   const base: Block = {
     person: source.person,
     layer: source.layer,
     day: "",
-    start: plainText(props.Start),
-    end: plainText(props.End),
+    date: null,
+    // Verbatim display strings — the route stays a reader, and picking a single display
+    // format remains the renderer's call. startMin/endMin carry the sortable form.
+    start,
+    end,
+    startMin: parseMinutes(start),
+    endMin: parseMinutes(end),
     title,
     notes: plainText(props.Notes),
   };
 
-  if (source.shape === "weekly") {
+  if (weekly) {
     const category = selectName(props.Category);
     const detail = plainText(props.Detail);
     const emoji = plainText(props.Emoji);
@@ -141,7 +221,9 @@ function mapRow(page: NotionPage, source: SourceDef): Block[] {
     if (emoji) base.emoji = emoji;
   }
 
-  return days.map((day) => ({ ...base, day }));
+  const blocks = days.map((day) => ({ ...base, day }));
+  if (date !== null) blocks.push({ ...base, date });
+  return blocks;
 }
 
 async function fetchSource(source: SourceDef): Promise<Block[]> {
@@ -203,5 +285,18 @@ export async function GET() {
   });
 
   const payload: BoardPayload = { blocks, errors };
-  return NextResponse.json(payload);
+
+  // Every source down is an outage, not an empty week. Returning 200 here makes a dead
+  // token indistinguishable from a genuinely empty board to anything that does not read
+  // `errors`, so it is a 503 — and an uncached one, so it clears the moment Notion or the
+  // credential recovers. `errors` is still populated: the 503 body names every failure.
+  // Partial failure is untouched — one surviving source is still a 200.
+  if (errors.length === SOURCES.length) {
+    return NextResponse.json(payload, {
+      status: 503,
+      headers: { "Cache-Control": CACHE_FAIL },
+    });
+  }
+
+  return NextResponse.json(payload, { headers: { "Cache-Control": CACHE_OK } });
 }

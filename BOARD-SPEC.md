@@ -102,3 +102,85 @@ shared package ever exists for other reasons; nothing here forecloses it.
 **Not changed.** Canonical logic is still ansar-habits-tracker's — `homeschool_session`
 alone awards 5. `WEEKLY_MAX` is still 56 and the tier thresholds are still 42 / 34 / 26 / 0.
 This amendment relaxes *where the function lives*, not *what it computes*.
+
+### 2026-07-26 — BLOCK SHAPE: `date` added for one-off Weekly Schedule entries
+
+**Changed.** The normalised block shape gains `date: string | null`, formatted
+`"YYYY-MM-DD"`. It carries the Weekly Schedule's `Date` property for one-off dated
+occurrences, and is `null` on every recurring block and on all seven layer sources, which
+have no such property. A Weekly Schedule row carrying a `Date` but no `Days` must now
+yield a block; previously it yielded nothing.
+
+**Why.** Required for PARITY with `/week`. `/week` places an entry in a day column when
+*either* its recurring `days[]` matches *or* its one-off `date` equals that column's
+calendar date (`app/week/page.tsx:172-179`), reading the field from `/api/schedule`
+(`app/api/schedule/route.ts:51`). `/api/board` had no `date` field at all, so a dated
+one-off row produced no block and no error — it vanished silently. `/board` replaces
+`/week` entirely, so a payload that cannot represent those rows cannot satisfy the PARITY
+section. This was flagged as an open VIOLATION rather than fixed at the time — see
+BOARD-LEDGER.md, Findings 2026-07-26 (`/api/board`), "One-off dated Weekly Schedule
+entries are dropped — latent parity gap" — on the grounds that widening a frozen block
+shape is a scope decision, not an implementation detail. This amendment is that decision.
+
+**Note.** All 9 Weekly Schedule rows carry `Date = null` today, so this changes no current
+output. It closes a latent gap; the field is not optional for that reason.
+
+### 2026-07-26 — BLOCK SHAPE: `startMin` / `endMin` added as the sort keys
+
+**Changed.** The normalised block shape gains `startMin: number | null` and
+`endMin: number | null` — integer minutes from midnight, or `null` when the source string
+is absent or unparseable. Both the 24-hour form (`"14:00"`) and the 12-hour form
+(`"9:05am"`) must parse. **Renderers sort and position on `startMin`/`endMin`, never on
+the display strings.**
+
+**Why.** The two shapes store times in different formats — layer sources 24-hour, the
+Weekly Schedule 12-hour — and the route passes both through verbatim. String-sorting
+`"14:00"` against `"9:05am"` is wrong in a way that looks plausible on screen, and every
+renderer would otherwise have to reimplement the same two-format parser. Recorded as a
+live trap in BOARD-LEDGER.md, Findings 2026-07-26 (`/api/board`), "Start/End formats
+differ between the shapes and are NOT normalised". Parsing once, in the reader, is the
+fix. `null` is preserved rather than coerced to `0` so that "no time given" stays
+distinguishable from "midnight".
+
+**Not changed.** `start` and `end` remain the original display strings, untouched. The
+route still does not pick a display format — that stays the renderer's call. This
+amendment adds sort keys alongside the strings; it does not replace them.
+
+### 2026-07-26 — RULES: total source failure must be HTTP 503 and must not be cached
+
+**Changed.** If **all eight** sources fail, `/api/board` must respond **HTTP 503** and must
+not be cached (`Cache-Control: no-store`). A fully empty payload is never a success.
+Partial failure is unaffected: if any source succeeds, the response is still HTTP 200 with
+the survivors in `blocks` and the failures named in `errors`.
+
+**Why.** The route *was* `dynamic = "force-static"` with `revalidate = 300`. A build with no
+`NOTION_TOKEN` bakes the all-fail response — HTTP 200, `blocks: []`, eight errors — and
+then serves an empty board as a success for 300s. That exact response was produced and
+observed under an invalid token; see BOARD-LEDGER.md, Findings 2026-07-26 (`/api/board`),
+"`force-static` means a token-less build serves an empty board as a success". A 200 with
+an empty array is indistinguishable from a genuinely empty week to anything that does not
+read `errors`, and caching it makes a transient credential outage outlive its cause by
+five minutes. 503 is unambiguous to caches, monitoring and the renderer alike.
+
+**Also changed, and deliberately: how the 300s cache is expressed.** The RULES line "300s
+cache" stands and the duration is unchanged, but the mechanism moves. `force-static`
+prerenders the handler and caches its result, so the response is fixed at build time; a
+baked response cannot be conditionally uncacheable, and the 503 above is therefore
+unimplementable while the route is statically prerendered. The route becomes
+`dynamic = "force-dynamic"` and declares the cache per response instead:
+`Cache-Control: public, s-maxage=300, stale-while-revalidate=300` on success, `no-store`
+on the 503. This is recorded here rather than left in the diff because it is a mechanism
+change, not an implementation detail, and the first draft of this amendment wrongly
+asserted the success path was untouched — the board-reviewer caught the contradiction.
+
+**Consequence, accepted.** The 300s bound is now downstream rather than at the origin.
+Under `force-static` the origin itself would not re-query Notion within 300s regardless of
+what sat in front of it, capping Notion traffic at 8 requests per 300s. Under
+`force-dynamic` every cache miss, eviction or cold edge region runs all eight queries at
+the origin; the cap is whatever the CDN delivers. Accepted because a correct failure
+signal is worth more than an origin-side request cap on a board read, and because the
+cached lifetime seen by clients is unchanged at 300s.
+
+**Not changed.** The degrade-a-layer-at-a-time behaviour stands: `Promise.allSettled` and
+the per-source `errors` entries are untouched, partial failure is still HTTP 200, and the
+cache lifetime on the success path is still 300s.
