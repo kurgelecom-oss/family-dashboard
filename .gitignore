@@ -35,4 +35,13 @@ yarn-error.log*
 next-env.d.ts
 
 # local dev scripts (contain credentials — never commit)
-/scripts/
+# Pattern is /scripts/* rather than /scripts/ so a specific file can be
+# un-ignored below: git does not descend into an ignored *directory*, so a
+# negation under a bare `/scripts/` rule would have no effect.
+/scripts/*
+# Carries no credentials — it only compares two file hashes. Must be tracked so
+# both repos ship the same check.
+!/scripts/check-scoring-sync.sh
+
+# Local Netlify folder
+.netlify

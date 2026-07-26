@@ -1,13 +1,13 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { supabase, getTodayDate, getWeekStart } from "../lib/supabase";
+import { scoreDay } from "../lib/scoring";
 
-// ─── ANSAR FC block-based scoring — exact copy of app/week/page.tsx ─────────
-// Block-based, NOT per-habit sums. Daily max 10 (11 on Mon/Wed training days).
-// Habit list (id/block/order) is now sourced from Notion via /api/habits —
-// only the specific-habit-id checks below are still literal, since they
-// encode which habits carry which bonus, not just which block they're in.
-const SOCCER_DAYS = ["Monday", "Wednesday"];
+// ─── ANSAR FC scoring now lives in app/lib/scoring.ts ───────────────────────
+// One canonical implementation, mirrored into ansar-habits-tracker. It was
+// previously copied inline here, in WeekProgressStrip.tsx and in the tracker,
+// and the copies had drifted: this one scored a homeschool session as 3 + 1 + 1
+// across three habits where the tracker scored it a flat 5.
 
 interface Habit {
   id: string;
@@ -16,33 +16,6 @@ interface Habit {
   order: number;
   points: number;
   pointType: string;
-}
-
-function visibleIds(dayName: string, baseIds: string[]): string[] {
-  return SOCCER_DAYS.includes(dayName) ? [...baseIds, "soccer_training"] : baseIds;
-}
-
-function scoreDay(completedIds: Set<string>, dayName: string, preIds: string[], baseIds: string[]) {
-  const hasSoccer = SOCCER_DAYS.includes(dayName);
-
-  const pre = preIds.length > 0 && preIds.every(id => completedIds.has(id)) ? 2 : 0;
-
-  let school = 0;
-  if (completedIds.has("homeschool_session")) school += 3;
-  if (completedIds.has("readtheory") && completedIds.has("khan")) school += 1;
-  if (completedIds.has("journal")) school += 1;
-
-  let arvo = 0;
-  if (completedIds.has("btn_cornell")) arvo += 1;
-  if (completedIds.has("all_namaz")) arvo += 1;
-
-  const conditional = hasSoccer && completedIds.has("soccer_training") ? 1 : 0;
-
-  const ids = visibleIds(dayName, baseIds);
-  const perfect = ids.length > 0 && ids.every(id => completedIds.has(id));
-  const bonus = perfect ? 1 : 0;
-
-  return { total: pre + school + arvo + conditional + bonus, perfect };
 }
 
 // Weekly max = 56 (incl. +3 streak bonus for 5 Perfect Days Mon–Fri).

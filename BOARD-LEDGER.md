@@ -54,13 +54,14 @@ against production must cite the fetched URL and what was found in the response 
 
 ## SCORING
 
-- [ ] Single shared `scoreDay` lives in `app/lib/`
-- [ ] `app/components/WeekProgressStrip.tsx` copy removed, imports the shared one
-- [ ] `app/components/PanelHabits.tsx` copy removed, imports the shared one
-- [ ] ansar-habits-tracker `app/page.tsx` copy removed, imports the shared one
-- [ ] Canonical logic adopted: `homeschool_session` alone awards 5
-- [ ] `WEEKLY_MAX` still 56
-- [ ] Tier thresholds unchanged (42 / 34 / 26 / 0)
+- [x] Single shared `scoreDay` lives in `app/lib/` — see Findings 2026-07-26: it is
+      *mirrored* into two repos, not one physical file. Spec says "one". Unresolved.
+- [x] `app/components/WeekProgressStrip.tsx` copy removed, imports the shared one
+- [x] `app/components/PanelHabits.tsx` copy removed, imports the shared one
+- [x] ansar-habits-tracker `app/page.tsx` copy removed, imports the shared one
+- [x] Canonical logic adopted: `homeschool_session` alone awards 5
+- [x] `WEEKLY_MAX` still 56
+- [x] Tier thresholds unchanged (42 / 34 / 26 / 0)
 
 ## STYLE
 
@@ -92,3 +93,54 @@ including anything that contradicts an assumption in `BOARD-SPEC.md`.
   TypeScript is a devDependency at `^5`, so the typecheck command for this repo is
   `npx tsc --noEmit`. The PostToolUse hook in `.claude/settings.json` uses that.
 - Nothing ticked above. Harness only — no `/board` code written yet.
+
+### 2026-07-26 — scoring collapsed to one canonical implementation
+
+**Family-dashboard totals will now be HIGHER than before for session-only days.**
+This is the intended consequence of adopting the canonical logic, not a regression.
+The old family-dashboard split awarded the homeschool block `3` for
+`homeschool_session`, `+1` for `readtheory && khan`, `+1` for `journal` — three habits
+needed to reach 5. Canonical awards a flat `5` for `homeschool_session` alone. So any
+day where Ansar completed the session but not the sub-items now scores **up to 2 points
+higher** on `/week` and the `/` habits panel than it did yesterday. Same 5-point ceiling,
+same `WEEKLY_MAX` 56, same tiers — but weekly totals and tier placement can both move up
+on historical days, because the score is recomputed from stored `habit_completions` rows
+on every load rather than being persisted. Expect the TV to show a higher week total
+after deploy with no change in Ansar's behaviour. ansar-habits-tracker is unaffected: it
+was already canonical.
+
+**Open spec conflict — `scoreDay` is mirrored, not shared.** BOARD-SPEC.md says "One
+shared `scoreDay` function in `app/lib/`", singular. What exists is two byte-identical
+files, one per repo, kept honest by `scripts/check-scoring-sync.sh`. Two repos with no
+shared package cannot host one physical file without publishing a module or adding a
+submodule. Flagged by the spec review and left unresolved — resolving it means either
+amending BOARD-SPEC.md deliberately to sanction mirroring, or extracting a real shared
+package. Not decided here; the spec is frozen and this is not a change to make as a side
+effect.
+
+**Tier tables were not collapsed.** `app/lib/scoring.ts` exports `WEEKLY_MAX`,
+`THRESHOLDS`, `getThreshold`, `visibleIds` and `DayScore`, and no consumer imports any of
+them — all three surfaces still declare their own `WEEKLY_MAX` and `THRESHOLDS`. That was
+deliberate: the three tier tables differ in presentation (family-dashboard's
+WeekProgressStrip carries emoji + `var(--*)` colour tokens, PanelHabits carries neither,
+ansar carries emoji + descriptions + its own Real Madrid hex), so importing a single
+labelled table would have changed what renders. The instruction for this pass was to
+touch nothing beyond `scoreDay`. The exports are in place for `/board` to use.
+
+**Pre-existing STYLE violations surfaced, not introduced.** `PanelHabits.tsx:49` and
+`:210` carry literal `#a78bfa`, and there are non-token `rgba()` literals at
+`PanelHabits.tsx:188-189` and `WeekProgressStrip.tsx:157`. Repo-wide there are ~73 hex
+literals under `app/`. This change set adds none — every line it adds is a comment, an
+import or a deletion — but BOARD-SPEC's STYLE rule is absolute and these two files are in
+the change set. Cleanup not attempted here.
+
+**`.gitignore` had to change for the sync script to be committable.** Line 38 was
+`/scripts/` with the comment "local dev scripts (contain credentials — never commit)".
+Git does not descend into an ignored directory, so a negation alone would have had no
+effect; the pattern is now `/scripts/*` plus `!/scripts/check-scoring-sync.sh`. Verified
+with `git check-ignore` that `get-ms-token.js` and the three `.sql` files remain ignored.
+
+**Verification run for this pass:** `scripts/check-scoring-sync.sh` → IN SYNC, exit 0,
+sha256 `fb737767…c06fd` matching in both repos. `npx tsc --noEmit` → exit 0 in
+family-dashboard and exit 0 in ansar-habits-tracker. All local only — nothing here is
+production-verified, and no CUTOVER item is ticked.
