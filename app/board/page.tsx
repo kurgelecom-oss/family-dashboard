@@ -289,13 +289,12 @@ export default function BoardPage() {
   // Set only after a completed fetch, never during render, so the server and client
   // markup cannot disagree about the time.
   const [lastLoaded, setLastLoaded] = useState<string | null>(null);
-  // Open/closed lives here and nowhere else — no localStorage, no sessionStorage.
-  // All three start open: on a wall-mounted TV nobody is there to expand them.
-  const [open, setOpen] = useState<Record<string, boolean>>({
-    taylan: true,
-    nihal: true,
-    ansar: true,
-  });
+  // Exactly one person is on screen at a time — this is a radio, not three checkboxes.
+  // Holding a single key rather than a Record<string, boolean> makes "all three at once"
+  // unrepresentable rather than merely discouraged. Lives here and nowhere else — no
+  // localStorage, no sessionStorage. Taylan is the default because he is first in PEOPLE;
+  // on a wall-mounted TV nobody is there to pick one.
+  const [selected, setSelected] = useState<string>(PEOPLE[0].key);
 
   const load = useCallback(async (force = false) => {
     if (force) setRefreshing(true);
@@ -334,6 +333,10 @@ export default function BoardPage() {
 
   const errors = payload?.errors ?? [];
   const blocks = payload?.blocks ?? [];
+  // The one person on screen. `?? PEOPLE[0]` is not defensive noise: it is what keeps the
+  // board non-empty if `selected` ever holds a key PEOPLE no longer has — renaming or
+  // removing a person here should degrade to showing Taylan, not to a blank page.
+  const person = PEOPLE.find((p) => p.key === selected) ?? PEOPLE[0];
 
   return (
     // `html, body` are `height: 100%; overflow: hidden` in globals.css — that rule is
@@ -369,49 +372,57 @@ export default function BoardPage() {
           <div className="header-name">
             Family <span>Board</span>
           </div>
-          <div className="header-sub">Taylan · Nihal · Ansar — the whole week</div>
+          {/* Was "Taylan · Nihal · Ansar — the whole week", which described a board showing
+              all three at once. It now names the one person on screen, so the subtitle and
+              the board below it cannot disagree. */}
+          <div className="header-sub">{person.label} — the whole week</div>
         </div>
         <div className="header-right">
-          {/* The person toggles live HERE, in the header row that already exists, rather
-              than as three 52px section headers stacked down the page. Open or closed they
-              cost the board zero vertical space: the row is sized by the Refresh button
-              beside them, which is no shorter. A closed section renders nothing at all, so
-              the only thing between the nav and the timetable is this one row. */}
+          {/* The person picker lives HERE, in the header row that already exists, rather
+              than as three 52px section headers stacked down the page. It costs the board
+              zero vertical space: the row is sized by the Refresh button beside them, which
+              is no shorter. Picking a person REPLACES the one on screen — there is no state
+              in which two boards are visible, so the whole viewport below belongs to one
+              person. `radiogroup` + `aria-checked` is the honest role for that: a screen
+              reader announces "1 of 3", not three independent switches. */}
           <div
-            role="group"
-            aria-label="Show or hide each person's board"
+            role="radiogroup"
+            aria-label="Which person's board to show"
             style={{ display: "flex", gap: 6, marginRight: 4 }}
           >
             {PEOPLE.map((person) => {
-              const isOpen = open[person.key] ?? true;
+              const isSelected = selected === person.key;
               return (
                 <button
                   key={person.key}
                   type="button"
-                  onClick={() => setOpen((o) => ({ ...o, [person.key]: !isOpen }))}
-                  aria-pressed={isOpen}
-                  title={`${isOpen ? "Hide" : "Show"} ${person.label} — ${
+                  role="radio"
+                  aria-checked={isSelected}
+                  // Re-pressing the selected person is a no-op rather than a toggle-off:
+                  // one person is always on screen, never zero.
+                  onClick={() => setSelected(person.key)}
+                  title={`Show ${person.label} — ${
                     blocks.filter((b) => b.person === person.key).length
                   } blocks`}
                   style={{
-                    // 44px minimum so a closed section is recoverable by thumb on the iPad,
-                    // not just by mouse.
+                    // 44px minimum so switching person is a real target by thumb on the
+                    // iPad, not just by mouse.
                     minHeight: 44,
                     padding: "8px 14px",
                     fontSize: 13,
                     fontWeight: 800,
                     borderRadius: 6,
                     cursor: "pointer",
-                    // Open is the person's accent on the raised background; closed drops to
-                    // muted on transparent. Reads as on/off at TV distance without a second
-                    // row of state text.
-                    background: isOpen ? "var(--bg-highlight)" : "transparent",
-                    color: isOpen ? person.accent : "var(--text-muted)",
-                    border: `1px solid ${isOpen ? person.accent : "var(--border)"}`,
+                    // Selected is the person's accent on the raised background; the other two
+                    // drop to muted on transparent. Reads as picked/not-picked at TV distance
+                    // without a second row of state text.
+                    background: isSelected ? "var(--bg-highlight)" : "transparent",
+                    color: isSelected ? person.accent : "var(--text-muted)",
+                    border: `1px solid ${isSelected ? person.accent : "var(--border)"}`,
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {isOpen ? "●" : "○"} {person.label}
+                  {isSelected ? "●" : "○"} {person.label}
                 </button>
               );
             })}
@@ -512,76 +523,74 @@ export default function BoardPage() {
         </div>
       ) : null}
 
-      {PEOPLE.map((person) => {
-        const isOpen = open[person.key] ?? true;
-        // Closed means gone, not collapsed-to-a-bar: the toggle that brings it back is in
-        // the header row, so nothing has to be left behind on the page to click. This is
-        // the whole point of the change — a hidden person costs the timetable zero pixels.
-        if (!isOpen) return null;
-        return (
-          <section
-            key={person.key}
-            className="card"
-            style={{
-              // The person's identity now rides on this accent stripe and on the layer
-              // headings below, so removing the header bar cost no ownership signal.
-              padding: "10px 12px",
-              borderLeft: `4px solid ${person.accent}`,
-              overflow: "hidden",
-              flex: "none",
-              display: "flex",
-              flexDirection: "column",
-              gap: 14,
-            }}
-          >
-            {/* PARITY: the ANSAR FC strip, reused as-is. It already imports the
-                canonical scoreDay from app/lib/scoring.ts — no fourth copy. */}
-            {person.key === "ansar" ? <WeekProgressStrip /> : null}
+      {/* ONE section, not a map over three. The board renders the selected person and no
+          one else — the unselected two are not hidden, collapsed or zero-height, they are
+          not in the tree at all, so there is no arrangement of state that puts two people
+          on screen. The picker that swaps them is in the header row, so nothing has to be
+          left behind on the page to click, and a person costs the timetable zero pixels
+          until they are the one chosen. `key` remounts the subtree on every swap, which is
+          what keeps Ansar's WeekProgressStrip from carrying state across a person change. */}
+      <section
+        key={person.key}
+        className="card"
+        style={{
+          // The person's identity now rides on this accent stripe and on the layer
+          // headings below, so removing the header bar cost no ownership signal.
+          padding: "10px 12px",
+          borderLeft: `4px solid ${person.accent}`,
+          overflow: "hidden",
+          flex: "none",
+          display: "flex",
+          flexDirection: "column",
+          gap: 14,
+        }}
+      >
+        {/* PARITY: the ANSAR FC strip, reused as-is. It already imports the
+            canonical scoreDay from app/lib/scoring.ts — no fourth copy. */}
+        {person.key === "ansar" ? <WeekProgressStrip /> : null}
 
-            {person.layers.map((layer) => {
-              const layerBlocks = blocks.filter(
-                (b) => b.person === person.key && b.layer === layer.key,
-              );
-              const failed = errors.find((e) => e.person === person.key && e.layer === layer.key);
-              return (
-                <div key={layer.key}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "baseline",
-                      gap: 8,
-                      marginBottom: 6,
-                    }}
-                  >
-                    {/* Person name folded into the layer heading rather than given a row of
-                        its own. Same information, one line instead of two. */}
-                    <h3
-                      style={{
-                        margin: 0,
-                        fontSize: 17,
-                        fontWeight: 800,
-                        color: person.accent,
-                        letterSpacing: "0.02em",
-                      }}
-                    >
-                      {person.label} · {layer.label}
-                    </h3>
-                    <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 600 }}>
-                      {layerBlocks.length} block{layerBlocks.length === 1 ? "" : "s"}
-                    </span>
-                    {failed ? (
-                      <span className="badge badge-red" style={{ fontSize: 11 }}>
-                        failed to load
-                      </span>
-                    ) : null}
-                  </div>
-                  <LayerGrid blocks={layerBlocks} />
-                </div>
-              );
-            })}
-          </section>
-        );
-      })}
+        {person.layers.map((layer) => {
+          const layerBlocks = blocks.filter(
+            (b) => b.person === person.key && b.layer === layer.key,
+          );
+          const failed = errors.find((e) => e.person === person.key && e.layer === layer.key);
+          return (
+            <div key={layer.key}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: 8,
+                  marginBottom: 6,
+                }}
+              >
+                {/* Person name folded into the layer heading rather than given a row of
+                    its own. Same information, one line instead of two. */}
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: 17,
+                    fontWeight: 800,
+                    color: person.accent,
+                    letterSpacing: "0.02em",
+                  }}
+                >
+                  {person.label} · {layer.label}
+                </h3>
+                <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 600 }}>
+                  {layerBlocks.length} block{layerBlocks.length === 1 ? "" : "s"}
+                </span>
+                {failed ? (
+                  <span className="badge badge-red" style={{ fontSize: 11 }}>
+                    failed to load
+                  </span>
+                ) : null}
+              </div>
+              <LayerGrid blocks={layerBlocks} />
+            </div>
+          );
+        })}
+      </section>
     </div>
   );
 }

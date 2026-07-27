@@ -15,7 +15,11 @@ Running state lives in `BOARD-LEDGER.md`. This file does not get ticked.
 
 ## STRUCTURE
 
-- Three collapsible person sections: Taylan, Nihal, Ansar.
+- One person on screen at a time: Taylan, Nihal or Ansar, chosen by a picker in the
+  header row. Amended 2026-07-27 at the owner's instruction ("this board must only have
+  the ability to show one person at a time not all three"), superseding the original
+  "Three collapsible person sections". The unselected people are not rendered at all —
+  not collapsed, not hidden — so no state shows two boards at once.
 - Taylan contains layers: Work, Personal, Ecom.
 - Nihal contains layers: Home, Personal, Ecom, Ayah.
 - Ansar contains layers: Homeschool.
