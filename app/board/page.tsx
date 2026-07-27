@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import WeekProgressStrip from "../components/WeekProgressStrip";
 import type { Block, BoardPayload } from "../api/board/route";
 
@@ -13,6 +20,22 @@ import type { Block, BoardPayload } from "../api/board/route";
    `import type` above is erased at compile time — it carries the Block shape
    from the route so the two cannot drift, and pulls no server code (and no
    NOTION_TOKEN) into the client bundle. Verified by grepping the built output.
+
+   LAYOUT CONTRACT: the page never scrolls. It is exactly one viewport tall and
+   every visible block is on screen at once. That is enforced in three places and
+   all three are load-bearing:
+
+     1. The root is `height: calc(100dvh - nav)` with `overflow: hidden`.
+     2. The timetable is ONE grid — seven day columns, one row per layer — instead
+        of eight separate seven-column grids stacked down the page. Rows are `fr`
+        weighted by that layer's busiest day, so Ansar's twelve-block Monday gets
+        roughly three times the height of Taylan's four-block one.
+     3. `fitToBox` binary-searches the grid's font size until no cell's content
+        exceeds its track. Everything inside a cell is sized in `em`, so one
+        number scales the whole timetable.
+
+   Anything added to this page must be `flexShrink: 0` and must be worth the rows
+   it takes from the timetable, or it belongs in a cell.
    ──────────────────────────────────────────────────────────────────────────── */
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
@@ -56,11 +79,22 @@ const PEOPLE = [
   },
 ] as const;
 
-// Notes/detail up to this length sit on the block; anything longer would swamp a
-// column at TV distance, so it moves to the hover title. `detail` runs to 352
-// chars on the homeschool layer and `notes` peaks at 45, so in practice notes
-// show and long detail hides, without either being special-cased.
-const INLINE_MAX = 60;
+// The eight layer rows of the timetable, flattened once at module scope in spec
+// order. Every row still names its owner, so STRUCTURE's "a layer may only appear
+// under its owner" holds exactly as it did when each person had their own section.
+const ROWS = PEOPLE.flatMap((person) => person.layers.map((layer) => ({ person, layer })));
+
+// Font-size search bounds for the fit pass, in px. The floor is the point past
+// which a block title stops being readable across a room; below it the page shows
+// a "+N" count rather than shrinking further, because silently unreadable is the
+// same as silently missing.
+const FIT_MIN = 6;
+const FIT_MAX = 15;
+
+// `useLayoutEffect` warns when React renders on the server. Picking the hook once
+// at module scope keeps the call order identical on both sides while still
+// measuring before paint in the browser, so the timetable never flashes unscaled.
+const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 /** Weekday column for a one-off dated block, anchored at UTC noon so no timezone
  *  can push a calendar date onto the wrong day. Mirrors app/week/page.tsx. */
@@ -99,185 +133,121 @@ function byStart(a: Block, b: Block): number {
   return a.startMin - b.startMin;
 }
 
-function BlockCard({ block }: { block: Block }) {
-  const extra = [block.notes, block.detail].filter(Boolean).join(" · ");
+const cellKey = (person: string, layer: string, day: DayKey) => `${person}|${layer}|${day}`;
+
+/**
+ * Does every day cell's content sit inside its grid track?
+ *
+ * Day cells only. The left rail is deliberately excluded: its labels are fixed px
+ * so they stay readable at whatever size the timetable settles on, which also means
+ * shrinking the font can never make a too-tall rail fit. Including it made the
+ * search unsatisfiable and pinned the whole board at FIT_MIN — measured at 6px with
+ * every cell fitting comfortably, dragged there by Ayah's 22px rail in a 15px row.
+ */
+function everythingFits(root: HTMLElement): boolean {
+  const boxes = Array.from(root.querySelectorAll<HTMLElement>("[data-key]"));
+  return boxes.every((b) => b.scrollHeight <= b.clientHeight + 1);
+}
+
+/**
+ * Largest font size in [FIT_MIN, FIT_MAX] at which nothing overflows.
+ *
+ * Nine bisection steps land within ~0.02px of the true boundary, which is far
+ * finer than the eye or the layout can tell apart. Each step forces a synchronous
+ * reflow — that is the cost of measuring rather than guessing, and it is paid on
+ * data change and window resize only, not per frame.
+ */
+function fitToBox(root: HTMLElement): void {
+  let lo = FIT_MIN;
+  let hi = FIT_MAX;
+  let best = FIT_MIN;
+  for (let i = 0; i < 9; i++) {
+    const mid = (lo + hi) / 2;
+    root.style.fontSize = `${mid}px`;
+    if (everythingFits(root)) {
+      best = mid;
+      lo = mid;
+    } else {
+      hi = mid;
+    }
+  }
+  root.style.fontSize = `${best}px`;
+}
+
+/**
+ * One block, as a single line: emoji, time, title.
+ *
+ * Everything that used to sit on its own line inside a card — category, notes,
+ * detail, the one-off date — moves to the hover title. On a wall-mounted board the
+ * question is "what is on, and when"; the rest is available on the iPad by touch
+ * and in Notion behind the link, and none of it is worth a row of the timetable.
+ */
+function BlockChip({ block, accent }: { block: Block; accent: string }) {
   const time = [block.start, block.end].filter(Boolean).join("–");
+  const tip = [
+    block.title,
+    time || "no time given",
+    block.category,
+    block.date ? `one-off · ${block.date}` : null,
+    block.notes,
+    block.detail,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div
-      title={extra || undefined}
+      data-chip
+      title={tip}
       style={{
-        background: "var(--bg-card)",
-        border: "1px solid var(--border)",
-        borderRadius: 6,
-        padding: "6px 8px",
+        // `flexShrink: 0` is what makes the fit pass mean anything: a chip that
+        // could compress would silently squash instead of reporting that it does
+        // not fit, and the search would settle on an unreadable size.
+        flexShrink: 0,
         display: "flex",
-        flexDirection: "column",
-        gap: 2,
+        alignItems: "baseline",
+        gap: "0.3em",
+        background: "var(--bg-highlight)",
+        borderLeft: `0.25em solid ${accent}`,
+        borderRadius: "0.25em",
+        padding: "0.15em 0.4em",
+        lineHeight: 1.25,
+        overflow: "hidden",
       }}
     >
-      <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
-        {block.emoji ? (
-          <span aria-hidden style={{ fontSize: 15, lineHeight: 1.2, flexShrink: 0 }}>
-            {block.emoji}
-          </span>
-        ) : null}
-        <span
-          style={{
-            fontSize: 14,
-            fontWeight: 700,
-            color: "var(--text-primary)",
-            lineHeight: 1.25,
-          }}
-        >
-          {block.title}
+      {block.emoji ? (
+        <span aria-hidden style={{ fontSize: "0.95em", flexShrink: 0 }}>
+          {block.emoji}
         </span>
-      </div>
-
-      {time ? (
-        <div
-          style={{
-            fontSize: 13,
-            fontWeight: 600,
-            color: "var(--text-secondary)",
-            fontVariantNumeric: "tabular-nums",
-          }}
-        >
-          {time}
-          {block.startMin === null ? (
-            // An untimed block sorts last rather than to midnight. Saying so beats
-            // leaving it silently at the bottom of the column.
-            <span style={{ color: "var(--text-muted)", fontWeight: 500 }}> · untimed</span>
-          ) : null}
-        </div>
       ) : null}
-
-      {block.date ? (
-        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--amber)" }}>
-          one-off · {block.date}
-        </div>
-      ) : null}
-
-      {/* Category is one of the five Weekly Schedule fields BOARD-SPEC names as the
-          difference the renderer must cope with, so it is shown rather than dropped.
-          /week colour-codes by it; here it is a text label, because seven columns of
-          coloured chips at TV distance competes with the person accent that carries
-          ownership — the more important signal on this page. */}
-      {block.category ? (
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: "0.06em",
-            textTransform: "uppercase",
-            color: "var(--text-label)",
-          }}
-        >
-          {block.category}
-        </div>
-      ) : null}
-
-      {extra && extra.length <= INLINE_MAX ? (
-        <div style={{ fontSize: 12, color: "var(--text-muted)", lineHeight: 1.3 }}>{extra}</div>
-      ) : null}
-    </div>
-  );
-}
-
-function LayerGrid({ blocks }: { blocks: Block[] }) {
-  // An empty layer never collapses to a blank gap — it says so. Ayah is empty
-  // today, and an empty layer is indistinguishable from a failed one by block
-  // count alone, so the wording points at the banner rather than claiming the
-  // layer is genuinely clear.
-  if (blocks.length === 0) {
-    return (
-      <div
+      <span
         style={{
-          padding: "14px 12px",
-          border: "1px dashed var(--border)",
-          borderRadius: 6,
-          color: "var(--text-muted)",
-          fontSize: 13,
-          fontWeight: 600,
+          fontSize: "0.88em",
+          fontWeight: 700,
+          color: block.startMin === null ? "var(--text-muted)" : "var(--text-secondary)",
+          fontVariantNumeric: "tabular-nums",
+          whiteSpace: "nowrap",
+          flexShrink: 0,
         }}
       >
-        No blocks in this layer. An empty layer and a failed one look the same here — a
-        failure would be named in the banner at the top of the page.
-      </div>
-    );
-  }
-
-  const byDay = new Map<DayKey, Block[]>(DAYS.map((d) => [d, []]));
-  // Unplaceable blocks are surfaced rather than dropped — the reader emits no block
-  // without a day or a date, so this should stay empty, but silently discarding one
-  // is exactly the failure mode /board exists to end.
-  const unplaced: Block[] = [];
-  for (const b of blocks) {
-    const col = columnOf(b);
-    if (col) byDay.get(col)?.push(b);
-    else unplaced.push(b);
-  }
-  for (const list of byDay.values()) list.sort(byStart);
-
-  return (
-    <>
-      <div style={{ overflowX: "auto" }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(7, minmax(120px, 1fr))",
-            gap: 6,
-            minWidth: 840,
-          }}
-        >
-          {DAYS.map((d) => (
-            <div
-              key={`h-${d}`}
-              style={{
-                fontSize: 12,
-                fontWeight: 800,
-                letterSpacing: "0.08em",
-                textTransform: "uppercase",
-                color: "var(--text-label)",
-                paddingBottom: 2,
-              }}
-            >
-              {d}
-            </div>
-          ))}
-          {DAYS.map((d) => {
-            const list = byDay.get(d) ?? [];
-            return (
-              <div key={`c-${d}`} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {list.length === 0 ? (
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: "var(--text-muted)",
-                      padding: "6px 8px",
-                      border: "1px dashed var(--border)",
-                      borderRadius: 6,
-                    }}
-                  >
-                    —
-                  </div>
-                ) : (
-                  list.map((b, i) => <BlockCard key={`${b.title}-${b.start}-${i}`} block={b} />)
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {unplaced.length > 0 ? (
-        <div style={{ marginTop: 8, fontSize: 13, fontWeight: 600, color: "var(--red)" }}>
-          {unplaced.length} block{unplaced.length === 1 ? "" : "s"} could not be placed on a day
-          and {unplaced.length === 1 ? "is" : "are"} not shown above:{" "}
-          {unplaced.map((b) => b.title).join(", ")}
-        </div>
-      ) : null}
-    </>
+        {/* An untimed block sorts last rather than to midnight, and says so here
+            rather than just sitting at the bottom of the column unexplained. */}
+        {time || "untimed"}
+      </span>
+      <span
+        style={{
+          fontSize: "1em",
+          fontWeight: 700,
+          color: "var(--text-primary)",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          minWidth: 0,
+        }}
+      >
+        {block.title}
+      </span>
+    </div>
   );
 }
 
@@ -296,6 +266,10 @@ export default function BoardPage() {
     nihal: true,
     ansar: true,
   });
+  // How many chips the fit pass could not get on screen, per cell. Populated only
+  // when the search bottoms out at FIT_MIN — normally empty.
+  const [clipped, setClipped] = useState<Record<string, number>>({});
+  const gridRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async (force = false) => {
     if (force) setRefreshing(true);
@@ -332,39 +306,112 @@ export default function BoardPage() {
     return () => clearInterval(id);
   }, [load]);
 
-  const errors = payload?.errors ?? [];
-  const blocks = payload?.blocks ?? [];
+  const errors = useMemo(() => payload?.errors ?? [], [payload]);
+  const blocks = useMemo(() => payload?.blocks ?? [], [payload]);
+
+  // Every block filed under exactly one (person, layer, day) cell, sorted once.
+  // Anything that cannot be placed on a day is kept aside and named on screen —
+  // the reader emits no such block today, and dropping one silently is exactly the
+  // failure mode /board exists to end.
+  const { cells, unplaced } = useMemo(() => {
+    const map = new Map<string, Block[]>();
+    const orphans: Block[] = [];
+    for (const b of blocks) {
+      const day = columnOf(b);
+      if (!day) {
+        orphans.push(b);
+        continue;
+      }
+      const k = cellKey(b.person, b.layer, day);
+      const list = map.get(k);
+      if (list) list.push(b);
+      else map.set(k, [b]);
+    }
+    for (const list of map.values()) list.sort(byStart);
+    return { cells: map, unplaced: orphans };
+  }, [blocks]);
+
+  const visibleRows = ROWS.filter((r) => open[r.person.key] ?? true);
+
+  // A row is as tall as its busiest day, relative to the other rows. An empty layer
+  // still gets a weight of 1: Ayah is empty today and must stay visible under Nihal,
+  // because a layer that disappears when it empties is indistinguishable from one
+  // that was never wired up.
+  const rowWeights = visibleRows.map(({ person, layer }) =>
+    Math.max(
+      1,
+      ...DAYS.map((d) => (cells.get(cellKey(person.key, layer.key, d)) ?? []).length),
+    ),
+  );
+
+  // Re-fit whenever the content, the open set, or the viewport changes. Nothing
+  // here runs per frame: the observer fires on resize, and the deps cover the rest.
+  useIsoLayoutEffect(() => {
+    const root = gridRef.current;
+    if (!root) return;
+
+    const measure = () => {
+      // Measuring an unsettled layout is worse than not measuring: with tracks still
+      // at zero height nothing can fit, the search bottoms out at FIT_MIN, and the
+      // board latches there. Observed exactly that — 6px with every cell fitting
+      // comfortably, while re-running the same search against the settled layout
+      // returned 7.99px. Bail and wait for the callbacks below instead.
+      if (root.clientHeight < 40) return;
+      fitToBox(root);
+      // What is still clipped once the search has bottomed out. Counted by comparing
+      // each chip's offset against its cell, and reported as a "+N" badge that is
+      // absolutely positioned — it must not itself add height, or measuring it would
+      // change the thing being measured.
+      const next: Record<string, number> = {};
+      for (const cell of Array.from(root.querySelectorAll<HTMLElement>("[data-key]"))) {
+        const key = cell.dataset.key as string;
+        const limit = cell.clientHeight + 1;
+        const hidden = Array.from(cell.querySelectorAll<HTMLElement>("[data-chip]")).filter(
+          (chip) => chip.offsetTop + chip.offsetHeight > limit,
+        ).length;
+        if (hidden > 0) next[key] = hidden;
+      }
+      setClipped((prev) => {
+        const sameSize = Object.keys(prev).length === Object.keys(next).length;
+        if (sameSize && Object.keys(next).every((k) => prev[k] === next[k])) return prev;
+        return next;
+      });
+    };
+
+    measure();
+    // Again after paint. The ANSAR FC strip below the grid loads its own data and
+    // settles late; when it does, the grid loses ~150px and the size chosen before
+    // it arrived is wrong. The observer covers that too, but the frame callback
+    // makes the first correct fit happen immediately rather than on the next resize.
+    const frame = requestAnimationFrame(measure);
+    const ro = new ResizeObserver(measure);
+    ro.observe(root);
+    return () => {
+      cancelAnimationFrame(frame);
+      ro.disconnect();
+    };
+  }, [cells, visibleRows.length, loading, errors.length, loadError]);
 
   return (
     // `html, body` are `height: 100%; overflow: hidden` in globals.css — that rule is
-    // what pins the TV dashboard at `/` to exactly one viewport, so it stays. The cost
-    // was that anything taller than the viewport on THIS page got clipped and became
-    // unreachable: with all three sections open the board runs well past 1080px. So the
-    // board root is its own scroll container — fixed to exactly the space below the nav,
-    // scrolling internally. `tabIndex` is deliberate, not a lint slip: a scrollable
-    // region has to be reachable by keyboard, which on the Samsung TV is the remote's
-    // arrow keys. The focus ring is left alone for the same reason.
+    // what pins the TV dashboard at `/` to exactly one viewport, and this page now
+    // holds itself to the same standard rather than working around it. The root is
+    // exactly the space under the nav and clips: nothing on this page scrolls, so
+    // anything that does not fit is a layout bug to be fixed here, not something the
+    // reader is expected to go looking for.
     <div
-      tabIndex={0}
-      aria-label="Family board — scrollable"
       style={{
         marginTop: "var(--nav-h)",
         height: "calc(100dvh - var(--nav-h))",
-        overflowY: "auto",
-        overscrollBehavior: "contain",
-        WebkitOverflowScrolling: "touch",
-        // Thin, themed scrollbar: enough to signal "there is more below" at TV distance
-        // without introducing a colour outside the existing token set.
-        scrollbarWidth: "thin",
-        scrollbarColor: "var(--border) transparent",
+        overflow: "hidden",
         background: "var(--bg-base)",
-        padding: 14,
+        padding: 10,
         display: "flex",
         flexDirection: "column",
-        gap: 12,
+        gap: 8,
       }}
     >
-      <div className="header">
+      <div className="header" style={{ flexShrink: 0 }}>
         <div className="header-brand">
           <div className="header-name">
             Family <span>Board</span>
@@ -374,9 +421,9 @@ export default function BoardPage() {
         <div className="header-right">
           {/* The person toggles live HERE, in the header row that already exists, rather
               than as three 52px section headers stacked down the page. Open or closed they
-              cost the board zero vertical space: the row is sized by the Refresh button
-              beside them, which is no shorter. A closed section renders nothing at all, so
-              the only thing between the nav and the timetable is this one row. */}
+              cost the timetable zero vertical space: the row is sized by the Refresh button
+              beside them, which is no shorter. A closed person's rows leave the grid
+              entirely, and the rows that remain grow into the space. */}
           <div
             role="group"
             aria-label="Show or hide each person's board"
@@ -394,7 +441,7 @@ export default function BoardPage() {
                     blocks.filter((b) => b.person === person.key).length
                   } blocks`}
                   style={{
-                    // 44px minimum so a closed section is recoverable by thumb on the iPad,
+                    // 44px minimum so a hidden person is recoverable by thumb on the iPad,
                     // not just by mouse.
                     minHeight: 44,
                     padding: "8px 14px",
@@ -416,7 +463,16 @@ export default function BoardPage() {
               );
             })}
           </div>
-          {lastLoaded ? (
+          {/* An empty board and a still-loading one are pixel-identical now that the
+              rows render before their blocks arrive — eight rails reading "0 blocks"
+              over empty cells. The old full-width "Loading the board…" card said which
+              it was but cost a row; this says the same thing in the slot the timestamp
+              already occupies, so it costs the timetable nothing. */}
+          {loading ? (
+            <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 700 }}>
+              Loading…
+            </span>
+          ) : lastLoaded ? (
             <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>
               loaded {lastLoaded}
             </span>
@@ -454,31 +510,26 @@ export default function BoardPage() {
         </div>
       </div>
 
-      {/* Never fail silently: any failed layer is named, in view, above the board. */}
+      {/* Never fail silently: any failed layer is named, in view, above the board. These
+          banners are `flexShrink: 0` and appear only when something is wrong — on a
+          healthy board they cost the timetable nothing. */}
       {errors.length > 0 ? (
         <div
           role="alert"
           style={{
-            // flexShrink 0 on every direct child of the scroll container: the column has
-            // a fixed height now, so a shrinkable child compresses to fit instead of
-            // pushing the scroll height out. The person sections already pin themselves
-            // with `flex: "none"`; these banners did not, and a squashed failure banner
-            // is the one thing on this page that must never be hard to read.
             flexShrink: 0,
             background: "var(--bg-card)",
             border: "1px solid var(--red)",
             borderRadius: 8,
-            padding: "10px 14px",
+            padding: "6px 12px",
           }}
         >
-          <div style={{ fontSize: 15, fontWeight: 800, color: "var(--red)" }}>
-            {errors.length} of 8 layers failed to load
+          <div style={{ fontSize: 14, fontWeight: 800, color: "var(--red)" }}>
+            {errors.length} of 8 layers failed to load — those rows are shown empty below.
+            Empty here does not mean empty in Notion.
           </div>
-          <div style={{ marginTop: 4, fontSize: 13, color: "var(--text-secondary)" }}>
+          <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
             {errors.map((e) => `${e.person} · ${e.layer} — ${e.error}`).join("  |  ")}
-          </div>
-          <div style={{ marginTop: 4, fontSize: 12, color: "var(--text-muted)" }}>
-            Those layers are shown empty below. Empty here does not mean empty in Notion.
           </div>
         </div>
       ) : null}
@@ -491,8 +542,8 @@ export default function BoardPage() {
             background: "var(--bg-card)",
             border: "1px solid var(--red)",
             borderRadius: 8,
-            padding: "10px 14px",
-            fontSize: 14,
+            padding: "6px 12px",
+            fontSize: 13,
             fontWeight: 700,
             color: "var(--red)",
           }}
@@ -501,87 +552,204 @@ export default function BoardPage() {
         </div>
       ) : null}
 
-      {loading ? (
+      {unplaced.length > 0 ? (
         <div
-          className="card"
-          // `.card` is `flex: 1; min-height: 0` in globals.css — inside a fixed-height
-          // column that lets it collapse to nothing. Pin it like the sections do.
-          style={{ flex: "none", color: "var(--text-secondary)", fontSize: 15 }}
+          role="alert"
+          style={{
+            flexShrink: 0,
+            fontSize: 13,
+            fontWeight: 700,
+            color: "var(--red)",
+            padding: "0 2px",
+          }}
         >
-          Loading the board…
+          {unplaced.length} block{unplaced.length === 1 ? "" : "s"} could not be placed on a
+          day and {unplaced.length === 1 ? "is" : "are"} not on the board:{" "}
+          {unplaced.map((b) => b.title).join(", ")}
         </div>
       ) : null}
 
-      {PEOPLE.map((person) => {
-        const isOpen = open[person.key] ?? true;
-        // Closed means gone, not collapsed-to-a-bar: the toggle that brings it back is in
-        // the header row, so nothing has to be left behind on the page to click. This is
-        // the whole point of the change — a hidden person costs the timetable zero pixels.
-        if (!isOpen) return null;
-        return (
-          <section
-            key={person.key}
-            className="card"
+      {/* The timetable. One grid, seven day columns, one row per visible layer. It takes
+          every pixel the header and any banners do not. */}
+      <div
+        ref={gridRef}
+        style={{
+          flex: "1 1 0",
+          minHeight: 0,
+          display: "grid",
+          // The rail is fixed px, not em: it carries the layer and owner labels, which
+          // must stay readable at whatever size the fit pass settles on.
+          gridTemplateColumns: "94px repeat(7, minmax(0, 1fr))",
+          // `minmax(0, Nfr)` and not `Nfr` — a bare fr track has an automatic minimum
+          // and would grow past the container to fit its content, which is precisely
+          // the overflow this page is here to prevent.
+          gridTemplateRows: `auto ${rowWeights.map((w) => `minmax(0, ${w}fr)`).join(" ")}`,
+          columnGap: 4,
+          rowGap: 4,
+          fontSize: FIT_MAX,
+        }}
+      >
+        <div />
+        {DAYS.map((d) => (
+          <div
+            key={`h-${d}`}
             style={{
-              // The person's identity now rides on this accent stripe and on the layer
-              // headings below, so removing the header bar cost no ownership signal.
-              padding: "10px 12px",
-              borderLeft: `4px solid ${person.accent}`,
-              overflow: "hidden",
-              flex: "none",
-              display: "flex",
-              flexDirection: "column",
-              gap: 14,
+              fontSize: 12,
+              fontWeight: 800,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: "var(--text-label)",
+              textAlign: "center",
             }}
           >
-            {/* PARITY: the ANSAR FC strip, reused as-is. It already imports the
-                canonical scoreDay from app/lib/scoring.ts — no fourth copy. */}
-            {person.key === "ansar" ? <WeekProgressStrip /> : null}
+            {d}
+          </div>
+        ))}
 
-            {person.layers.map((layer) => {
-              const layerBlocks = blocks.filter(
-                (b) => b.person === person.key && b.layer === layer.key,
-              );
-              const failed = errors.find((e) => e.person === person.key && e.layer === layer.key);
-              return (
-                <div key={layer.key}>
+        {visibleRows.map(({ person, layer }) => {
+          const failed = errors.find((e) => e.person === person.key && e.layer === layer.key);
+          const total = DAYS.reduce(
+            (n, d) => n + (cells.get(cellKey(person.key, layer.key, d)) ?? []).length,
+            0,
+          );
+          return (
+            <div key={`${person.key}-${layer.key}`} style={{ display: "contents" }}>
+              {/* The rail replaces what used to be a full-width person header bar and a
+                  full-width layer heading — two rows of the page, now zero.
+
+                  Its lines are in fixed px and in priority order, because a short row
+                  clips the bottom of this box: layer, owner, failure, then the block
+                  count. The count is the only line that can be lost, and it is the only
+                  one that is a nicety. */}
+              <div
+                style={{
+                  overflow: "hidden",
+                  display: "flex",
+                  flexDirection: "column",
+                  // `flex-start`, not `center`. Centering clips a short row at BOTH ends,
+                  // which took the layer name off the top of Nihal's single-height Ayah
+                  // row and left it reading "Nihal / 0 blocks" with no layer at all.
+                  // Anchoring to the top makes the clip bottom-only, which is what the
+                  // priority order of these lines assumes.
+                  justifyContent: "flex-start",
+                  paddingRight: 6,
+                  borderRight: `2px solid ${person.accent}`,
+                  minWidth: 0,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: person.accent,
+                    lineHeight: 1.2,
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {layer.label}
+                </div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "var(--text-secondary)",
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {person.label}
+                </div>
+                {failed ? (
+                  <div style={{ fontSize: 10, fontWeight: 800, color: "var(--red)" }}>
+                    failed to load
+                  </div>
+                ) : null}
+                <div
+                  title="An empty layer and a failed one look the same here — a failure is named in the banner at the top of the page."
+                  style={{ fontSize: 10, fontWeight: 600, color: "var(--text-muted)" }}
+                >
+                  {total} block{total === 1 ? "" : "s"}
+                </div>
+              </div>
+
+              {DAYS.map((d) => {
+                const key = cellKey(person.key, layer.key, d);
+                const list = cells.get(key) ?? [];
+                const hidden = clipped[key] ?? 0;
+                return (
                   <div
+                    key={key}
+                    data-fit
+                    data-key={key}
                     style={{
+                      position: "relative",
+                      overflow: "hidden",
+                      minHeight: 0,
                       display: "flex",
-                      alignItems: "baseline",
-                      gap: 8,
-                      marginBottom: 6,
+                      flexDirection: "column",
+                      gap: "0.2em",
+                      background: "var(--bg-card)",
+                      borderRadius: 4,
+                      padding: list.length === 0 ? 0 : "0.2em",
                     }}
                   >
-                    {/* Person name folded into the layer heading rather than given a row of
-                        its own. Same information, one line instead of two. */}
-                    <h3
-                      style={{
-                        margin: 0,
-                        fontSize: 17,
-                        fontWeight: 800,
-                        color: person.accent,
-                        letterSpacing: "0.02em",
-                      }}
-                    >
-                      {person.label} · {layer.label}
-                    </h3>
-                    <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 600 }}>
-                      {layerBlocks.length} block{layerBlocks.length === 1 ? "" : "s"}
-                    </span>
-                    {failed ? (
-                      <span className="badge badge-red" style={{ fontSize: 11 }}>
-                        failed to load
+                    {list.map((b, i) => (
+                      <BlockChip key={`${b.title}-${b.start}-${i}`} block={b} accent={person.accent} />
+                    ))}
+                    {hidden > 0 ? (
+                      // Absolutely positioned so it adds no height. If this ever shows,
+                      // the board is denser than one viewport can hold at a readable
+                      // size — which is worth saying out loud rather than hiding.
+                      <span
+                        title={`${hidden} more block${hidden === 1 ? "" : "s"} in this cell than fit on screen`}
+                        style={{
+                          position: "absolute",
+                          right: 2,
+                          bottom: 1,
+                          fontSize: 10,
+                          fontWeight: 800,
+                          color: "var(--red)",
+                          background: "var(--bg-base)",
+                          borderRadius: 3,
+                          padding: "0 3px",
+                        }}
+                      >
+                        +{hidden}
                       </span>
                     ) : null}
                   </div>
-                  <LayerGrid blocks={layerBlocks} />
-                </div>
-              );
-            })}
-          </section>
-        );
-      })}
+                );
+              })}
+            </div>
+          );
+        })}
+
+        {visibleRows.length === 0 ? (
+          <div
+            style={{
+              gridColumn: "1 / -1",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--text-muted)",
+              fontSize: 15,
+              fontWeight: 700,
+            }}
+          >
+            Everyone is hidden. Use the toggles above to bring a person back.
+          </div>
+        ) : null}
+      </div>
+
+      {/* PARITY: the ANSAR FC strip, reused as-is. It already imports the canonical
+          scoreDay from app/lib/scoring.ts — no fourth copy. It is pinned below the
+          timetable rather than inside it, and leaves with Ansar when he is hidden. */}
+      {open.ansar ? (
+        <div style={{ flexShrink: 0 }}>
+          <WeekProgressStrip compact />
+        </div>
+      ) : null}
     </div>
   );
 }
