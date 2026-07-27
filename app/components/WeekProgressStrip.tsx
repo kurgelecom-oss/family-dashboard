@@ -42,14 +42,7 @@ function addDays(dateStr: string, n: number) {
 
 const ANSAR = "var(--amber)"; // Ansar = orange across the dashboard
 
-/**
- * `compact` folds the whole strip onto one ~34px line for /board, which is held to
- * exactly one viewport and cannot spare the 150px the stacked layout takes. It
- * carries the same four things BOARD-SPEC's PARITY section names — points today,
- * week total out of 56, day streak, and all four tier thresholds — so it is a
- * layout change and not a reduction. Default is `false`: /week renders as before.
- */
-export default function WeekProgressStrip({ compact = false }: { compact?: boolean }) {
+export default function WeekProgressStrip() {
   const [todayPts, setTodayPts] = useState<number | null>(null);
   const [todayPerfect, setTodayPerfect] = useState(false);
   const [weeklyPts, setWeeklyPts] = useState<number | null>(null);
@@ -156,65 +149,6 @@ export default function WeekProgressStrip({ compact = false }: { compact?: boole
 
   const tier = getThreshold(weeklyPts ?? 0);
   const showPoints = mounted && pointsActive;
-
-  if (compact) {
-    const pct = showPoints ? Math.min(100, Math.round(((weeklyPts ?? 0) / WEEKLY_MAX) * 100)) : 0;
-    return (
-      <div
-        className="card"
-        style={{
-          flex: "none",
-          padding: "5px 10px",
-          display: "flex",
-          // `.card` in globals.css is `flex-direction: column`. Without this the five
-          // parts of the strip stack and it is 133px tall — taller than the layout it
-          // replaces was supposed to save.
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 12,
-          flexWrap: "nowrap",
-          overflow: "hidden",
-        }}
-      >
-        <span style={{ fontSize: 12, fontWeight: 800, color: ANSAR, whiteSpace: "nowrap" }}>
-          Ansar · ANSAR FC
-        </span>
-        <span
-          className="badge"
-          style={{ background: "var(--bg-highlight)", color: tier.color, whiteSpace: "nowrap" }}
-        >
-          {showPoints ? tier.label : "—"}
-        </span>
-        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-          <b style={{ color: ANSAR, fontSize: 14 }}>
-            {showPoints && todayPts !== null ? todayPts : "—"}
-            {showPoints && todayPerfect ? " ⭐" : ""}
-          </b>{" "}
-          today ·{" "}
-          <b style={{ color: "var(--green)", fontSize: 14 }}>
-            {showPoints && weeklyPts !== null ? weeklyPts : "—"}
-          </b>
-          /{WEEKLY_MAX} week ·{" "}
-          <b style={{ color: "var(--cyan)", fontSize: 14 }}>
-            {showPoints && streak !== null ? `${streak}${streak > 0 ? " 🔥" : ""}` : "—"}
-          </b>{" "}
-          streak
-        </span>
-        <div className="progress-track" style={{ flex: 1, minWidth: 60 }}>
-          <div className="progress-fill" style={{ width: `${pct}%`, background: ANSAR }} />
-        </div>
-        {/* All four thresholds, as PARITY requires — same list, one line instead of a row
-            under a full-width bar. */}
-        <span style={{ display: "flex", gap: 8, whiteSpace: "nowrap" }}>
-          {THRESHOLDS.slice().reverse().map(t => (
-            <span key={t.min} style={{ fontSize: 10, fontWeight: 600, color: showPoints && (weeklyPts ?? 0) >= t.min ? t.color : "var(--text-muted)" }}>
-              {t.label} · {t.min}+
-            </span>
-          ))}
-        </span>
-      </div>
-    );
-  }
 
   return (
     <div className="card" style={{ flex: "none" }}>
