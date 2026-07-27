@@ -295,6 +295,18 @@ export default function BoardPage() {
   // localStorage, no sessionStorage. Taylan is the default because he is first in PEOPLE;
   // on a wall-mounted TV nobody is there to pick one.
   const [selected, setSelected] = useState<string>(PEOPLE[0].key);
+  // Which layers each person has switched on. Keyed person → layer → on, NOT layer → on:
+  // "personal" and "ecom" exist under both Taylan and Nihal, so a flat map would make her
+  // hiding Personal also hide his. Nesting keeps each person's view their own, and keeps it
+  // while they flick between people — the state lives on this component, above the section
+  // that remounts on every swap.
+  //
+  // Everything starts on, so the default view is unchanged from before this existed.
+  const [layersOn, setLayersOn] = useState<Record<string, Record<string, boolean>>>(() =>
+    Object.fromEntries(
+      PEOPLE.map((p) => [p.key, Object.fromEntries(p.layers.map((l) => [l.key, true]))]),
+    ),
+  );
 
   const load = useCallback(async (force = false) => {
     if (force) setRefreshing(true);
@@ -337,6 +349,25 @@ export default function BoardPage() {
   // board non-empty if `selected` ever holds a key PEOPLE no longer has — renaming or
   // removing a person here should degrade to showing Taylan, not to a blank page.
   const person = PEOPLE.find((p) => p.key === selected) ?? PEOPLE[0];
+
+  // `?? true` throughout: a layer this map has never heard of reads as on. That is what
+  // makes adding a layer to PEOPLE safe — it appears, rather than silently defaulting to
+  // hidden and looking like a data failure.
+  const isLayerOn = (layerKey: string) => layersOn[person.key]?.[layerKey] ?? true;
+  const shownLayers = person.layers.filter((l) => isLayerOn(l.key));
+  const allLayersOn = shownLayers.length === person.layers.length;
+
+  const toggleLayer = (layerKey: string) =>
+    setLayersOn((s) => ({
+      ...s,
+      [person.key]: { ...s[person.key], [layerKey]: !isLayerOn(layerKey) },
+    }));
+
+  const showAllLayers = () =>
+    setLayersOn((s) => ({
+      ...s,
+      [person.key]: Object.fromEntries(person.layers.map((l) => [l.key, true])),
+    }));
 
   return (
     // `html, body` are `height: 100%; overflow: hidden` in globals.css — that rule is
@@ -545,11 +576,99 @@ export default function BoardPage() {
           gap: 14,
         }}
       >
+        {/* Layer switches, scoped to the person on screen. Only rendered when there is
+            more than one layer to combine — Ansar owns Homeschool alone, and a lone switch
+            whose only two states are "your board" and "nothing" is a trap, not a control.
+            So his page stays exactly as it is.
+
+            Checkboxes, not radios: the whole point is combinations — Home + Personal, or
+            Ecom + Ayah, or Personal by itself. Unlike the person picker above, this row is
+            allowed to reach zero; see the empty state below for why that is not a dead end. */}
+        {person.layers.length > 1 ? (
+          <div
+            role="group"
+            aria-label={`Which of ${person.label}'s areas to show`}
+            style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}
+          >
+            {person.layers.map((layer) => {
+              const on = isLayerOn(layer.key);
+              return (
+                <button
+                  key={layer.key}
+                  type="button"
+                  onClick={() => toggleLayer(layer.key)}
+                  aria-pressed={on}
+                  title={`${on ? "Hide" : "Show"} ${person.label} · ${layer.label}`}
+                  style={{
+                    // Smaller than the 44px person picker — these are the secondary control
+                    // on the page — but still a real thumb target on the iPad.
+                    minHeight: 36,
+                    padding: "6px 12px",
+                    fontSize: 12,
+                    fontWeight: 800,
+                    borderRadius: 999,
+                    cursor: "pointer",
+                    // Same on/off language as the person picker, one step quieter: the
+                    // person's accent when on, muted on transparent when off.
+                    background: on ? "var(--bg-highlight)" : "transparent",
+                    color: on ? person.accent : "var(--text-muted)",
+                    border: `1px solid ${on ? person.accent : "var(--border)"}`,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {on ? "●" : "○"} {layer.label}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={showAllLayers}
+              disabled={allLayersOn}
+              title={`Show all of ${person.label}'s areas`}
+              style={{
+                minHeight: 36,
+                padding: "6px 12px",
+                fontSize: 12,
+                fontWeight: 800,
+                borderRadius: 999,
+                // Disabled when everything is already on, so the button never claims there
+                // is something left to restore when there isn't.
+                cursor: allLayersOn ? "default" : "pointer",
+                background: "transparent",
+                color: allLayersOn ? "var(--text-muted)" : "var(--text-primary)",
+                border: "1px dashed var(--border)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              All
+            </button>
+          </div>
+        ) : null}
+
         {/* PARITY: the ANSAR FC strip, reused as-is. It already imports the
             canonical scoreDay from app/lib/scoring.ts — no fourth copy. */}
         {person.key === "ansar" ? <WeekProgressStrip /> : null}
 
-        {person.layers.map((layer) => {
+        {/* Switching every layer off is permitted — refusing the last click would mean the
+            row silently stops responding — but it is never left looking like a broken or
+            empty board. It says which state it is in and points at the way back. */}
+        {shownLayers.length === 0 ? (
+          <div
+            style={{
+              padding: "14px 12px",
+              border: "1px dashed var(--border)",
+              borderRadius: 6,
+              color: "var(--text-muted)",
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            All {person.layers.length} of {person.label}&rsquo;s areas are switched off. This is a
+            view setting, not missing data — press All above, or any area, to bring them back.
+          </div>
+        ) : null}
+
+        {shownLayers.map((layer) => {
           const layerBlocks = blocks.filter(
             (b) => b.person === person.key && b.layer === layer.key,
           );

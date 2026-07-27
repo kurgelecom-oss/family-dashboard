@@ -24,6 +24,14 @@ Running state lives in `BOARD-LEDGER.md`. This file does not get ticked.
 - Nihal contains layers: Home, Personal, Ecom, Ayah.
 - Ansar contains layers: Homeschool.
 - A layer may only appear under its owner. No cross-person layers.
+- Within the person on screen, each of their layers switches on and off independently —
+  any combination, including all on (the default) and all off. Added 2026-07-27 at the
+  owner's instruction ("they need to be toggles ... if they want to play around with how
+  their time allocation board is viewed"). The switches are scoped per person, so Nihal
+  hiding her Personal layer does not hide Taylan's. A person with a single layer gets no
+  switch row, because its only two states would be their board and nothing — this is why
+  Ansar's page is unchanged. All-off is a legal state and says so on screen; it is never
+  left looking like missing data.
 
 ## DATA SOURCES (Notion data source IDs)
 
