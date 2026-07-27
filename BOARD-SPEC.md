@@ -42,8 +42,16 @@ Running state lives in `BOARD-LEDGER.md`. This file does not get ticked.
   Hues live in `globals.css` as `--type-*` / `--type-*-bg`, per theme; `/board` itself
   holds no hex. Each block states its type three ways — tint, coloured left spine, and
   the category label — so the signal survives TV distance and colour-blindness. A grid
-  that mixes types carries a legend beside its heading; a single-type grid does not,
-  because the heading already names it.
+  that mixes types carries a legend; where the layer switches already serve as one, it is
+  not repeated.
+- ONE seven-column week per person, not one grid per layer. Amended 2026-07-27 at the
+  owner's instruction ("we dont need to see 2 tuesdays ... 1 time block. 1 schedule").
+  Every switched-on layer merges into the same day columns and sorts by time together, so
+  a person's Tuesday appears exactly once and reads in the order the day actually runs.
+  Which layer a block belongs to is carried by its colour and its printed type label, not
+  by which grid it sits in. Consequences of dropping the per-layer headings: the block
+  count moves onto each layer switch, and a failed layer is named in one line above the
+  week rather than badged beside a heading.
 
 ## DATA SOURCES (Notion data source IDs)
 

@@ -233,12 +233,14 @@ function BlockCard({ block, type }: { block: Block; type: BlockType | null }) {
           /week colour-codes by it; here it is a text label, because seven columns of
           coloured chips at TV distance competes with the person accent that carries
           ownership — the more important signal on this page. */}
-      {/* The category now carries the block's own colour rather than the generic label
-          grey — it is the thing the colour is naming, so the two should agree. It stays
-          conditional on `category`: for Taylan and Nihal the type is the layer, which the
-          heading above the grid already states, and stamping "PERSONAL" on sixteen
-          identical blocks would be noise. It appears exactly where it adds something. */}
-      {block.category ? (
+      {/* The type, in the block's own colour — it is the thing the colour is naming, so
+          the two should agree. Now shown on EVERY block, not just the ones with a Notion
+          category. When each layer had its own grid the heading above it said "Personal"
+          and repeating that on sixteen blocks was noise; in one merged week a Work block
+          and a Personal block sit in the same Tuesday column, so each has to say which it
+          is. Colour alone would leave anyone who cannot separate two of these hues with
+          no way to tell them apart. */}
+      {type || block.category ? (
         <div
           style={{
             fontSize: 11,
@@ -248,7 +250,7 @@ function BlockCard({ block, type }: { block: Block; type: BlockType | null }) {
             color: type ? type.fg : "var(--text-label)",
           }}
         >
-          {block.category}
+          {type ? type.label : block.category}
         </div>
       ) : null}
 
@@ -259,19 +261,29 @@ function BlockCard({ block, type }: { block: Block; type: BlockType | null }) {
   );
 }
 
-function LayerGrid({
+/**
+ * ONE week. Every block the person has switched on, in a single seven-column grid.
+ *
+ * This used to be a grid per layer, stacked — which meant Nihal with four layers on
+ * got four Mondays, four Tuesdays and so on down the page, and no way to see that her
+ * 11:00 Home block and her 11:30 Ecom block collide. There is one Tuesday in a week,
+ * so there is one Tuesday here: layers are merged into the day columns and sorted by
+ * time together, so the column reads as the day actually runs. Which layer a block
+ * belongs to is carried by its colour and its label, not by its position on the page.
+ *
+ * `typeFor` rather than a layer key: this grid holds blocks from several layers at
+ * once, so each block has to answer for its own colour.
+ */
+function WeekGrid({
   blocks,
-  layerKey,
-  layerLabel,
+  typeFor,
 }: {
   blocks: Block[];
-  layerKey: string;
-  layerLabel: string;
+  typeFor: (block: Block) => BlockType | null;
 }) {
-  // An empty layer never collapses to a blank gap — it says so. Ayah is empty
-  // today, and an empty layer is indistinguishable from a failed one by block
-  // count alone, so the wording points at the banner rather than claiming the
-  // layer is genuinely clear.
+  // An empty week never collapses to a blank gap — it says so. An empty layer and a
+  // failed one are indistinguishable by block count alone, so the wording points at
+  // the banner rather than claiming the week is genuinely clear.
   if (blocks.length === 0) {
     return (
       <div
@@ -284,8 +296,8 @@ function LayerGrid({
           fontWeight: 600,
         }}
       >
-        No blocks in this layer. An empty layer and a failed one look the same here — a
-        failure would be named in the banner at the top of the page.
+        No blocks in the areas switched on. Empty and failed look the same here — a failure
+        would be named in the banner at the top of the page.
       </div>
     );
   }
@@ -347,9 +359,9 @@ function LayerGrid({
                 ) : (
                   list.map((b, i) => (
                     <BlockCard
-                      key={`${b.title}-${b.start}-${i}`}
+                      key={`${b.layer}-${b.title}-${b.start}-${i}`}
                       block={b}
-                      type={typeOf(b.category, layerKey, layerLabel)}
+                      type={typeFor(b)}
                     />
                   ))
                 )}
@@ -457,6 +469,30 @@ export default function BoardPage() {
       ...s,
       [person.key]: Object.fromEntries(person.layers.map((l) => [l.key, true])),
     }));
+
+  // Every block this person has on, from all their switched-on layers at once. This is the
+  // set that feeds the single week grid — the merge that ends four stacked Tuesdays.
+  const shownBlocks = blocks.filter(
+    (b) => b.person === person.key && shownLayers.some((l) => l.key === b.layer),
+  );
+
+  // A block's colour, resolved against the layer it actually came from rather than a layer
+  // fixed by the grid. In one merged week the grid holds several layers, so the block's own
+  // `layer` field is the only thing that can answer this.
+  const typeForBlock = (b: Block): BlockType | null => {
+    const layer = person.layers.find((l) => l.key === b.layer);
+    return typeOf(b.category, b.layer, layer?.label ?? b.layer);
+  };
+
+  // Distinct types on screen, in first-seen order. Built from the blocks rather than a fixed
+  // list so it can only name colours that are really in the grid.
+  const legend: BlockType[] = [];
+  for (const b of shownBlocks) {
+    const t = typeForBlock(b);
+    if (t && !legend.some((x) => x.label === t.label)) legend.push(t);
+  }
+
+  const personErrors = errors.filter((e) => e.person === person.key);
 
   return (
     // `html, body` are `height: 100%; overflow: hidden` in globals.css — that rule is
@@ -687,13 +723,21 @@ export default function BoardPage() {
               // like the same control.
               const t = typeOf(null, layer.key, layer.label);
               const hue = t ? t.fg : person.accent;
+              // The per-layer block count used to sit beside each layer's heading. The
+              // headings are gone with the merge, so it moves here — still the only place
+              // that says how much of the week each area accounts for.
+              const count = blocks.filter(
+                (b) => b.person === person.key && b.layer === layer.key,
+              ).length;
               return (
                 <button
                   key={layer.key}
                   type="button"
                   onClick={() => toggleLayer(layer.key)}
                   aria-pressed={on}
-                  title={`${on ? "Hide" : "Show"} ${person.label} · ${layer.label}`}
+                  title={`${on ? "Hide" : "Show"} ${person.label} · ${layer.label} — ${count} block${
+                    count === 1 ? "" : "s"
+                  }`}
                   style={{
                     // Smaller than the 44px person picker — these are the secondary control
                     // on the page — but still a real thumb target on the iPad.
@@ -711,7 +755,8 @@ export default function BoardPage() {
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {on ? "●" : "○"} {layer.label}
+                  {on ? "●" : "○"} {layer.label}{" "}
+                  <span style={{ fontWeight: 700, opacity: 0.7 }}>{count}</span>
                 </button>
               );
             })}
@@ -763,111 +808,61 @@ export default function BoardPage() {
           </div>
         ) : null}
 
-        {shownLayers.map((layer) => {
-          const layerBlocks = blocks.filter(
-            (b) => b.person === person.key && b.layer === layer.key,
-          );
-          const failed = errors.find((e) => e.person === person.key && e.layer === layer.key);
-          // The distinct types actually present in this grid, in first-seen order (which,
-          // the blocks being day-then-time sorted, is roughly the order of the week). Built
-          // from the blocks rather than from a fixed list so it can only ever name types
-          // that are really on screen — a legend entry with nothing under it is worse than
-          // no legend. Shown only when there is more than one: for Taylan and Nihal every
-          // block in a grid is the same type, and a one-entry legend just repeats the
-          // heading. For Ansar it becomes the key to his four colours.
-          const legend: BlockType[] = [];
-          for (const b of layerBlocks) {
-            const t = typeOf(b.category, layer.key, layer.label);
-            if (t && !legend.some((x) => x.label === t.label)) legend.push(t);
-          }
-          const layerType = typeOf(null, layer.key, layer.label);
-          return (
-            <div key={layer.key}>
-              <div
+        {/* Failure used to be reported by a badge beside each layer's heading. There are no
+            layer headings left, so it is stated once here, naming the layers — otherwise
+            merging the grids would have quietly deleted the only per-layer failure signal
+            on the board. The banner at the top of the page still carries the full detail. */}
+        {shownLayers.length > 0 && personErrors.length > 0 ? (
+          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--red)" }}>
+            Failed to load: {personErrors.map((e) => e.layer).join(", ")} — those blocks are
+            missing from the week below.
+          </div>
+        ) : null}
+
+        {/* The key to the colours, only where the switch row above is not already it. For
+            Taylan and Nihal the switches ARE the legend — same words, same hues, and they
+            list every area rather than only the ones with blocks in them. Ansar has no
+            switch row (one layer), and his colours come from categories the switches would
+            not name anyway, so his legend is drawn here. Built from the blocks on screen,
+            so it can never name a colour that is not in the grid. */}
+        {shownLayers.length > 0 && person.layers.length === 1 && legend.length > 1 ? (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+            {legend.map((t) => (
+              <span
+                key={t.label}
                 style={{
-                  display: "flex",
-                  alignItems: "baseline",
-                  flexWrap: "wrap",
-                  gap: 8,
-                  marginBottom: 6,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "2px 8px",
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 800,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  color: t.fg,
+                  background: t.bg,
+                  border: `1px solid ${t.fg}`,
+                  whiteSpace: "nowrap",
                 }}
               >
-                {/* Person name folded into the layer heading rather than given a row of
-                    its own. Same information, one line instead of two.
+                {/* The swatch repeats the hue as a solid shape. The chip's own text is the
+                    same colour, but an 8px block of pure hue is what makes two similar
+                    colours separable at a glance. */}
+                <span
+                  aria-hidden
+                  style={{ width: 8, height: 8, borderRadius: 2, background: t.fg, flexShrink: 0 }}
+                />
+                {t.label}
+              </span>
+            ))}
+          </div>
+        ) : null}
 
-                    The heading now takes the LAYER's colour, not the person's accent: it
-                    is the label on a group of blocks, so it should be the colour of the
-                    blocks under it. That is what turns four stacked grids into four
-                    visibly separate groups. No ownership signal is lost — the section's
-                    left stripe and the picker above both still carry the person, and the
-                    heading says their name in words. */}
-                <h3
-                  style={{
-                    margin: 0,
-                    fontSize: 17,
-                    fontWeight: 800,
-                    color: layerType ? layerType.fg : person.accent,
-                    letterSpacing: "0.02em",
-                  }}
-                >
-                  {person.label} · {layer.label}
-                </h3>
-                <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 600 }}>
-                  {layerBlocks.length} block{layerBlocks.length === 1 ? "" : "s"}
-                </span>
-
-                {/* The key to the colours, right where they start — only when this grid
-                    actually mixes types. In practice that is Ansar's board, where one
-                    layer holds Routine, Learning, Meal and Screen. */}
-                {legend.length > 1 ? (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-                    {legend.map((t) => (
-                      <span
-                        key={t.label}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 5,
-                          padding: "2px 8px",
-                          borderRadius: 999,
-                          fontSize: 11,
-                          fontWeight: 800,
-                          letterSpacing: "0.06em",
-                          textTransform: "uppercase",
-                          color: t.fg,
-                          background: t.bg,
-                          border: `1px solid ${t.fg}`,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {/* The swatch repeats the hue as a solid shape. The chip's own text
-                            is the same colour, but a 8px block of pure hue is what makes two
-                            similar colours separable at a glance. */}
-                        <span
-                          aria-hidden
-                          style={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: 2,
-                            background: t.fg,
-                            flexShrink: 0,
-                          }}
-                        />
-                        {t.label}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-                {failed ? (
-                  <span className="badge badge-red" style={{ fontSize: 11 }}>
-                    failed to load
-                  </span>
-                ) : null}
-              </div>
-              <LayerGrid blocks={layerBlocks} layerKey={layer.key} layerLabel={layer.label} />
-            </div>
-          );
-        })}
+        {/* One week. Not one per layer. */}
+        {shownLayers.length > 0 ? (
+          <WeekGrid blocks={shownBlocks} typeFor={typeForBlock} />
+        ) : null}
       </section>
     </div>
   );
