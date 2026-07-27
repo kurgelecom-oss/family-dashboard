@@ -336,10 +336,27 @@ export default function BoardPage() {
   const blocks = payload?.blocks ?? [];
 
   return (
+    // `html, body` are `height: 100%; overflow: hidden` in globals.css — that rule is
+    // what pins the TV dashboard at `/` to exactly one viewport, so it stays. The cost
+    // was that anything taller than the viewport on THIS page got clipped and became
+    // unreachable: with all three sections open the board runs well past 1080px. So the
+    // board root is its own scroll container — fixed to exactly the space below the nav,
+    // scrolling internally. `tabIndex` is deliberate, not a lint slip: a scrollable
+    // region has to be reachable by keyboard, which on the Samsung TV is the remote's
+    // arrow keys. The focus ring is left alone for the same reason.
     <div
+      tabIndex={0}
+      aria-label="Family board — scrollable"
       style={{
         marginTop: "var(--nav-h)",
-        minHeight: "calc(100dvh - var(--nav-h))",
+        height: "calc(100dvh - var(--nav-h))",
+        overflowY: "auto",
+        overscrollBehavior: "contain",
+        WebkitOverflowScrolling: "touch",
+        // Thin, themed scrollbar: enough to signal "there is more below" at TV distance
+        // without introducing a colour outside the existing token set.
+        scrollbarWidth: "thin",
+        scrollbarColor: "var(--border) transparent",
         background: "var(--bg-base)",
         padding: 14,
         display: "flex",
@@ -398,6 +415,12 @@ export default function BoardPage() {
         <div
           role="alert"
           style={{
+            // flexShrink 0 on every direct child of the scroll container: the column has
+            // a fixed height now, so a shrinkable child compresses to fit instead of
+            // pushing the scroll height out. The person sections already pin themselves
+            // with `flex: "none"`; these banners did not, and a squashed failure banner
+            // is the one thing on this page that must never be hard to read.
+            flexShrink: 0,
             background: "var(--bg-card)",
             border: "1px solid var(--red)",
             borderRadius: 8,
@@ -420,6 +443,7 @@ export default function BoardPage() {
         <div
           role="alert"
           style={{
+            flexShrink: 0,
             background: "var(--bg-card)",
             border: "1px solid var(--red)",
             borderRadius: 8,
@@ -434,7 +458,12 @@ export default function BoardPage() {
       ) : null}
 
       {loading ? (
-        <div className="card" style={{ color: "var(--text-secondary)", fontSize: 15 }}>
+        <div
+          className="card"
+          // `.card` is `flex: 1; min-height: 0` in globals.css — inside a fixed-height
+          // column that lets it collapse to nothing. Pin it like the sections do.
+          style={{ flex: "none", color: "var(--text-secondary)", fontSize: 15 }}
+        >
           Loading the board…
         </div>
       ) : null}
