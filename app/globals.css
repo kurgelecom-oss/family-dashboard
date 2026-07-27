@@ -32,6 +32,42 @@
   --accent-budget:   #00d4ff;
   --accent-goals:    #00d4ff;
   --accent-calendar: #00d4ff;
+
+  /* ── /board block types ──────────────────────────────────────────
+     One hue per kind of block, so a block's colour says what it IS.
+     Two axes, and they never appear on the same screen: Taylan's and
+     Nihal's blocks carry no category and are coloured by LAYER; every
+     one of Ansar's carries a category and is coloured by CATEGORY,
+     because colouring his single Homeschool layer would paint all 52
+     of his blocks the same and say nothing. That is why amber, blue and
+     green each appear on both lists — one person only ever sees one of
+     the two axes.
+
+     `-bg` is the card tint. Deliberately rgba rather than color-mix():
+     it composites over whatever sits behind it in every browser, and
+     the TV is a Samsung whose engine is old enough to matter. Alpha is
+     low so a block reads as tinted, never as a coloured slab that
+     fights its own title text. */
+  --type-work:          #5b9dff;
+  --type-work-bg:       rgba(91,157,255,0.14);
+  --type-personal:      #b57bff;
+  --type-personal-bg:   rgba(181,123,255,0.14);
+  --type-ecom:          #00d4ff;
+  --type-ecom-bg:       rgba(0,212,255,0.12);
+  --type-home:          #2ecc71;
+  --type-home-bg:       rgba(46,204,113,0.13);
+  --type-ayah:          #ff6ec7;
+  --type-ayah-bg:       rgba(255,110,199,0.13);
+  --type-homeschool:    #f5a623;
+  --type-homeschool-bg: rgba(245,166,35,0.13);
+  --type-routine:       #f5a623;
+  --type-routine-bg:    rgba(245,166,35,0.13);
+  --type-learning:      #5b9dff;
+  --type-learning-bg:   rgba(91,157,255,0.14);
+  --type-meal:          #2ecc71;
+  --type-meal-bg:       rgba(46,204,113,0.13);
+  --type-screen:        #ff7a5c;
+  --type-screen-bg:     rgba(255,122,92,0.14);
 }
 
 /* ── DAY THEME ─────────────────────────────────────────────────── */
@@ -60,6 +96,31 @@
   --accent-budget:   #0099e6;
   --accent-goals:    #0099e6;
   --accent-calendar: #0099e6;
+
+  /* Same block-type hues, darkened for white cards — the night values are
+     tuned for #252a4a and several of them (cyan, amber) go illegible as
+     text on white. Tint alpha drops too: 0.14 over a dark card is subtle,
+     the same alpha over white is a highlighter. */
+  --type-work:          #1d6fd0;
+  --type-work-bg:       rgba(29,111,208,0.10);
+  --type-personal:      #7c3aed;
+  --type-personal-bg:   rgba(124,58,237,0.10);
+  --type-ecom:          #0099e6;
+  --type-ecom-bg:       rgba(0,153,230,0.10);
+  --type-home:          #1e9e5a;
+  --type-home-bg:       rgba(30,158,90,0.10);
+  --type-ayah:          #c2358f;
+  --type-ayah-bg:       rgba(194,53,143,0.10);
+  --type-homeschool:    #c47d0a;
+  --type-homeschool-bg: rgba(196,125,10,0.10);
+  --type-routine:       #c47d0a;
+  --type-routine-bg:    rgba(196,125,10,0.10);
+  --type-learning:      #1d6fd0;
+  --type-learning-bg:   rgba(29,111,208,0.10);
+  --type-meal:          #1e9e5a;
+  --type-meal-bg:       rgba(30,158,90,0.10);
+  --type-screen:        #d1492c;
+  --type-screen-bg:     rgba(209,73,44,0.10);
 }
 
 *, *::before, *::after {

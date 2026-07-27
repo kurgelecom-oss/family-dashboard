@@ -32,6 +32,18 @@ Running state lives in `BOARD-LEDGER.md`. This file does not get ticked.
   switch row, because its only two states would be their board and nothing — this is why
   Ansar's page is unchanged. All-off is a legal state and says so on screen; it is never
   left looking like missing data.
+- Every block is colour-coded by what KIND of block it is. Added 2026-07-27 at the owner's
+  instruction ("colour code each different block ... to distinguish the type of block it
+  is"). Resolved category-first, layer-second: a block with a category is coloured by it,
+  otherwise by its layer. Today that splits cleanly — Taylan and Nihal carry no categories
+  and colour by layer, all of Ansar's carry one and colour by category — but the rule is
+  data-driven, so a category added to a Taylan block starts colouring it with no code
+  change. Colouring Ansar by layer instead would make all 52 of his blocks one colour.
+  Hues live in `globals.css` as `--type-*` / `--type-*-bg`, per theme; `/board` itself
+  holds no hex. Each block states its type three ways — tint, coloured left spine, and
+  the category label — so the signal survives TV distance and colour-blindness. A grid
+  that mixes types carries a legend beside its heading; a single-type grid does not,
+  because the heading already names it.
 
 ## DATA SOURCES (Notion data source IDs)
 

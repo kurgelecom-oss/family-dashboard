@@ -62,6 +62,70 @@ const PEOPLE = [
 // show and long detail hides, without either being special-cased.
 const INLINE_MAX = 60;
 
+/* ── Block types ──────────────────────────────────────────────────────────────
+   What KIND of block this is, as a colour. Resolved on two axes, category first:
+
+     category (Routine, Learning, Meal, Screen) → else layer (Work, Personal, …)
+
+   Category wins because it is the finer statement. In today's data the two axes
+   are cleanly split — Taylan and Nihal have no categories at all, so they colour
+   by layer, and all 52 of Ansar's blocks have one, so he colours by category.
+   That split is data, not a rule: the day a Taylan block gets a category, it
+   starts colouring by it, which is the correct answer and needs no code change.
+
+   Colouring Ansar by layer instead would paint his whole board one amber, since
+   Homeschool is his only layer. Colouring everyone by category would leave the
+   other two entirely uncoloured. Hence the fallback rather than a choice.
+
+   Keys are lowercased so "Meal" and "meal" from Notion land on the same hue, and
+   an unknown key resolves to null — an unrecognised category falls back to the
+   layer's colour, and a block is never rendered referencing a `var()` that does
+   not exist. Every value here has a matching --type-* pair in globals.css. */
+const TYPE_TOKENS: Record<string, string> = {
+  // layers
+  "layer:work": "work",
+  "layer:personal": "personal",
+  "layer:ecom": "ecom",
+  "layer:home": "home",
+  "layer:ayah": "ayah",
+  "layer:homeschool": "homeschool",
+  // categories, Ansar's day
+  "cat:routine": "routine",
+  "cat:learning": "learning",
+  "cat:meal": "meal",
+  "cat:screen": "screen",
+};
+
+type BlockType = { label: string; fg: string; bg: string };
+
+/**
+ * The type a block should be coloured as, or null if neither axis is known.
+ *
+ * Takes the category rather than the whole Block so the layer's own colour can be
+ * asked for with `typeOf(null, …)` — used for the grid heading, which has a layer
+ * but no block. Passing a fake Block to get that answer would be a lie about what
+ * this function reads.
+ */
+function typeOf(
+  category: string | null | undefined,
+  layerKey: string,
+  layerLabel: string,
+): BlockType | null {
+  const cat = category?.trim();
+  const name =
+    (cat ? TYPE_TOKENS[`cat:${cat.toLowerCase()}`] : undefined) ??
+    TYPE_TOKENS[`layer:${layerKey.toLowerCase()}`];
+  if (!name) return null;
+  return {
+    // The label follows the same precedence as the colour, so the legend chip and
+    // the block always say the same word. Notion's own casing is kept for a
+    // category — it is the user's word, not ours.
+    label: cat && TYPE_TOKENS[`cat:${cat.toLowerCase()}`] ? cat : layerLabel,
+    fg: `var(--type-${name})`,
+    bg: `var(--type-${name}-bg)`,
+  };
+}
+
 /** Weekday column for a one-off dated block, anchored at UTC noon so no timezone
  *  can push a calendar date onto the wrong day. Mirrors app/week/page.tsx. */
 function weekdayOf(dateStr: string): string {
@@ -99,7 +163,7 @@ function byStart(a: Block, b: Block): number {
   return a.startMin - b.startMin;
 }
 
-function BlockCard({ block }: { block: Block }) {
+function BlockCard({ block, type }: { block: Block; type: BlockType | null }) {
   const extra = [block.notes, block.detail].filter(Boolean).join(" · ");
   const time = [block.start, block.end].filter(Boolean).join("–");
 
@@ -107,8 +171,14 @@ function BlockCard({ block }: { block: Block }) {
     <div
       title={extra || undefined}
       style={{
-        background: "var(--bg-card)",
+        // Three signals of the same type, so it survives being read badly: the tint
+        // (what you catch scanning the whole week), the 3px spine (what separates two
+        // adjacent blocks of different types in one day column) and the label below.
+        // The spine matters most — a tint alone is close to invisible at TV distance,
+        // and to anyone whose colour vision makes two of these hues agree.
+        background: type ? type.bg : "var(--bg-card)",
         border: "1px solid var(--border)",
+        borderLeft: type ? `3px solid ${type.fg}` : "1px solid var(--border)",
         borderRadius: 6,
         padding: "6px 8px",
         display: "flex",
@@ -163,6 +233,11 @@ function BlockCard({ block }: { block: Block }) {
           /week colour-codes by it; here it is a text label, because seven columns of
           coloured chips at TV distance competes with the person accent that carries
           ownership — the more important signal on this page. */}
+      {/* The category now carries the block's own colour rather than the generic label
+          grey — it is the thing the colour is naming, so the two should agree. It stays
+          conditional on `category`: for Taylan and Nihal the type is the layer, which the
+          heading above the grid already states, and stamping "PERSONAL" on sixteen
+          identical blocks would be noise. It appears exactly where it adds something. */}
       {block.category ? (
         <div
           style={{
@@ -170,7 +245,7 @@ function BlockCard({ block }: { block: Block }) {
             fontWeight: 700,
             letterSpacing: "0.06em",
             textTransform: "uppercase",
-            color: "var(--text-label)",
+            color: type ? type.fg : "var(--text-label)",
           }}
         >
           {block.category}
@@ -184,7 +259,15 @@ function BlockCard({ block }: { block: Block }) {
   );
 }
 
-function LayerGrid({ blocks }: { blocks: Block[] }) {
+function LayerGrid({
+  blocks,
+  layerKey,
+  layerLabel,
+}: {
+  blocks: Block[];
+  layerKey: string;
+  layerLabel: string;
+}) {
   // An empty layer never collapses to a blank gap — it says so. Ayah is empty
   // today, and an empty layer is indistinguishable from a failed one by block
   // count alone, so the wording points at the banner rather than claiming the
@@ -262,7 +345,13 @@ function LayerGrid({ blocks }: { blocks: Block[] }) {
                     —
                   </div>
                 ) : (
-                  list.map((b, i) => <BlockCard key={`${b.title}-${b.start}-${i}`} block={b} />)
+                  list.map((b, i) => (
+                    <BlockCard
+                      key={`${b.title}-${b.start}-${i}`}
+                      block={b}
+                      type={typeOf(b.category, layerKey, layerLabel)}
+                    />
+                  ))
                 )}
               </div>
             );
@@ -592,6 +681,12 @@ export default function BoardPage() {
           >
             {person.layers.map((layer) => {
               const on = isLayerOn(layer.key);
+              // Each switch wears the colour of the group it governs, so the row doubles as
+              // the legend for the board below it: the green switch turns the green blocks
+              // on and off. A switch in the person's accent would have made all four look
+              // like the same control.
+              const t = typeOf(null, layer.key, layer.label);
+              const hue = t ? t.fg : person.accent;
               return (
                 <button
                   key={layer.key}
@@ -608,11 +703,11 @@ export default function BoardPage() {
                     fontWeight: 800,
                     borderRadius: 999,
                     cursor: "pointer",
-                    // Same on/off language as the person picker, one step quieter: the
-                    // person's accent when on, muted on transparent when off.
-                    background: on ? "var(--bg-highlight)" : "transparent",
-                    color: on ? person.accent : "var(--text-muted)",
-                    border: `1px solid ${on ? person.accent : "var(--border)"}`,
+                    // Same on/off language as the person picker: lit in its own hue when on,
+                    // muted on transparent when off.
+                    background: on ? (t ? t.bg : "var(--bg-highlight)") : "transparent",
+                    color: on ? hue : "var(--text-muted)",
+                    border: `1px solid ${on ? hue : "var(--border)"}`,
                     whiteSpace: "nowrap",
                   }}
                 >
@@ -673,24 +768,45 @@ export default function BoardPage() {
             (b) => b.person === person.key && b.layer === layer.key,
           );
           const failed = errors.find((e) => e.person === person.key && e.layer === layer.key);
+          // The distinct types actually present in this grid, in first-seen order (which,
+          // the blocks being day-then-time sorted, is roughly the order of the week). Built
+          // from the blocks rather than from a fixed list so it can only ever name types
+          // that are really on screen — a legend entry with nothing under it is worse than
+          // no legend. Shown only when there is more than one: for Taylan and Nihal every
+          // block in a grid is the same type, and a one-entry legend just repeats the
+          // heading. For Ansar it becomes the key to his four colours.
+          const legend: BlockType[] = [];
+          for (const b of layerBlocks) {
+            const t = typeOf(b.category, layer.key, layer.label);
+            if (t && !legend.some((x) => x.label === t.label)) legend.push(t);
+          }
+          const layerType = typeOf(null, layer.key, layer.label);
           return (
             <div key={layer.key}>
               <div
                 style={{
                   display: "flex",
                   alignItems: "baseline",
+                  flexWrap: "wrap",
                   gap: 8,
                   marginBottom: 6,
                 }}
               >
                 {/* Person name folded into the layer heading rather than given a row of
-                    its own. Same information, one line instead of two. */}
+                    its own. Same information, one line instead of two.
+
+                    The heading now takes the LAYER's colour, not the person's accent: it
+                    is the label on a group of blocks, so it should be the colour of the
+                    blocks under it. That is what turns four stacked grids into four
+                    visibly separate groups. No ownership signal is lost — the section's
+                    left stripe and the picker above both still carry the person, and the
+                    heading says their name in words. */}
                 <h3
                   style={{
                     margin: 0,
                     fontSize: 17,
                     fontWeight: 800,
-                    color: person.accent,
+                    color: layerType ? layerType.fg : person.accent,
                     letterSpacing: "0.02em",
                   }}
                 >
@@ -699,13 +815,56 @@ export default function BoardPage() {
                 <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 600 }}>
                   {layerBlocks.length} block{layerBlocks.length === 1 ? "" : "s"}
                 </span>
+
+                {/* The key to the colours, right where they start — only when this grid
+                    actually mixes types. In practice that is Ansar's board, where one
+                    layer holds Routine, Learning, Meal and Screen. */}
+                {legend.length > 1 ? (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                    {legend.map((t) => (
+                      <span
+                        key={t.label}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 5,
+                          padding: "2px 8px",
+                          borderRadius: 999,
+                          fontSize: 11,
+                          fontWeight: 800,
+                          letterSpacing: "0.06em",
+                          textTransform: "uppercase",
+                          color: t.fg,
+                          background: t.bg,
+                          border: `1px solid ${t.fg}`,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {/* The swatch repeats the hue as a solid shape. The chip's own text
+                            is the same colour, but a 8px block of pure hue is what makes two
+                            similar colours separable at a glance. */}
+                        <span
+                          aria-hidden
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: 2,
+                            background: t.fg,
+                            flexShrink: 0,
+                          }}
+                        />
+                        {t.label}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
                 {failed ? (
                   <span className="badge badge-red" style={{ fontSize: 11 }}>
                     failed to load
                   </span>
                 ) : null}
               </div>
-              <LayerGrid blocks={layerBlocks} />
+              <LayerGrid blocks={layerBlocks} layerKey={layer.key} layerLabel={layer.label} />
             </div>
           );
         })}
