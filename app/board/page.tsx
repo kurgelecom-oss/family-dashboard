@@ -372,6 +372,50 @@ export default function BoardPage() {
           <div className="header-sub">Taylan · Nihal · Ansar — the whole week</div>
         </div>
         <div className="header-right">
+          {/* The person toggles live HERE, in the header row that already exists, rather
+              than as three 52px section headers stacked down the page. Open or closed they
+              cost the board zero vertical space: the row is sized by the Refresh button
+              beside them, which is no shorter. A closed section renders nothing at all, so
+              the only thing between the nav and the timetable is this one row. */}
+          <div
+            role="group"
+            aria-label="Show or hide each person's board"
+            style={{ display: "flex", gap: 6, marginRight: 4 }}
+          >
+            {PEOPLE.map((person) => {
+              const isOpen = open[person.key] ?? true;
+              return (
+                <button
+                  key={person.key}
+                  type="button"
+                  onClick={() => setOpen((o) => ({ ...o, [person.key]: !isOpen }))}
+                  aria-pressed={isOpen}
+                  title={`${isOpen ? "Hide" : "Show"} ${person.label} — ${
+                    blocks.filter((b) => b.person === person.key).length
+                  } blocks`}
+                  style={{
+                    // 44px minimum so a closed section is recoverable by thumb on the iPad,
+                    // not just by mouse.
+                    minHeight: 44,
+                    padding: "8px 14px",
+                    fontSize: 13,
+                    fontWeight: 800,
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    // Open is the person's accent on the raised background; closed drops to
+                    // muted on transparent. Reads as on/off at TV distance without a second
+                    // row of state text.
+                    background: isOpen ? "var(--bg-highlight)" : "transparent",
+                    color: isOpen ? person.accent : "var(--text-muted)",
+                    border: `1px solid ${isOpen ? person.accent : "var(--border)"}`,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {isOpen ? "●" : "○"} {person.label}
+                </button>
+              );
+            })}
+          </div>
           {lastLoaded ? (
             <span style={{ fontSize: 12, color: "var(--text-muted)", fontWeight: 600 }}>
               loaded {lastLoaded}
@@ -470,98 +514,71 @@ export default function BoardPage() {
 
       {PEOPLE.map((person) => {
         const isOpen = open[person.key] ?? true;
+        // Closed means gone, not collapsed-to-a-bar: the toggle that brings it back is in
+        // the header row, so nothing has to be left behind on the page to click. This is
+        // the whole point of the change — a hidden person costs the timetable zero pixels.
+        if (!isOpen) return null;
         return (
           <section
             key={person.key}
             className="card"
-            style={{ padding: 0, overflow: "hidden", flex: "none" }}
+            style={{
+              // The person's identity now rides on this accent stripe and on the layer
+              // headings below, so removing the header bar cost no ownership signal.
+              padding: "10px 12px",
+              borderLeft: `4px solid ${person.accent}`,
+              overflow: "hidden",
+              flex: "none",
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
+            }}
           >
-            <button
-              type="button"
-              onClick={() => setOpen((o) => ({ ...o, [person.key]: !isOpen }))}
-              aria-expanded={isOpen}
-              style={{
-                width: "100%",
-                // 52px: comfortably past the 44px touch target an iPad needs.
-                minHeight: 52,
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: "10px 16px",
-                background: "var(--bg-highlight)",
-                border: "none",
-                borderLeft: `4px solid ${person.accent}`,
-                cursor: "pointer",
-                textAlign: "left",
-                color: "var(--text-primary)",
-              }}
-            >
-              <span
-                aria-hidden
-                style={{ fontSize: 16, color: person.accent, width: 16, flexShrink: 0 }}
-              >
-                {isOpen ? "▾" : "▸"}
-              </span>
-              <span style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.01em" }}>
-                {person.label}
-              </span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)" }}>
-                {person.layers.length} layer{person.layers.length === 1 ? "" : "s"} ·{" "}
-                {blocks.filter((b) => b.person === person.key).length} blocks
-              </span>
-            </button>
+            {/* PARITY: the ANSAR FC strip, reused as-is. It already imports the
+                canonical scoreDay from app/lib/scoring.ts — no fourth copy. */}
+            {person.key === "ansar" ? <WeekProgressStrip /> : null}
 
-            {isOpen ? (
-              <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 18 }}>
-                {/* PARITY: the ANSAR FC strip, reused as-is. It already imports the
-                    canonical scoreDay from app/lib/scoring.ts — no fourth copy. */}
-                {person.key === "ansar" ? <WeekProgressStrip /> : null}
-
-                {person.layers.map((layer) => {
-                  const layerBlocks = blocks.filter(
-                    (b) => b.person === person.key && b.layer === layer.key,
-                  );
-                  const failed = errors.find(
-                    (e) => e.person === person.key && e.layer === layer.key,
-                  );
-                  return (
-                    <div key={layer.key}>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "baseline",
-                          gap: 10,
-                          marginBottom: 8,
-                        }}
-                      >
-                        <h3
-                          style={{
-                            margin: 0,
-                            fontSize: 17,
-                            fontWeight: 800,
-                            color: person.accent,
-                            letterSpacing: "0.02em",
-                          }}
-                        >
-                          {layer.label}
-                        </h3>
-                        <span
-                          style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 600 }}
-                        >
-                          {layerBlocks.length} block{layerBlocks.length === 1 ? "" : "s"}
-                        </span>
-                        {failed ? (
-                          <span className="badge badge-red" style={{ fontSize: 11 }}>
-                            failed to load
-                          </span>
-                        ) : null}
-                      </div>
-                      <LayerGrid blocks={layerBlocks} />
-                    </div>
-                  );
-                })}
-              </div>
-            ) : null}
+            {person.layers.map((layer) => {
+              const layerBlocks = blocks.filter(
+                (b) => b.person === person.key && b.layer === layer.key,
+              );
+              const failed = errors.find((e) => e.person === person.key && e.layer === layer.key);
+              return (
+                <div key={layer.key}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "baseline",
+                      gap: 8,
+                      marginBottom: 6,
+                    }}
+                  >
+                    {/* Person name folded into the layer heading rather than given a row of
+                        its own. Same information, one line instead of two. */}
+                    <h3
+                      style={{
+                        margin: 0,
+                        fontSize: 17,
+                        fontWeight: 800,
+                        color: person.accent,
+                        letterSpacing: "0.02em",
+                      }}
+                    >
+                      {person.label} · {layer.label}
+                    </h3>
+                    <span style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 600 }}>
+                      {layerBlocks.length} block{layerBlocks.length === 1 ? "" : "s"}
+                    </span>
+                    {failed ? (
+                      <span className="badge badge-red" style={{ fontSize: 11 }}>
+                        failed to load
+                      </span>
+                    ) : null}
+                  </div>
+                  <LayerGrid blocks={layerBlocks} />
+                </div>
+              );
+            })}
           </section>
         );
       })}
