@@ -507,8 +507,10 @@ export default function BoardPage() {
       tabIndex={0}
       aria-label="Family board — scrollable"
       style={{
-        marginTop: "var(--nav-h)",
-        height: "calc(100dvh - var(--nav-h))",
+        // --strip-h is OriginsStrip, fixed under the nav on every route. Both
+        // offsets have to account for it or the last row falls below the fold.
+        marginTop: "calc(var(--nav-h) + var(--strip-h))",
+        height: "calc(100dvh - var(--nav-h) - var(--strip-h))",
         overflowY: "auto",
         overscrollBehavior: "contain",
         WebkitOverflowScrolling: "touch",

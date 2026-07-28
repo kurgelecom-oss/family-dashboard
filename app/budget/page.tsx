@@ -177,7 +177,10 @@ export default function BudgetPage() {
   return (
     // globals.css puts overflow:hidden on html/body for the TV surfaces, which
     // left this scrolling page's overflow unreachable. Scroll here instead.
-    <div style={{ height: "100vh", overflowY: "auto", paddingTop: "var(--nav-h)", background: "#0d0f14", color: "#f0f2f8", fontFamily: "'Inter', sans-serif" }}>
+    // This page scrolls rather than filling a fixed viewport, so the strip cannot
+    // push anything below a fold — but it would sit over the first 40px of
+    // content unless this offset accounts for it too.
+    <div style={{ height: "100vh", overflowY: "auto", paddingTop: "calc(var(--nav-h) + var(--strip-h))", background: "#0d0f14", color: "#f0f2f8", fontFamily: "'Inter', sans-serif" }}>
 
       <header style={{
         background: "#13161e", borderBottom: "1px solid #232736",

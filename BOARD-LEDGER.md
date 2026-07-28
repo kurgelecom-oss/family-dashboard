@@ -1077,3 +1077,28 @@ substitution leaving a 3-line comment. **Fourth consecutive commit where every n
 every fetched fact was sound and the failures were all in the connective prose.** The
 lesson has stopped being incidental: on this work, the sentence joining two verified facts
 is less reliable than either fact, and it is where review time should go.
+
+### 2026-07-28 — `/board` content overflows the fixed viewport at 1920x1080
+
+**Pre-existing. Not caused by the Origins strip.** Logged, deliberately not fixed.
+
+Baseline **65px hidden BEFORE the Origins strip; 105px after**. Measured, not estimated:
+both states were read in the same loaded page at a 1920x1080 viewport, the second by
+setting `--strip-h: 0px` and hiding `.origins-strip` to reproduce the pre-change geometry
+exactly, then restoring both. The strip's contribution is exactly its own height, 40px.
+
+The overflowing content sits in a `div` with `overflow-y: auto` (`clientHeight` 1000,
+`scrollHeight` 1119), so it is reachable by scrolling inside the board region and is not
+destroyed. That is not a defence: **it violates the fixed no-scroll TV rule** — nobody
+scrolls a 65" wall display, and the deepest `.card` is cut at the viewport edge.
+
+**Needs a BOARD-SPEC amendment and its own diff.** BOARD-SPEC is frozen and changing scope
+is a deliberate act, never a side effect of implementation — so the Origins work, which is
+what surfaced this, is the wrong diff to fix it in. The Origins strip shipped with the
+40px regression knowingly and on the owner's explicit instruction ("Option 1 confirmed.
+Ship. Do not touch /board's layout in this diff.").
+
+**Scope of this pass on `/board`:** two inline style values only —
+`marginTop: calc(var(--nav-h) + var(--strip-h))` and
+`height: calc(100dvh - var(--nav-h) - var(--strip-h))`. No hex, no data logic, no
+structural change; STYLE, STRUCTURE, DATA SOURCES, RULES, PARITY and SCORING are untouched.

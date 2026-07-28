@@ -8,6 +8,7 @@ const LINKS = [
   { label: "ECOM Launchpad",        href: "https://ecom-launchpad-mentor.netlify.app/" },
   { label: "Ansar · ANSAR FC",      href: "https://ansar-habits-tracker.netlify.app/" },
   { label: "Time Allocation Board", href: "https://kurgel-dashboard.netlify.app/board" },
+  { label: "ORIGINS",               href: "https://kurgel-dashboard.netlify.app/origins" },
   { label: "Link Board",            href: "https://luxury-kringle-cf4171.netlify.app/" },
 ];
 

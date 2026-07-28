@@ -200,7 +200,10 @@ export default function WeekPage() {
 
   return (
     // Mirrors .dashboard (globals.css): fixed-viewport flex column, no page scroll
-    <div style={{ height: "calc(100dvh - var(--nav-h))", marginTop: "var(--nav-h)", width: "100vw", overflow: "hidden", display: "flex", flexDirection: "column", gap: 12, padding: 12, background: "var(--bg-base)" }}>
+    // --strip-h is OriginsStrip, fixed under the nav on every route. This page is
+    // 308-redirected to /board and so unreachable, but it stays on disk and the
+    // maths has to stay right if that redirect is ever lifted.
+    <div style={{ height: "calc(100dvh - var(--nav-h) - var(--strip-h))", marginTop: "calc(var(--nav-h) + var(--strip-h))", width: "100vw", overflow: "hidden", display: "flex", flexDirection: "column", gap: 12, padding: 12, background: "var(--bg-base)" }}>
 
         {/* HEADER */}
         <div className="header">
