@@ -4,8 +4,19 @@ import { getTodayDate } from "../lib/supabase";
 import WeekProgressStrip from "../components/WeekProgressStrip";
 
 // ─── Theme (mirrors Header.tsx so /week matches the dashboard) ──────────────
+// Local hour in Sydney. The hardcoded `getUTCHours() + 10` this replaces was
+// wrong for roughly half the year: Sydney runs UTC+11 during AEDT (early Oct to
+// early Apr), so the theme flipped to night an hour early all summer. An IANA
+// zone knows the DST rules; an offset constant never can. Kept byte-identical
+// to the copy in Header.tsx so the two surfaces cannot drift apart again.
 function getAestHour(): number {
-  return (new Date().getUTCHours() + 10) % 24;
+  return Number(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Australia/Sydney",
+      hourCycle: "h23",
+      hour: "2-digit",
+    }).format(new Date()),
+  );
 }
 function getAutoTheme(): "day" | "night" {
   return getAestHour() >= 17 ? "night" : "day";

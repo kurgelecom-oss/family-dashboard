@@ -1,8 +1,21 @@
 "use client";
 import { useState, useEffect } from "react";
 
+// Local hour in Sydney. The hardcoded `getUTCHours() + 10` this replaces was
+// wrong for roughly half the year: Sydney runs UTC+11 during AEDT (early Oct to
+// early Apr), so the theme flipped to night an hour early all summer. An IANA
+// zone knows the DST rules; an offset constant never can.
+//
+// hourCycle "h23" matters — with hour12:false some locales render midnight as
+// "24", which would parse to 24 rather than 0.
 function getAestHour(): number {
-  return (new Date().getUTCHours() + 10) % 24;
+  return Number(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Australia/Sydney",
+      hourCycle: "h23",
+      hour: "2-digit",
+    }).format(new Date()),
+  );
 }
 
 function getAutoTheme(): "day" | "night" {
