@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Profit Split — Unit Economics Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;450;500;600;700&display=swap" rel="stylesheet">
+<style>
+  html[data-theme="light"]{
+    --canvas:#EDEBE6; --surface:#FFFFFF; --recess:#F6F5F2; --sunk:#EAE7E1;
+    --ink:#15171F; --ink-2:#575D6B; --ink-3:#8D929E;
+    --line:#E4E1DA; --line-soft:#EDEAE4;
+    --accent:#4B3BEB; --accent-2:#6C5DFF; --accent-wash:#EEEBFF; --accent-ink:#2A1FA8;
+    --pos:#0B8A5C; --pos-wash:#E4F5EE;
+    --warn:#B96C05; --warn-wash:#FCF0DC;
+    --neg:#C13328; --neg-wash:#FBE9E7;
+    --cut-a:#E8968E; --cut-b:#E0857C;
+    --glow:rgba(21,23,31,.14);
+    --canvas-a:#FFFFFF; --canvas-b:#F3F1FF;
+  }
+  html[data-theme="dark"]{
+    --canvas:#101219; --surface:#1B1E27; --recess:#232631; --sunk:#15181F;
+    --ink:#F1F3F6; --ink-2:#A4AAB8; --ink-3:#6F7686;
+    --line:#2E323D; --line-soft:#282C36;
+    --accent:#7C6DFF; --accent-2:#9B8FFF; --accent-wash:#252246; --accent-ink:#B4A9FF;
+    --pos:#3BD298; --pos-wash:#12332A;
+    --warn:#E8A33C; --warn-wash:#332711;
+    --neg:#F0716A; --neg-wash:#38191B;
+    --cut-a:#8A4A46; --cut-b:#7A403C;
+    --glow:rgba(0,0,0,.5);
+    --canvas-a:#1A1D27; --canvas-b:#191634;
+  }
+
+  :root{
+    --shadow-sm:0 1px 2px var(--glow);
+    --shadow:0 1px 2px var(--glow), 0 10px 26px -14px var(--glow);
+    --shadow-lg:0 2px 4px var(--glow), 0 18px 44px -18px var(--glow);
+    --ease:cubic-bezier(.22,.61,.36,1);
+    --r-lg:18px; --r-md:13px; --r-sm:10px;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:var(--canvas);
+    background-image:radial-gradient(circle at 12% -8%, var(--canvas-a) 0%, transparent 46%),
+                     radial-gradient(circle at 96% 4%, var(--canvas-b) 0%, transparent 42%);
+    background-attachment:fixed;
+    color:var(--ink);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    font-size:14px;line-height:1.55;padding:30px 20px 90px;
+    -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+    transition:background-color .35s var(--ease), color .35s var(--ease);
+  }
+  .wrap{max-width:1240px;margin:0 auto}
+  .num{font-family:'Space Grotesk','Inter',sans-serif;font-variant-numeric:tabular-nums;letter-spacing:-0.01em}
+
+  header{display:flex;flex-wrap:wrap;gap:20px;justify-content:space-between;align-items:center;margin-bottom:26px}
+  .brand{display:flex;align-items:center;gap:14px}
+  .glyph{
+    width:44px;height:44px;border-radius:13px;flex-shrink:0;
+    background:linear-gradient(145deg,var(--accent-2),var(--accent));
+    box-shadow:0 6px 18px -6px var(--accent);display:grid;place-items:center;
+  }
+  h1{font-family:'Space Grotesk',sans-serif;font-size:23px;font-weight:700;letter-spacing:-0.02em;line-height:1.15}
+  .sub{color:var(--ink-2);font-size:13.5px;margin-top:1px}
+  .hctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+  .periods{display:inline-flex;gap:2px;background:var(--sunk);padding:5px;border-radius:14px;box-shadow:inset 0 1px 3px var(--glow)}
+  .pbtn{
+    appearance:none;border:0;background:transparent;color:var(--ink-2);
+    font-family:inherit;font-size:13px;font-weight:600;padding:10px 20px;border-radius:10px;cursor:pointer;
+    transition:color .22s var(--ease), background .3s var(--ease), box-shadow .3s var(--ease), transform .14s var(--ease);
+  }
+  .pbtn:hover{color:var(--ink)}
+  .pbtn:active{transform:scale(.965)}
+  .pbtn:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  .pbtn.on{background:var(--surface);color:var(--accent-ink);box-shadow:0 1px 2px var(--glow), 0 4px 12px -6px var(--glow)}
+
+  .themebtn{
+    appearance:none;border:0;cursor:pointer;width:46px;height:46px;border-radius:14px;
+    background:var(--surface);color:var(--ink-2);display:grid;place-items:center;
+    box-shadow:var(--shadow-sm);
+    transition:transform .16s var(--ease), color .22s var(--ease), background .3s var(--ease);
+  }
+  .themebtn:hover{color:var(--accent-ink);transform:translateY(-1px)}
+  .themebtn:active{transform:scale(.94)}
+  .themebtn:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  html[data-theme="dark"] .themebtn .i-sun{display:block}
+  html[data-theme="dark"] .themebtn .i-moon{display:none}
+  html[data-theme="light"] .themebtn .i-sun{display:none}
+  html[data-theme="light"] .themebtn .i-moon{display:block}
+
+  .cols{display:grid;grid-template-columns:352px 1fr;gap:20px;align-items:start}
+  @media(max-width:1080px){.cols{grid-template-columns:1fr}}
+
+  .card{background:var(--surface);border-radius:var(--r-lg);padding:20px 20px 22px;margin-bottom:18px;box-shadow:var(--shadow);
+        transition:background .35s var(--ease)}
+  .card.feature{box-shadow:var(--shadow-lg)}
+  .chead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:17px;padding-bottom:13px;border-bottom:1px solid var(--line-soft)}
+  .chead h2{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600}
+  .chead .per{font-size:11px;font-weight:600;color:var(--accent-ink);background:var(--accent-wash);padding:4px 10px;border-radius:20px;white-space:nowrap}
+
+  .field{margin-bottom:14px}
+  .field:last-child{margin-bottom:0}
+  .field label{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:10px}
+  .field .name{font-size:13px;font-weight:500;color:var(--ink)}
+  .field .hint{font-size:11px;color:var(--ink-3);text-align:right}
+
+  .autopill{
+    appearance:none;border:0;cursor:pointer;font-family:inherit;
+    font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+    padding:4px 9px;border-radius:20px;white-space:nowrap;
+    background:var(--sunk);color:var(--ink-3);
+    transition:background .22s var(--ease), color .22s var(--ease), transform .14s var(--ease);
+  }
+  .autopill:hover{transform:translateY(-1px)}
+  .autopill:active{transform:scale(.94)}
+  .autopill:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .autopill.on{background:var(--accent-wash);color:var(--accent-ink)}
+
+  .inputwrap{position:relative}
+  .inputwrap .pre{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--ink-3);font-size:14px;pointer-events:none;font-family:'Space Grotesk',sans-serif}
+  .inputwrap .suf{position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--ink-3);font-size:13px;pointer-events:none}
+  input[type=number],select{
+    width:100%;background:var(--recess);border:1.5px solid transparent;border-radius:var(--r-md);
+    color:var(--ink);padding:12px 14px 12px 28px;font-size:15px;font-weight:500;
+    font-family:'Space Grotesk','Inter',sans-serif;font-variant-numeric:tabular-nums;
+    box-shadow:inset 0 1px 2px var(--glow);
+    transition:border-color .2s var(--ease), background .25s var(--ease), box-shadow .2s var(--ease);
+  }
+  select{
+    padding-left:14px;padding-right:38px;cursor:pointer;appearance:none;font-family:'Inter',sans-serif;font-size:14px;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1.5L6 6.5L11 1.5' stroke='%238D929E' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat;background-position:right 14px center;
+  }
+  input.plain{padding-left:14px}
+  input.pct{padding-left:14px;padding-right:36px}
+  input[type=number]:focus,select:focus{outline:none;border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 4px var(--accent-wash)}
+  input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  input[type=number]{-moz-appearance:textfield}
+  input.isauto{color:var(--accent-ink)}
+
+  .computed{display:flex;justify-content:space-between;align-items:center;background:var(--accent-wash);border-radius:var(--r-md);padding:13px 15px}
+  .computed .ck{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-ink);opacity:.8}
+  .computed .cv{font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;color:var(--accent-ink);font-variant-numeric:tabular-nums}
+
+  input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:8px;background:var(--sunk);border-radius:6px;margin-top:11px;cursor:pointer;box-shadow:inset 0 1px 2px var(--glow)}
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:var(--surface);cursor:grab;border:0;
+    box-shadow:0 0 0 1.5px var(--line), 0 3px 10px -2px var(--glow);
+    transition:transform .18s var(--ease), box-shadow .18s var(--ease);
+  }
+  input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.1);box-shadow:0 0 0 1.5px var(--accent), 0 4px 14px -2px var(--glow)}
+  input[type=range]::-webkit-slider-thumb:active{cursor:grabbing;transform:scale(1.02)}
+  input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:50%;background:var(--surface);cursor:grab;border:1.5px solid var(--line)}
+  input[type=range]:focus{outline:none}
+
+  /* waterfall */
+  .fall{display:flex;flex-direction:column;gap:3px}
+  .wrow{display:grid;grid-template-columns:158px 1fr 118px;align-items:center;gap:16px;padding:11px 14px;border-radius:var(--r-md);transition:background .2s var(--ease)}
+  .wrow:hover{background:var(--recess)}
+  .wname{font-size:13.5px;font-weight:500;display:flex;align-items:center;gap:8px}
+  .wname .pctchip{font-size:10.5px;color:var(--ink-3);font-family:'Space Grotesk',sans-serif}
+  .wtrack{position:relative;height:22px;border-radius:7px;background:var(--sunk);overflow:hidden}
+  .wfill{position:absolute;top:0;height:100%;border-radius:6px;transition:left .35s var(--ease), width .35s var(--ease)}
+  .wval{text-align:right;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+  .wrow.lvl .wfill{background:linear-gradient(135deg,var(--accent-2),var(--accent))}
+  .wrow.cut .wfill{background:repeating-linear-gradient(135deg,var(--cut-a) 0 6px,var(--cut-b) 6px 12px)}
+  .wrow.cut .wname{color:var(--ink-2);padding-left:16px;position:relative}
+  .wrow.cut .wname::before{content:"–";position:absolute;left:2px;color:var(--neg);font-weight:700;font-size:15px}
+  .wrow.cut .wval{color:var(--neg);font-weight:500}
+  .wrow.net{background:var(--accent-wash);padding-top:15px;padding-bottom:15px;margin-top:5px}
+  .wrow.net .wname{font-weight:700;font-size:14px}
+  .wrow.net .wval{font-size:20px;font-weight:700;color:var(--accent-ink)}
+  .wrow.net.loss{background:var(--neg-wash)}
+  .wrow.net.loss .wfill{background:linear-gradient(135deg,var(--neg),var(--neg))}
+  .wrow.net.loss .wval{color:var(--neg)}
+  @media(max-width:620px){
+    .wrow{grid-template-columns:104px 1fr 92px;gap:10px;padding:10px}
+    .wval{font-size:13.5px}.wrow.net .wval{font-size:17px}
+  }
+
+  /* verdict */
+  .verdict{display:flex;align-items:center;gap:15px;padding:17px 19px;border-radius:var(--r-md);margin-bottom:20px;transition:background .3s var(--ease)}
+  .verdict .vmark{width:44px;height:44px;border-radius:13px;flex-shrink:0;display:grid;place-items:center;font-size:21px;background:var(--surface);box-shadow:var(--shadow-sm)}
+  .verdict .vt{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700}
+  .verdict .vs{font-size:12.5px;color:var(--ink-2);margin-top:3px;line-height:1.45}
+  .verdict.go{background:var(--pos-wash)} .verdict.go .vt{color:var(--pos)}
+  .verdict.fix{background:var(--warn-wash)} .verdict.fix .vt{color:var(--warn)}
+  .verdict.stop{background:var(--neg-wash)} .verdict.stop .vt{color:var(--neg)}
+  .verdict.idle{background:var(--recess)} .verdict.idle .vt{color:var(--ink-2)}
+
+  /* gates */
+  .gate{padding:15px 0;border-bottom:1px solid var(--line-soft)}
+  .gate:last-of-type{border-bottom:0;padding-bottom:3px}
+  .gtop{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:9px}
+  .gname{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .draghint{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);background:var(--sunk);padding:3px 7px;border-radius:20px}
+  .gright{display:flex;align-items:center;gap:11px}
+  .gval{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+  .gtag{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:5px 10px;border-radius:20px;white-space:nowrap}
+  .gtag.ok{background:var(--pos-wash);color:var(--pos)}
+  .gtag.warn{background:var(--warn-wash);color:var(--warn)}
+  .gtag.bad{background:var(--neg-wash);color:var(--neg)}
+  .gval.ok{color:var(--pos)}.gval.warn{color:var(--warn)}.gval.bad{color:var(--neg)}
+
+  .track{position:relative;height:10px;background:var(--sunk);border-radius:7px;margin:13px 0 8px;box-shadow:inset 0 1px 2px var(--glow)}
+  .track.drag{height:14px;margin:14px 0 9px;cursor:grab;touch-action:none}
+  .track.drag:active{cursor:grabbing}
+  .track.drag::before{
+    content:"";position:absolute;inset:-9px -4px;border-radius:12px;
+    transition:background .2s var(--ease);
+  }
+  .track.drag:hover::before{background:var(--accent-wash);opacity:.45}
+  .zone{position:absolute;top:0;height:100%;background:var(--pos);opacity:.22;border-radius:5px;transition:left .3s var(--ease), width .3s var(--ease)}
+  .zedge{position:absolute;top:-2px;width:1.5px;height:calc(100% + 4px);background:var(--pos);opacity:.55;border-radius:2px;transition:left .3s var(--ease)}
+  .pin{
+    position:absolute;top:50%;width:20px;height:20px;border-radius:50%;
+    transform:translate(-10px,-50%);background:var(--surface);
+    box-shadow:0 2px 8px -1px var(--glow), 0 0 0 1px var(--line);
+    display:grid;place-items:center;transition:left .3s var(--ease), transform .16s var(--ease);
+  }
+  .pin::after{content:"";width:9px;height:9px;border-radius:50%}
+  .pin.ok::after{background:var(--pos)}
+  .pin.warn::after{background:var(--warn)}
+  .pin.bad::after{background:var(--neg)}
+  .track.drag .pin{width:24px;height:24px;transform:translate(-12px,-50%)}
+  .track.drag .pin::after{width:10px;height:10px}
+  .track.drag:hover .pin{transform:translate(-12px,-50%) scale(1.12)}
+  .track.dragging .pin{transition:none;transform:translate(-12px,-50%) scale(1.06)}
+  .track.dragging .zone,.track.dragging .zedge{transition:none}
+  .gscale{display:flex;justify-content:space-between;font-size:10.5px;color:var(--ink-3);font-family:'Space Grotesk',sans-serif}
+  .gnote{font-size:12px;color:var(--ink-2);margin-top:7px;line-height:1.5}
+
+  .caveat{margin-top:17px;font-size:12px;line-height:1.55;color:var(--warn);background:var(--warn-wash);border-radius:var(--r-sm);padding:12px 14px;display:flex;gap:10px}
+  .caveat::before{content:"⚠";flex-shrink:0}
+
+  .bar{display:flex;height:44px;border-radius:var(--r-md);overflow:hidden;margin:4px 0 20px;box-shadow:var(--shadow-sm)}
+  .seg{display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden;transition:width .35s var(--ease);color:#fff}
+  .seg.re{background:linear-gradient(135deg,#FF9A4D,#F2761B)}
+  .seg.fam{background:linear-gradient(135deg,var(--accent-2),var(--accent))}
+  .seg.rw{background:linear-gradient(135deg,#4FC3A1,#12A177)}
+
+  .row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:baseline;margin-bottom:5px}
+  .row .k{font-size:13px;display:flex;align-items:center;gap:9px;color:var(--ink-2)}
+  .row .v{font-family:'Space Grotesk',sans-serif;font-size:14px;font-variant-numeric:tabular-nums;font-weight:600}
+  .dot{width:10px;height:10px;border-radius:4px;flex-shrink:0}
+  .dot.re{background:#F2761B}.dot.fam{background:var(--accent)}.dot.rw{background:#12A177}
+  .subnote{font-size:11.5px;color:var(--ink-3);margin:0 0 15px 19px;line-height:1.5}
+
+  .metric{border-radius:var(--r-md);padding:19px;margin-bottom:14px;background:var(--recess);transition:background .3s var(--ease)}
+  .metric.good{background:var(--pos-wash)}
+  .metric.warn{background:var(--warn-wash)}
+  .metric.bad{background:var(--neg-wash)}
+  .metric .mk{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);margin-bottom:10px}
+  .metric .mv{font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;letter-spacing:-0.02em}
+  .metric.good .mv{color:var(--pos)}.metric.warn .mv{color:var(--warn)}.metric.bad .mv{color:var(--neg)}
+  .metric .mn{font-size:12.5px;color:var(--ink-2);margin-top:10px;line-height:1.5}
+  .duo{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:620px){.duo{grid-template-columns:1fr}}
+
+  .flag{margin-top:14px;font-size:12px;display:flex;gap:9px;align-items:flex-start;line-height:1.55;color:var(--ink-2)}
+  .flag::before{content:"→";flex-shrink:0;color:var(--ink-3)}
+
+  .solvegrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+  .sm{background:var(--recess);border-radius:var(--r-md);padding:16px}
+  .sm .smk{font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);margin-bottom:8px;line-height:1.35}
+  .sm .smv{font-family:'Space Grotesk',sans-serif;font-size:25px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--accent-ink);line-height:1.05;letter-spacing:-0.02em}
+  .sm .smn{font-size:11.5px;color:var(--ink-3);margin-top:6px;line-height:1.4}
+
+  footer{margin-top:30px;padding:20px 22px;background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--shadow-sm);font-size:12.5px;color:var(--ink-2);line-height:1.75}
+  footer strong{color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="brand">
+    <div class="glyph">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <path d="M3 5h18M6 10h15M9 15h12M13 20h8" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div>
+      <h1>Profit Split</h1>
+      <p class="sub">Where every dollar goes, and whether the numbers hold up.</p>
+    </div>
+  </div>
+  <div class="hctl">
+    <div class="periods" role="group" aria-label="Time period">
+      <button class="pbtn" data-p="day">Daily</button>
+      <button class="pbtn on" data-p="week">Weekly</button>
+      <button class="pbtn" data-p="month">Monthly</button>
+      <button class="pbtn" data-p="year">Yearly</button>
+    </div>
+    <button class="themebtn" id="themeBtn" aria-label="Toggle dark mode" title="Toggle dark mode">
+      <svg class="i-moon" width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <svg class="i-sun" width="19" height="19" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4.2" stroke="currentColor" stroke-width="1.9"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.2 5.2l1.4 1.4M17.4 17.4l1.4 1.4M18.8 5.2l-1.4 1.4M6.6 17.4l-1.4 1.4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+</header>
+
+<div class="cols">
+
+  <!-- ================= LEFT ================= -->
+  <div>
+
+    <div class="card">
+      <div class="chead"><h2>Business</h2><span class="per" id="per1">per week</span></div>
+      <div class="field">
+        <label><span class="name">Product category</span><span class="hint">sets the COGS band</span></label>
+        <select id="category">
+          <option value="general">General / mixed</option>
+          <option value="apparel">Apparel</option>
+          <option value="beauty">Beauty</option>
+          <option value="supps">Health &amp; supplements</option>
+          <option value="electronics">Electronics</option>
+        </select>
+      </div>
+      <div class="field">
+        <label><span class="name">Average order value</span><span class="hint">what one customer pays</span></label>
+        <div class="inputwrap"><span class="pre">$</span><input type="number" id="aov" step="1"></div>
+      </div>
+      <div class="field">
+        <label><span class="name">Total sales</span><span class="hint">number of orders</span></label>
+        <div class="inputwrap"><input class="plain" type="number" id="orders" step="1"></div>
+      </div>
+      <div class="computed"><span class="ck">Revenue</span><span class="cv" id="revBox">—</span></div>
+      <div class="field" style="margin-top:14px">
+        <label><span class="name">COGS</span><button class="autopill on" id="autoCogsBtn">Auto</button></label>
+        <div class="inputwrap"><span class="pre">$</span><input type="number" id="cogs" step="10"></div>
+      </div>
+      <div class="field">
+        <label><span class="name">Ads</span><button class="autopill on" id="autoAdsBtn">Auto</button></label>
+        <div class="inputwrap"><span class="pre">$</span><input type="number" id="ads" step="10"></div>
+      </div>
+      <div class="field">
+        <label><span class="name">Platform + payment fees</span><span class="hint">% of revenue</span></label>
+        <div class="inputwrap"><input class="pct" type="number" id="feesPct" step="0.05"><span class="suf">%</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><h2>Household</h2><span class="per" id="per2">per week</span></div>
+      <div class="field">
+        <label><span class="name">Rent or mortgage</span></label>
+        <div class="inputwrap"><span class="pre">$</span><input type="number" id="rent" step="10"></div>
+      </div>
+      <div class="field">
+        <label><span class="name">All other expenses</span><span class="hint">excludes housing</span></label>
+        <div class="inputwrap"><span class="pre">$</span><input type="number" id="expenses" step="10"></div>
+      </div>
+      <div class="field">
+        <label><span class="name">Other income</span><span class="hint">outside the business</span></label>
+        <div class="inputwrap"><span class="pre">$</span><input type="number" id="otherIncome" step="10"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><h2>Targets</h2><span class="per" id="per3">per week</span></div>
+      <div class="field">
+        <label><span class="name">Net income target</span><span class="hint">combined, take-home</span></label>
+        <div class="inputwrap"><span class="pre">$</span><input type="number" id="incomeTarget" step="10"></div>
+      </div>
+      <div class="field">
+        <label><span class="name">Housing rule</span><span class="hint">max % of income</span></label>
+        <div class="inputwrap"><input class="pct" type="number" id="housingRule" step="1"><span class="suf">%</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><h2>The split</h2><span id="splitWarn" class="per" style="display:none;background:var(--neg-wash);color:var(--neg)">over 100%</span></div>
+      <div class="bar">
+        <div class="seg re" id="segRe"></div>
+        <div class="seg fam" id="segFam"></div>
+        <div class="seg rw" id="segRw"></div>
+      </div>
+      <div class="row"><span class="k"><span class="dot re"></span>Back into the business</span><span class="v" id="rePctTxt"></span></div>
+      <input type="range" id="reinvestPct" min="0" max="100" value="60" step="5">
+      <p class="subnote">Stock, testing budget, cash buffer.</p>
+      <div class="row"><span class="k"><span class="dot rw"></span>Reward fund</span><span class="v" id="rwPctTxt"></span></div>
+      <input type="range" id="rewardPct" min="0" max="60" value="5" step="1">
+      <p class="subnote">Set aside. Nothing else touches it.</p>
+      <div class="row" style="margin-top:18px;padding-top:15px;border-top:1px solid var(--line-soft)">
+        <span class="k"><span class="dot fam"></span><strong style="color:var(--ink)">Household draw</strong></span>
+        <span class="v" id="famPctTxt" style="color:var(--accent-ink)"></span>
+      </div>
+      <p class="subnote" style="margin-bottom:0">What is left. This is what you live on.</p>
+    </div>
+  </div>
+
+  <!-- ================= RIGHT ================= -->
+  <div>
+
+    <div class="card feature">
+      <div class="chead"><h2>Business waterfall</h2><span class="per" id="per4">per week</span></div>
+      <div class="fall">
+        <div class="wrow lvl"><span class="wname">Revenue</span><span class="wtrack"><span class="wfill" id="bRev"></span></span><span class="wval num" id="vSales"></span></div>
+        <div class="wrow cut"><span class="wname">COGS <span class="pctchip" id="pCogs"></span></span><span class="wtrack"><span class="wfill" id="bCogs"></span></span><span class="wval num" id="vCogs"></span></div>
+        <div class="wrow lvl"><span class="wname">Gross profit <span class="pctchip" id="pGp"></span></span><span class="wtrack"><span class="wfill" id="bGp"></span></span><span class="wval num" id="vGp"></span></div>
+        <div class="wrow cut"><span class="wname">Ads <span class="pctchip" id="pAds"></span></span><span class="wtrack"><span class="wfill" id="bAds"></span></span><span class="wval num" id="vAds"></span></div>
+        <div class="wrow lvl"><span class="wname">Contribution <span class="pctchip" id="pContrib"></span></span><span class="wtrack"><span class="wfill" id="bContrib"></span></span><span class="wval num" id="vContrib"></span></div>
+        <div class="wrow cut"><span class="wname">Fees <span class="pctchip" id="pFees"></span></span><span class="wtrack"><span class="wfill" id="bFees"></span></span><span class="wval num" id="vFees"></span></div>
+        <div class="wrow net" id="netRow"><span class="wname">Net profit <span class="pctchip" id="pNet"></span></span><span class="wtrack"><span class="wfill" id="bNet"></span></span><span class="wval num" id="vNet"></span></div>
+      </div>
+    </div>
+
+    <div class="card feature">
+      <div class="chead"><h2>Benchmark gates</h2><span class="per" id="stageTag">—</span></div>
+      <div class="verdict idle" id="verdictBar">
+        <span class="vmark" id="vMark">—</span>
+        <div><div class="vt" id="vTitle">—</div><div class="vs" id="vSub"></div></div>
+      </div>
+      <div id="gates"></div>
+      <div class="caveat"><span>2026 note: Meta and Google CPMs are up 12&ndash;18% year on year and new tariffs are lifting landed costs. These bands are moving targets, not hard lines.</span></div>
+      <div class="caveat" id="varCaveat" style="display:none"><span>The benchmark shape assumes 10&ndash;15% of revenue goes to other variable costs — shipping, packing, fulfilment, returns. Your model only carries fees at <span id="feeEcho">3.75%</span>, so net margin here reads higher than a full P&amp;L would.</span></div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><h2>Household against business profit</h2></div>
+      <div class="metric" id="burnMetric">
+        <div class="mk">Household costs as a share of business net profit</div>
+        <div class="mv" id="burnVal">—</div>
+        <div class="mn" id="burnNote"></div>
+      </div>
+      <div class="row"><span class="k">Business net profit</span><span class="v" id="rNet"></span></div>
+      <div class="row"><span class="k">Household costs</span><span class="v" id="rHome"></span></div>
+      <div class="row"><span class="k">Business covers</span><span class="v" id="rCover"></span></div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><h2>Combined position</h2></div>
+      <div class="duo">
+        <div class="metric" id="incMetric"><div class="mk">Net income vs target</div><div class="mv" id="incVal">—</div><div class="mn" id="incNote"></div></div>
+        <div class="metric" id="houseMetric"><div class="mk">Housing share of income</div><div class="mv" id="houseVal">—</div><div class="mn" id="houseNote"></div></div>
+      </div>
+      <div style="margin-top:18px">
+        <div class="row"><span class="k">Household draw from business</span><span class="v" id="rDraw"></span></div>
+        <div class="row"><span class="k">Other income</span><span class="v" id="rOther"></span></div>
+        <div class="row"><span class="k">Combined net income</span><span class="v" id="rCombined" style="color:var(--accent-ink)"></span></div>
+        <div class="row"><span class="k">Left after household costs</span><span class="v" id="rLeft"></span></div>
+        <div class="row"><span class="k">Reinvested into the business</span><span class="v" id="rReinvest"></span></div>
+        <div class="row"><span class="k">Into the reward fund</span><span class="v" id="rReward"></span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="chead"><h2>What it takes</h2></div>
+      <div class="solvegrid">
+        <div class="sm"><div class="smk">Net profit per order</div><div class="smv" id="sPerOrder">—</div><div class="smn" id="sPerOrderN"></div></div>
+        <div class="sm"><div class="smk">Orders to hit income target</div><div class="smv" id="sTarget">—</div><div class="smn" id="sTargetN"></div></div>
+        <div class="sm"><div class="smk">Orders to cover household</div><div class="smv" id="sCover">—</div><div class="smn" id="sCoverN"></div></div>
+      </div>
+      <div class="flag" id="solveFlag"></div>
+    </div>
+
+  </div>
+</div>
+
+<footer>
+  <strong>Auto mode</strong> parks COGS and ads at the middle of their healthy band, so you start from a target rather than a guess. Type in a field or drag its bar to take manual control. Press Auto again to snap back.<br>
+  <strong>Draggable bars.</strong> COGS, ad spend and ROAS can all be dragged. Ad spend and ROAS are two views of the same number, so moving one moves the other.<br>
+  <strong>Order of costs.</strong> COGS and ads are the cost of making the sale, so they come out first. Reinvestment is taken from net profit, never from revenue.
+</footer>
+
+</div>
+
+<script>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var clamp = function(v,lo,hi){ return Math.max(lo,Math.min(hi,v)); };
+
+  var PERIOD = {
+    day:{f:1/7,label:"per day",short:"/day"},
+    week:{f:1,label:"per week",short:"/wk"},
+    month:{f:52/12,label:"per month",short:"/mo"},
+    year:{f:52,label:"per year",short:"/yr"}
+  };
+  var period = "week";
+
+  var COGS_BAND = { general:[30,50], apparel:[40,60], beauty:[30,50], supps:[30,45], electronics:[75,85] };
+  function adBand(y){
+    if(y < 1000000)  return {band:[25,35], name:"under $1M"};
+    if(y < 5000000)  return {band:[20,30], name:"$1M–$5M"};
+    if(y < 10000000) return {band:[15,25], name:"$5M–$10M"};
+    return {band:[0,20], name:"$10M+"};
+  }
+
+  var base = { orders:448, cogs:10500, ads:7700, rent:896, expenses:1190, otherIncome:1596, incomeTarget:3462 };
+  var aov = 60;
+  var autoCogs = false, autoAds = false;
+  var dragging = null;
+  var FLOW = ["orders","cogs","ads","rent","expenses","otherIncome","incomeTarget"];
+
+  function money(n){ return !isFinite(n) ? "—" : (n<0?"−$":"$")+Math.abs(n).toLocaleString("en-AU",{minimumFractionDigits:0,maximumFractionDigits:0}); }
+  function money2(n){ return !isFinite(n) ? "—" : (n<0?"−$":"$")+Math.abs(n).toLocaleString("en-AU",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function moneyP(n){ return money(n)+PERIOD[period].short; }
+  function pct(n){ return isFinite(n) ? (n*100).toFixed(1)+"%" : "—"; }
+  function raw(id){ var v=parseFloat($(id).value); return isFinite(v)?v:0; }
+  function count(n){ return isFinite(n) ? Math.ceil(n).toLocaleString("en-AU") : "—"; }
+
+  function weeklyRev(){ return aov * base.orders; }
+  function yearlyRev(){ return weeklyRev() * 52; }
+  function cogsBand(){ return COGS_BAND[$("category").value] || COGS_BAND.general; }
+  function mid(b){ return (b[0]+b[1])/2; }
+
+  // Auto mode parks COGS and ads at the middle of their healthy band.
+  function applyAuto(){
+    var wr = weeklyRev();
+    if(autoCogs) base.cogs = mid(cogsBand())/100 * wr;
+    if(autoAds)  base.ads  = mid(adBand(yearlyRev()).band)/100 * wr;
+  }
+
+  function paintFlow(only){
+    var f = PERIOD[period].f;
+    FLOW.forEach(function(k){
+      if(only && only.indexOf(k) === -1) return;
+      var v = base[k]*f;
+      $(k).value = (k==="orders") ? Math.round(v*10)/10 : Math.round(v*100)/100;
+    });
+  }
+  function paintAll(){
+    paintFlow(); $("aov").value = aov;
+    ["per1","per2","per3","per4"].forEach(function(id){ $(id).textContent = PERIOD[period].label; });
+  }
+  function pullFlow(k){ base[k] = raw(k)/PERIOD[period].f; }
+
+  function setAuto(which, on){
+    if(which==="cogs"){ autoCogs=on; $("autoCogsBtn").classList.toggle("on",on); $("cogs").classList.toggle("isauto",on); }
+    else { autoAds=on; $("autoAdsBtn").classList.toggle("on",on); $("ads").classList.toggle("isauto",on); }
+  }
+
+  function splits(){
+    var re=raw("reinvestPct")/100, rw=raw("rewardPct")/100, fam=1-re-rw;
+    return {re:re,rw:rw,fam:Math.max(0,fam),over:fam<0};
+  }
+
+  function setBar(id,a,b){
+    var lo=clamp(Math.min(a,b),0,1)*100, hi=clamp(Math.max(a,b),0,1)*100;
+    var el=$(id); el.style.left=lo+"%"; el.style.width=Math.max(hi-lo,0.8)+"%";
+  }
+
+  /* ---------------- gates: built once, updated in place ---------------- */
+  var GATE_DEFS = [
+    {key:"cogs",    name:"COGS",                max:100, dir:"lower",  drag:true,  sLo:"0%", sHi:"100%"},
+    {key:"ads",     name:"Ad spend",            max:60,  dir:"lower",  drag:true,  sLo:"0%", sHi:"60%"},
+    {key:"roas",    name:"ROAS",                max:6,   dir:"higher", drag:true,  sLo:"0×", sHi:"6×"},
+    {key:"contrib", name:"Contribution margin", max:70,  dir:"higher", drag:false, sLo:"0%", sHi:"70%"},
+    {key:"net",     name:"Net margin",          max:30,  dir:"higher", drag:false, sLo:"0%", sHi:"30%"}
+  ];
+  var G = {};
+
+  function buildGates(){
+    var host = $("gates"); host.innerHTML = "";
+    GATE_DEFS.forEach(function(d){
+      var g = document.createElement("div"); g.className = "gate";
+      g.innerHTML =
+        '<div class="gtop"><span class="gname">'+d.name
+        + (d.drag ? ' <span class="draghint">drag</span>' : '')
+        + '</span><span class="gright"><span class="gval"></span><span class="gtag"></span></span></div>'
+        + '<div class="track'+(d.drag?" drag":"")+'">'
+        +   '<div class="zone"></div><div class="zedge e1"></div><div class="zedge e2"></div>'
+        +   '<div class="pin"></div>'
+        + '</div>'
+        + '<div class="gscale"><span>'+d.sLo+'</span><span>'+d.sHi+'</span></div>'
+        + '<div class="gnote"></div>';
+      host.appendChild(g);
+      G[d.key] = {
+        def:d, root:g,
+        val:g.querySelector(".gval"), tag:g.querySelector(".gtag"),
+        track:g.querySelector(".track"), zone:g.querySelector(".zone"),
+        e1:g.querySelector(".e1"), e2:g.querySelector(".e2"),
+        pin:g.querySelector(".pin"), note:g.querySelector(".gnote")
+      };
+      if(d.drag) attachDrag(G[d.key]);
+    });
+  }
+
+  function attachDrag(g){
+    var t = g.track, d = g.def;
+    function valueAt(e){
+      var r = t.getBoundingClientRect();
+      return clamp((e.clientX - r.left)/r.width, 0, 1) * d.max;
+    }
+    function apply(v){
+      var wr = weeklyRev();
+      if(wr <= 0) return;
+      if(d.key === "cogs"){
+        setAuto("cogs", false);
+        base.cogs = clamp(v,0,100)/100 * wr;
+        paintFlow(["cogs"]);
+      } else if(d.key === "ads"){
+        setAuto("ads", false);
+        base.ads = clamp(v,0,100)/100 * wr;
+        paintFlow(["ads"]);
+      } else if(d.key === "roas"){
+        setAuto("ads", false);
+        base.ads = wr / Math.max(v, 0.15);
+        paintFlow(["ads"]);
+      }
+      render();
+    }
+    t.addEventListener("pointerdown", function(e){
+      dragging = d.key; t.classList.add("dragging");
+      try{ t.setPointerCapture(e.pointerId); }catch(_){}
+      apply(valueAt(e)); e.preventDefault();
+    });
+    t.addEventListener("pointermove", function(e){
+      if(dragging !== d.key) return;
+      apply(valueAt(e));
+    });
+    function end(e){
+      if(dragging !== d.key) return;
+      dragging = null; t.classList.remove("dragging");
+      try{ t.releasePointerCapture(e.pointerId); }catch(_){}
+    }
+    t.addEventListener("pointerup", end);
+    t.addEventListener("pointercancel", end);
+  }
+
+  function updateGate(key, o){
+    var g = G[key], d = g.def, v = o.value, cls, tag;
+    if(!isFinite(v)){ cls="warn"; tag="NO DATA"; }
+    else if(d.dir === "lower"){
+      cls = v<=o.hi ? "ok" : (v<=o.hi*1.2 ? "warn" : "bad");
+      tag = cls==="ok" ? (v<o.lo?"BETTER THAN BAND":"IN BAND") : (cls==="warn"?"ABOVE BAND":"WELL ABOVE BAND");
+    } else {
+      cls = v>=o.lo ? "ok" : (v>=o.lo*0.6 ? "warn" : "bad");
+      tag = cls==="ok" ? (v>o.hi?"TOP OF BAND":"IN BAND") : (cls==="warn"?"BELOW BAND":"WELL BELOW BAND");
+    }
+    if(o.forceBad){ cls="bad"; tag=o.forceBadTag||"FAIL"; }
+
+    var zl = clamp(o.lo/d.max*100,0,100);
+    var zw = clamp((o.hi-o.lo)/d.max*100,0,100-zl);
+    g.val.textContent = o.display; g.val.className = "gval "+cls;
+    g.tag.textContent = tag;       g.tag.className = "gtag "+cls;
+    g.zone.style.left = zl+"%";    g.zone.style.width = zw+"%";
+    g.e1.style.left = zl+"%";      g.e2.style.left = (zl+zw)+"%";
+    g.pin.style.left = (isFinite(v) ? clamp(v/d.max*100,0,100) : 0)+"%";
+    g.pin.className = "pin "+cls;
+    g.note.innerHTML = o.note;
+  }
+
+  /* ---------------- render ---------------- */
+  function render(){
+    applyAuto();
+    if(autoCogs || autoAds){
+      var only=[]; if(autoCogs) only.push("cogs"); if(autoAds) only.push("ads");
+      paintFlow(only);
+    }
+
+    var f = PERIOD[period].f, feeP = raw("feesPct")/100;
+    var orders=base.orders*f, sales=aov*orders;
+    var cogs=base.cogs*f, ads=base.ads*f;
+    var rent=base.rent*f, expense=base.expenses*f;
+    var other=base.otherIncome*f, target=base.incomeTarget*f;
+
+    var gp=sales-cogs, contrib=gp-ads, fees=sales*feeP, net=contrib-fees;
+    var gpPct = sales>0?gp/sales:NaN, netPct = sales>0?net/sales:NaN;
+    var home = rent+expense;
+
+    $("revBox").textContent = money(sales)+PERIOD[period].short;
+
+    var s = splits();
+    $("splitWarn").style.display = s.over?"inline-block":"none";
+    $("rePctTxt").textContent=Math.round(s.re*100)+"%";
+    $("rwPctTxt").textContent=Math.round(s.rw*100)+"%";
+    $("famPctTxt").textContent=Math.round(s.fam*100)+"%";
+    $("segRe").style.width=(s.re*100)+"%"; $("segFam").style.width=(s.fam*100)+"%"; $("segRw").style.width=(s.rw*100)+"%";
+    $("segRe").textContent=s.re>.16?"Business":""; $("segFam").textContent=s.fam>.16?"Household":""; $("segRw").textContent=s.rw>.16?"Reward":"";
+
+    var R = sales>0?sales:1;
+    $("vSales").textContent=money(sales);
+    $("vCogs").textContent=money(cogs);   $("pCogs").textContent=sales>0?pct(cogs/sales):"";
+    $("vGp").textContent=money(gp);       $("pGp").textContent=pct(gpPct);
+    $("vAds").textContent=money(ads);     $("pAds").textContent=sales>0?pct(ads/sales):"";
+    $("vContrib").textContent=money(contrib); $("pContrib").textContent=sales>0?pct(contrib/sales):"";
+    $("vFees").textContent=money(fees);   $("pFees").textContent=raw("feesPct").toFixed(2)+"%";
+    $("vNet").textContent=money(net);     $("pNet").textContent=pct(netPct);
+
+    setBar("bRev",0,1);
+    setBar("bCogs",gp/R,1);
+    setBar("bGp",0,gp/R);
+    setBar("bAds",contrib/R,gp/R);
+    setBar("bContrib",0,contrib/R);
+    setBar("bFees",net/R,contrib/R);
+    setBar("bNet",0,net/R);
+    $("netRow").className = "wrow net"+(net<0?" loss":"");
+
+    renderGates(sales,cogs,ads,contrib,net,gpPct,netPct,feeP);
+
+    $("rNet").textContent=moneyP(net); $("rHome").textContent=moneyP(home);
+    var bm=$("burnMetric");
+    if(net<=0){
+      $("burnVal").textContent="No profit";
+      $("burnNote").textContent="The business is not producing profit, so it carries none of the household.";
+      bm.className="metric bad"; $("rCover").textContent="0% of household costs"; $("rCover").style.color="var(--neg)";
+    } else if(home<=0){
+      $("burnVal").textContent="—"; $("burnNote").textContent="Enter household costs to compare.";
+      bm.className="metric"; $("rCover").textContent="—"; $("rCover").style.color="var(--ink)";
+    } else {
+      var share=home/net, cover=net/home;
+      $("burnVal").textContent=(share*100).toFixed(0)+"%";
+      if(share>1){ $("burnNote").textContent="The household costs "+share.toFixed(1)+"× what the business makes. It cannot carry the house yet."; bm.className="metric bad"; }
+      else if(share>0.7){ $("burnNote").textContent="The household eats most of the profit. Little left to grow on."; bm.className="metric warn"; }
+      else { $("burnNote").textContent="The business covers the household with room to spare."; bm.className="metric good"; }
+      $("rCover").textContent=(Math.min(cover,99)*100).toFixed(0)+"% of household costs";
+      $("rCover").style.color = cover>=1?"var(--pos)":"var(--warn)";
+    }
+
+    var draw=Math.max(0,net)*s.fam, reward=Math.max(0,net)*s.rw, reinvest=Math.max(0,net)*s.re;
+    var combined=draw+other, left=combined-home;
+    $("rDraw").textContent=moneyP(draw); $("rOther").textContent=moneyP(other);
+    $("rCombined").textContent=moneyP(combined);
+    $("rLeft").textContent=moneyP(left); $("rLeft").style.color=left>=0?"var(--pos)":"var(--neg)";
+    $("rReinvest").textContent=moneyP(reinvest); $("rReward").textContent=moneyP(reward);
+
+    var im=$("incMetric");
+    if(target>0){
+      var gap=combined-target;
+      $("incVal").textContent=(gap>=0?"+":"")+money(gap);
+      $("incNote").textContent = gap>=0
+        ? "Above the "+money(target)+PERIOD[period].short+" target."
+        : "Short of the "+money(target)+PERIOD[period].short+" target.";
+      im.className="metric "+(gap>=0?"good":"bad");
+    } else { $("incVal").textContent="—"; $("incNote").textContent="Set a net income target."; im.className="metric"; }
+
+    var hm=$("houseMetric"), rule=raw("housingRule")/100;
+    if(combined>0){
+      var hs=rent/combined;
+      $("houseVal").textContent=(hs*100).toFixed(1)+"%";
+      $("houseNote").textContent = hs<=rule ? "Inside the "+Math.round(rule*100)+"% rule."
+        : "Over the "+Math.round(rule*100)+"% rule. Income must rise or housing must fall.";
+      hm.className="metric "+(hs<=rule?"good":"bad");
+    } else { $("houseVal").textContent="—"; $("houseNote").textContent="No income to measure against."; hm.className="metric bad"; }
+
+    solve(sales,orders,net,home,target,other,s);
+  }
+
+  function renderGates(sales,cogs,ads,contrib,net,gpPct,netPct,feeP){
+    if(sales<=0){
+      $("stageTag").textContent="—";
+      $("verdictBar").className="verdict idle";
+      $("vMark").textContent="—"; $("vTitle").textContent="No data"; $("vSub").textContent="Enter orders and average order value.";
+      $("varCaveat").style.display="none";
+      GATE_DEFS.forEach(function(d){
+        updateGate(d.key,{value:NaN,display:"—",lo:0,hi:0,note:"Waiting on revenue."});
+      });
+      return;
+    }
+
+    var yearly = (sales/PERIOD[period].f)*52;
+    var st = adBand(yearly);
+    $("stageTag").textContent = st.name+" stage · "+money(yearly)+"/yr run rate";
+
+    var cb=cogsBand();
+    var cogsPct=cogs/sales*100, adPct=ads/sales*100;
+    var roas = ads>0 ? sales/ads : Infinity;
+    var beRoas = (gpPct-feeP)>0 ? 1/(gpPct-feeP) : Infinity;
+    var contribPct=contrib/sales*100, netPctN=netPct*100;
+
+    updateGate("cogs",{
+      value:cogsPct, display:cogsPct.toFixed(1)+"%", lo:cb[0], hi:cb[1],
+      note:"Healthy "+cb[0]+"–"+cb[1]+"% for this category. Auto parks it at "+mid(cb).toFixed(0)+"%. Gross margin is "+pct(gpPct)+"."
+    });
+    updateGate("ads",{
+      value:adPct, display:adPct.toFixed(1)+"%", lo:st.band[0], hi:st.band[1],
+      note:"Healthy "+st.band[0]+"–"+st.band[1]+"% at the "+st.name+" stage. Auto parks it at "+mid(st.band).toFixed(0)+"%."
+    });
+    var below = isFinite(beRoas) && roas < beRoas;
+    updateGate("roas",{
+      value:Math.min(roas,6), display:isFinite(roas)?roas.toFixed(2)+"×":"—", lo:2.87, hi:5,
+      forceBad:below, forceBadTag:"BELOW BREAK-EVEN",
+      note:"Break-even "+(isFinite(beRoas)?beRoas.toFixed(2)+"×":"unreachable at this COGS")+" · average 2.87× · strong 5×+."
+    });
+    updateGate("contrib",{
+      value:contribPct, display:contribPct.toFixed(1)+"%", lo:25, hi:55,
+      note:"Median 25% · top quartile 54–56%. What survives after product and ads."
+    });
+    updateGate("net",{
+      value:netPctN, display:netPctN.toFixed(1)+"%", lo:10, hi:20,
+      note:"Median DTC 3–10% · strong DTC 10–20%. Above 20% is exceptional."
+    });
+
+    var vb=$("verdictBar");
+    if(net<=0 || below){
+      vb.className="verdict stop"; $("vMark").textContent="⛔";
+      $("vTitle").textContent="Stop — the unit economics do not work";
+      $("vSub").textContent = below
+        ? "ROAS is below break-even. Every order loses money. Fix price, COGS or targeting before spending another dollar."
+        : "Net profit is negative. More volume makes the hole deeper.";
+    } else if(roas>=3 && adPct<=st.band[1]){
+      vb.className="verdict go"; $("vMark").textContent="🚀";
+      $("vTitle").textContent="Scale — ROAS and ad spend both clear";
+      $("vSub").textContent="ROAS "+roas.toFixed(2)+"× with ad spend at "+adPct.toFixed(1)+"%. This is the shape you push budget into.";
+    } else {
+      vb.className="verdict fix"; $("vMark").textContent="🔧";
+      $("vTitle").textContent="Fix ads first — do not scale yet";
+      $("vSub").textContent = roas<3
+        ? "ROAS is "+roas.toFixed(2)+"×. It needs 3× before extra budget earns its keep."
+        : "Ad spend is "+adPct.toFixed(1)+"% against a "+st.band[1]+"% ceiling at this stage.";
+    }
+
+    $("feeEcho").textContent = raw("feesPct").toFixed(2)+"%";
+    $("varCaveat").style.display = (feeP<0.10) ? "flex" : "none";
+  }
+
+  function solve(sales,orders,net,home,target,other,s){
+    var flag=$("solveFlag");
+    if(sales<=0||orders<=0){
+      ["sPerOrder","sTarget","sCover"].forEach(function(id){ $(id).textContent="—"; });
+      ["sPerOrderN","sTargetN","sCoverN"].forEach(function(id){ $(id).textContent=""; });
+      flag.textContent="Enter orders and average order value to see what it takes.";
+      flag.style.color="var(--ink-2)"; return;
+    }
+    var per=net/orders;
+    $("sPerOrder").textContent=money2(per);
+    $("sPerOrder").style.color = per>=0?"var(--accent-ink)":"var(--neg)";
+    $("sPerOrderN").textContent = per>=0?"kept from every sale":"lost on every sale";
+    if(per<=0){
+      ["sTarget","sCover"].forEach(function(id){ $(id).textContent="—"; });
+      ["sTargetN","sCoverN"].forEach(function(id){ $(id).textContent=""; });
+      flag.textContent="Every extra order loses money at this COGS and ad spend. Volume makes it worse. Price, COGS or ads must change first.";
+      flag.style.color="var(--neg)"; return;
+    }
+    var mult=function(v){ return (v/orders).toFixed(1)+"× today"; };
+    var oc=home/per; $("sCover").textContent=count(oc); $("sCoverN").textContent=mult(oc);
+    if(s.fam<=0){ $("sTarget").textContent="—"; $("sTargetN").textContent="no household draw set"; }
+    else if(target-other<=0){ $("sTarget").textContent="Already there"; $("sTargetN").textContent="other income alone clears it"; }
+    else { var ot=(target-other)/(per*s.fam); $("sTarget").textContent=count(ot); $("sTargetN").textContent=mult(ot); }
+    flag.textContent="Assumes COGS and ads stay the same share of revenue as orders grow.";
+    flag.style.color="var(--ink-2)";
+  }
+
+  /* ---------------- wiring ---------------- */
+  FLOW.forEach(function(k){
+    $(k).addEventListener("input", function(){
+      if(k==="cogs") setAuto("cogs",false);
+      if(k==="ads")  setAuto("ads",false);
+      pullFlow(k); render();
+    });
+  });
+  $("aov").addEventListener("input", function(){ aov=raw("aov"); render(); });
+  ["feesPct","housingRule"].forEach(function(id){ $(id).addEventListener("input", render); });
+  $("category").addEventListener("change", render);
+
+  $("autoCogsBtn").addEventListener("click", function(){ setAuto("cogs", !autoCogs); render(); });
+  $("autoAdsBtn").addEventListener("click",  function(){ setAuto("ads",  !autoAds);  render(); });
+
+  ["reinvestPct","rewardPct"].forEach(function(id){
+    $(id).addEventListener("input", function(){
+      var re=raw("reinvestPct"), rw=raw("rewardPct");
+      if(re+rw>100){
+        if(id==="reinvestPct") $("rewardPct").value=Math.max(0,100-re);
+        else $("reinvestPct").value=Math.max(0,100-rw);
+      }
+      render();
+    });
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll(".pbtn"), function(b){
+    b.addEventListener("click", function(){
+      Array.prototype.forEach.call(document.querySelectorAll(".pbtn"), function(x){ x.classList.remove("on"); });
+      b.classList.add("on"); period=b.getAttribute("data-p"); paintAll(); render();
+    });
+  });
+
+  $("themeBtn").addEventListener("click", function(){
+    var el = document.documentElement;
+    el.setAttribute("data-theme", el.getAttribute("data-theme")==="dark" ? "light" : "dark");
+  });
+
+  $("feesPct").value = 3.75;
+  $("housingRule").value = 30;
+  buildGates();
+  setAuto("cogs",false); setAuto("ads",false);
+  applyAuto();
+  paintAll();
+  render();
+})();
+</script>
+</body>
+</html>
