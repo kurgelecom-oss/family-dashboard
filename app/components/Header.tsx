@@ -27,10 +27,6 @@ export default function Header() {
   const [date, setDate] = useState("");
   const [theme, setTheme] = useState<"day" | "night">("night");
   const [manualOverride, setManualOverride] = useState(false);
-  // TEMP DIAGNOSTIC — remove after Pro Flip viewport is confirmed
-  // Empty until the effect runs, so the server renders nothing and there is no
-  // hydration mismatch — the server has no viewport to measure.
-  const [viewport, setViewport] = useState("");
 
   useEffect(() => {
     const stored = localStorage.getItem("themeOverride") as "day" | "night" | null;
@@ -60,17 +56,6 @@ export default function Header() {
     return () => clearInterval(id);
   }, []);
 
-  // TEMP DIAGNOSTIC — remove after Pro Flip viewport is confirmed
-  useEffect(() => {
-    const measure = () =>
-      setViewport(
-        `${document.documentElement.clientWidth} x ${document.documentElement.clientHeight}`,
-      );
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, []);
-
   const toggleTheme = () => {
     const next: "day" | "night" = theme === "day" ? "night" : "day";
     localStorage.setItem("themeOverride", next);
@@ -95,19 +80,6 @@ export default function Header() {
       </div>
       <div className="header-right">
         <div className="header-date">{date}</div>
-        {/* TEMP DIAGNOSTIC — remove after Pro Flip viewport is confirmed */}
-        {viewport && (
-          <span
-            style={{
-              fontSize: 11,
-              color: "var(--text-dim, var(--text-muted))",
-              fontVariantNumeric: "tabular-nums",
-              whiteSpace: "nowrap",
-            }}
-          >
-            VP {viewport}
-          </span>
-        )}
         <div className="header-time">{time}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <button
