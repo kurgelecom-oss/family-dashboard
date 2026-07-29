@@ -127,7 +127,7 @@ function ShellCard({
   message: string;
 }) {
   return (
-    <div className="card" style={{ padding: "10px 12px" }}>
+    <div className="card">
       <div className="card-header" style={{ marginBottom: 5 }}>
         <div className="card-title">{title}</div>
         <span className={`badge ${badgeClass}`}>{badge}</span>
@@ -192,7 +192,7 @@ function TodayPanel({ data, settings }: { data: ActionsPayload; settings?: Setti
   const more = Math.max(pendingCount - visible.length, 0);
 
   return (
-    <div className="card" style={{ padding: "10px 12px" }}>
+    <div className="card">
       <div className="card-header" style={{ marginBottom: 5 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
           <div className="card-title">Today</div>
@@ -321,7 +321,7 @@ function InputsPanel({ data, settings }: { data: ActionsPayload; settings?: Sett
   const visible = data.inputs.slice(0, shown);
 
   return (
-    <div className="card" style={{ padding: "10px 12px" }}>
+    <div className="card">
       <div className="card-header" style={{ marginBottom: 5 }}>
         <div className="card-title">Inputs</div>
         <span className="badge badge-cyan">{data.inputs.length} tracked</span>
@@ -453,7 +453,7 @@ function ClockPanel({ data, settings }: { data: ActionsPayload; settings?: Setti
     gap > gapRed ? "var(--red)" : gap > gapAmber ? "var(--amber)" : "var(--text-secondary)";
 
   return (
-    <div className="card" style={{ padding: "10px 12px" }}>
+    <div className="card">
       <div className="card-header" style={{ marginBottom: 5 }}>
         <div className="card-title">The Clock</div>
         <span className="badge badge-cyan">{c.yearElapsedPct.toFixed(1)}% of year</span>

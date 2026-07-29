@@ -233,7 +233,7 @@ function ShellCard({
   message: string;
 }) {
   return (
-    <div className="card" style={{ padding: "10px 12px" }}>
+    <div className="card">
       <div className="card-header" style={{ marginBottom: 5 }}>
         <div className="card-title">{title}</div>
         <span className={`badge ${badgeClass}`}>{badge}</span>
@@ -377,7 +377,7 @@ function TodayPanel({ data, settings }: { data: EcomPayload; settings?: Settings
   );
 
   return (
-    <div className="card" style={{ padding: "10px 12px" }}>
+    <div className="card">
       <div className="card-header" style={{ marginBottom: 5 }}>
         <div className="card-title">Today</div>
         <span className="badge badge-cyan">{dayLabel(data.today)}</span>
@@ -476,7 +476,7 @@ function ActiveTestPanel({
 }) {
   if (!test.present) {
     return (
-      <div className="card" style={{ padding: "10px 12px" }}>
+      <div className="card">
         <div className="card-header" style={{ marginBottom: 5 }}>
           <div className="card-title">Active Test</div>
           <span className="badge badge-amber">Idle</span>
@@ -591,7 +591,7 @@ function ActiveTestPanel({
   const staleTone = abandoned ? "var(--red)" : "var(--amber)";
 
   return (
-    <div className="card" style={{ padding: "10px 12px" }}>
+    <div className="card">
       <div className="card-header" style={{ marginBottom: 5 }}>
         <div className="card-title">Active Test</div>
         <span className={`badge ${badgeClass}`}>{badgeLabel}</span>
@@ -721,7 +721,7 @@ function MonthPanel({ data, settings }: { data: EcomPayload; settings?: Settings
   const unverified = m.cogsVerified === false;
 
   return (
-    <div className="card" style={{ padding: "10px 12px" }}>
+    <div className="card">
       <div className="card-header" style={{ marginBottom: 5 }}>
         <div className="card-title">Month · P&amp;L</div>
         <span className="badge badge-cyan">{monthLabel(data.today)}</span>

@@ -363,38 +363,6 @@ html, body {
   .origins-notion { display: none; }
 }
 
-/* ── HEIGHT RECOVERY ───────────────────────────────────────────────
-   The layout budget below is written for a 1080px viewport and clears it by
-   under 45px per card, so a windowed browser on the Pro Flip (~960px) drops
-   whichever card is tightest — ACCOUNTS loses its sixth row, LAST MONTH its
-   fourth category. Each tier buys the margin back from chrome only: padding,
-   gaps and radius. No font size and no content count changes, because a card
-   that fits by shrinking its own numbers is not a card that fits. */
-@media (max-height: 1040px) {
-  .dashboard      { padding: 10px; gap: 10px; }
-  .dashboard-grid { gap: 10px; }
-  .dashboard-col  { gap: 7px; }
-  .card           { padding: 9px 11px; }
-}
-@media (max-height: 1000px) {
-  .dashboard      { padding: 8px; gap: 8px; }
-  .dashboard-grid { gap: 8px; }
-  .dashboard-col  { gap: 6px; }
-  .card           { padding: 8px 10px; }
-}
-@media (max-height: 950px) {
-  .dashboard      { padding: 6px; gap: 6px; }
-  .dashboard-grid { gap: 6px; }
-  .dashboard-col  { gap: 5px; }
-  .card           { padding: 6px 9px; border-radius: 6px; }
-}
-@media (max-height: 900px) {
-  .dashboard      { padding: 4px; gap: 5px; margin-top: 76px; }
-  .dashboard-grid { gap: 5px; }
-  .dashboard-col  { gap: 4px; }
-  .card           { padding: 5px 8px; border-radius: 6px; }
-}
-
 .topnav-link.active::after {
   content: "";
   position: absolute;
@@ -454,6 +422,42 @@ html, body {
   overflow-y: auto;
   box-shadow: var(--card-shadow);
   flex-shrink: 1;
+}
+
+/* ── HEIGHT RECOVERY ───────────────────────────────────────────────
+   Must sit after the base rules: a media query adds no specificity, so at equal
+   specificity source order decides. Placed earlier, these tiers matched and did
+   nothing.
+
+   The layout budget above is written for a 1080px viewport and clears it by
+   under 45px per card, so a windowed browser on the Pro Flip (936px) drops
+   whichever card is tightest — ACCOUNTS loses its sixth row, LAST MONTH its
+   fourth category. Each tier buys the margin back from chrome only: padding,
+   gaps and radius. No font size and no content count changes, because a card
+   that fits by shrinking its own numbers is not a card that fits. */
+@media (max-height: 1040px) {
+  .dashboard      { padding: 10px; gap: 10px; }
+  .dashboard-grid { gap: 10px; }
+  .dashboard-col  { gap: 7px; }
+  .card           { padding: 9px 11px; }
+}
+@media (max-height: 1000px) {
+  .dashboard      { padding: 8px; gap: 8px; }
+  .dashboard-grid { gap: 8px; }
+  .dashboard-col  { gap: 6px; }
+  .card           { padding: 8px 10px; }
+}
+@media (max-height: 950px) {
+  .dashboard      { padding: 6px; gap: 6px; }
+  .dashboard-grid { gap: 6px; }
+  .dashboard-col  { gap: 5px; }
+  .card           { padding: 6px 9px; border-radius: 6px; }
+}
+@media (max-height: 900px) {
+  .dashboard      { padding: 4px; gap: 5px; }
+  .dashboard-grid { gap: 5px; }
+  .dashboard-col  { gap: 4px; }
+  .card           { padding: 5px 8px; border-radius: 6px; }
 }
 
 .card-header {

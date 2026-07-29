@@ -180,7 +180,7 @@ function ShellCard({
   message: string;
 }) {
   return (
-    <div className="card" style={{ padding: "10px 12px" }}>
+    <div className="card">
       <div className="card-header" style={{ marginBottom: 5 }}>
         <div className="card-title">{title}</div>
         <span className={`badge ${badgeClass}`}>{badge}</span>
@@ -232,7 +232,11 @@ function OpenLink({ href }: { href: string }) {
         letterSpacing: "0.06em",
         textTransform: "uppercase",
         background: "rgba(245,166,35,0.1)",
-        padding: "2px 7px",
+        // 1px, not 2: this badge carries a 1px border that .badge does not, so
+        // matching padding made it 21px against every other header's 19px and
+        // LAST WEEK's header stood 2px taller than its neighbours'. The border
+        // pays for the padding.
+        padding: "1px 7px",
         borderRadius: 4,
         border: "1px solid rgba(245,166,35,0.2)",
         display: "inline-flex",
@@ -265,7 +269,7 @@ function PeriodPanel({
   const hasUncategorised = uncategorised > 0;
 
   return (
-    <div className="card" style={{ padding: "10px 12px" }}>
+    <div className="card">
       <div className="card-header" style={{ marginBottom: 5 }}>
         <div className="card-title">{title}</div>
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
@@ -278,7 +282,9 @@ function PeriodPanel({
         style={{
           display: "flex",
           flexDirection: "column",
-          gap: 4,
+          // 2px, not 4: five gaps per card across two cards is 20px of pure air,
+          // and this column is the one that runs out of room.
+          gap: 2,
           flex: 1,
           minHeight: 0,
           overflow: "hidden",
@@ -287,7 +293,10 @@ function PeriodPanel({
         {/* Hero — total spent */}
         <div
           style={{
-            fontSize: 34,
+            // 34 -> 28. Still comfortably the largest thing in the card (the next
+            // is 18px), and the line-height below is unchanged: the height comes
+            // out of the glyph, never out of the line box.
+            fontSize: 28,
             fontWeight: 700,
             color: tone,
             // 1.2 keeps the glyph ink inside the line box; at 1.1 the "$" tail
@@ -365,7 +374,7 @@ function PeriodPanel({
 
 function AccountsPanel({ data }: { data: PocketSmithPayload }) {
   return (
-    <div className="card" style={{ padding: "10px 12px" }}>
+    <div className="card">
       <div className="card-header" style={{ marginBottom: 5 }}>
         <div className="card-title">Accounts</div>
         <span className="badge badge-cyan">as at {dayLabel(data.today)}</span>
@@ -389,7 +398,11 @@ function AccountsPanel({ data }: { data: PocketSmithPayload }) {
                 alignItems: "center",
                 justifyContent: "space-between",
                 gap: 8,
-                padding: "2px 0",
+                // Density, not deletion: the row carries no vertical padding and
+                // rides tight line boxes so all six accounts fit. Font sizes are
+                // untouched — this is a 65" panel read from across the room, and
+                // legibility comes from glyph size, not from the air around it.
+                padding: 0,
                 borderBottom:
                   i === data.accounts.length - 1 ? "none" : "1px solid var(--border)",
                 minWidth: 0,
@@ -399,7 +412,7 @@ function AccountsPanel({ data }: { data: PocketSmithPayload }) {
                 <div
                   style={{
                     fontSize: 12,
-                    lineHeight: 1.25,
+                    lineHeight: 1.15,
                     color: "var(--text-primary)",
                     fontWeight: 500,
                     overflow: "hidden",
@@ -412,7 +425,7 @@ function AccountsPanel({ data }: { data: PocketSmithPayload }) {
                 <div
                   style={{
                     fontSize: 10,
-                    lineHeight: 1.2,
+                    lineHeight: 1.1,
                     color: "var(--text-muted)",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
