@@ -123,23 +123,29 @@ function SpendDelta({ current, prior }: { current: number; prior: number }) {
 /** Earned / Spent / Saved, reusing the existing .stat-cell treatment. */
 function TripleStat({ period }: { period: PeriodSummary }) {
   const saved = period.difference;
+  // Overridden inline rather than in globals.css: .stat-cell / .stat-num /
+  // .stat-sublabel are shared with columns B and C, which are out of scope and
+  // have height to spare. Only this column is starved.
+  const cell = { padding: "3px 7px" };
+  const num = { fontSize: 16 };
+  const label = { marginTop: 1, fontSize: 10, lineHeight: 1.1 };
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 5, flexShrink: 0 }}>
-      <div className="stat-cell" style={{ padding: "5px 7px" }}>
-        <div className="stat-num sm green">{money(period.totalIncome)}</div>
-        <div className="stat-sublabel" style={{ marginTop: 2 }}>
+      <div className="stat-cell" style={cell}>
+        <div className="stat-num sm green" style={num}>{money(period.totalIncome)}</div>
+        <div className="stat-sublabel" style={label}>
           Earned
         </div>
       </div>
-      <div className="stat-cell" style={{ padding: "5px 7px" }}>
-        <div className="stat-num sm">{money(period.totalSpending)}</div>
-        <div className="stat-sublabel" style={{ marginTop: 2 }}>
+      <div className="stat-cell" style={cell}>
+        <div className="stat-num sm" style={num}>{money(period.totalSpending)}</div>
+        <div className="stat-sublabel" style={label}>
           Spent
         </div>
       </div>
-      <div className="stat-cell" style={{ padding: "5px 7px" }}>
-        <div className={`stat-num sm ${saved >= 0 ? "cyan" : "red"}`}>{money(saved)}</div>
-        <div className="stat-sublabel" style={{ marginTop: 2 }}>
+      <div className="stat-cell" style={cell}>
+        <div className={`stat-num sm ${saved >= 0 ? "cyan" : "red"}`} style={num}>{money(saved)}</div>
+        <div className="stat-sublabel" style={label}>
           Saved {period.savingsRate.toFixed(1)}%
         </div>
       </div>
@@ -150,8 +156,10 @@ function TripleStat({ period }: { period: PeriodSummary }) {
 /** One category row: name, share bar, amount — the existing .hbar-* language. */
 function CategoryRow({ category, tone }: { category: CategoryBreakdown; tone: string }) {
   return (
-    <div className="hbar-row" style={{ marginBottom: 4 }}>
-      <div className="hbar-label" style={{ width: 84, fontSize: 11 }}>
+    // 2px between rows, and line boxes trimmed to 1.15. Font size is untouched:
+    // four category rows per card is the data, and it stays.
+    <div className="hbar-row" style={{ marginBottom: 2 }}>
+      <div className="hbar-label" style={{ width: 84, fontSize: 11, lineHeight: 1.15 }}>
         {category.title}
       </div>
       <div className="hbar-track">
@@ -160,7 +168,7 @@ function CategoryRow({ category, tone }: { category: CategoryBreakdown; tone: st
           style={{ width: `${Math.min(category.percent, 100)}%`, background: tone }}
         />
       </div>
-      <div className="hbar-value" style={{ width: 66, fontSize: 11 }}>
+      <div className="hbar-value" style={{ width: 66, fontSize: 11, lineHeight: 1.15 }}>
         {money(category.amount)}
       </div>
     </div>
