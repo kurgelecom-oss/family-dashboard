@@ -6,6 +6,9 @@ import { useEffect, useState } from "react";
 const LINKS = [
   { label: "Family Dashboard",      href: "https://kurgel-dashboard.netlify.app/" },
   { label: "ECOM Launchpad",        href: "https://ecom-launchpad-mentor.netlify.app/" },
+  // Absolute, not "/profit.html": this list is copied verbatim into the other
+  // five surfaces, where a relative path would resolve against the wrong origin.
+  { label: "Calculator",            href: "https://kurgel-dashboard.netlify.app/profit.html" },
   { label: "Ansar · ANSAR FC",      href: "https://ansar-habits-tracker.netlify.app/" },
   { label: "Time Allocation Board", href: "https://kurgel-dashboard.netlify.app/board" },
   { label: "ORIGINS",               href: "https://kurgel-dashboard.netlify.app/origins" },

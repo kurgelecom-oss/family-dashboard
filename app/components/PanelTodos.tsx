@@ -1,15 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { SETTING_DEFAULTS, type SettingsMap, getSetting } from "../lib/settings";
 import { isActionsPayload } from "../lib/payload-guards";
 
 /* ════════════════════════════════════════════════════════════════════════════
-   Column C — TODAY / INPUTS / THE CLOCK.
+   Column C — FAMILY GOALS / THE CLOCK.
 
-   Reads GET /api/actions. Actionables and time only: this column renders ZERO
-   currency by design. Money lives in column B. If a dollar sign ever appears
-   here, something has been wired to the wrong payload.
+   Two panels. Family Goals is browser-local (localStorage, no API). THE CLOCK
+   still reads GET /api/actions — which is why this file keeps fetching that
+   route even though the Actions panel it used to feed has been removed from
+   this column. The route itself is untouched and still serves its other data.
+
+   Goals and time only: this column renders ZERO currency in its panel bodies by
+   design. Money lives in column B. The one sanctioned exception is the Family
+   Goals Edit toggle, which reveals the amount inputs on demand; if a dollar
+   figure shows up anywhere else here, something is wired to the wrong payload.
    ══════════════════════════════════════════════════════════════════════════ */
 
 interface ActionItem {
@@ -66,54 +72,8 @@ interface ActionsPayload {
 }
 
 const REFRESH_MS = 5 * 60 * 1000;
-const NOTION_URL = "https://app.notion.com/p/38e5429afa9080c98967cfef39103c0c";
-
-/** Priority stripe colour. Tokens only. */
-function priorityTone(priority: string | null): string {
-  switch ((priority ?? "").toLowerCase()) {
-    case "high":
-      return "var(--red)";
-    case "medium":
-    case "med":
-      return "var(--amber)";
-    case "low":
-      return "var(--cyan)";
-    default:
-      return "var(--text-muted)";
-  }
-}
 
 /* ── Shared chrome ────────────────────────────────────────────────────────── */
-
-/** The existing Notion open-in-new-tab badge, kept as it was. */
-function NotionBadge() {
-  return (
-    <a
-      href={NOTION_URL}
-      target="_blank"
-      rel="noopener noreferrer"
-      title="Open in Notion"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: 20,
-        height: 20,
-        borderRadius: 4,
-        background: "rgba(0, 212, 255, 0.15)",
-        border: "1px solid rgba(0, 212, 255, 0.3)",
-        color: "var(--cyan)",
-        textDecoration: "none",
-        fontSize: 12,
-        fontWeight: 600,
-        cursor: "pointer",
-        transition: "all 0.2s ease",
-      }}
-    >
-      ↗
-    </a>
-  );
-}
 
 function ShellCard({
   title,
@@ -183,306 +143,556 @@ function ClockStat({ value, label, tone }: { value: string; label: string; tone?
   );
 }
 
-/* ── Section label inside the merged panel ────────────────────────────────── */
+/* ── Panel 1 — FAMILY GOALS ───────────────────────────────────────────────────
+   A local savings tracker. It replaced the Actions panel in this column; the
+   /api/actions route is untouched and still fetched by this file, because THE
+   CLOCK below reads `clock` from that same payload.
+
+   Zero currency in the body, per the column rule: every goal row shows a bar, a
+   percentage and a state — never a dollar figure. The amounts live behind the
+   Edit toggle, the only place a "$" is allowed to appear.
+
+   State is browser-local (localStorage). There is no goals API, so nothing here
+   syncs between devices — deliberate for now, and the reason no figure from this
+   panel should be quoted as a source of truth.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+const GOALS_STORAGE_KEY = "familyGoals.v1";
+
+/** $250 a head, so the spree target tracks the people count. */
+const SPREE_PER_PERSON = 250;
+const DEFAULT_PEOPLE = 4;
+
+type GoalKey = "docklands" | "trip" | "crown" | "nightOut" | "spree";
+
+/** Editable targets. The spree is computed from `people`, never stored. */
+type TargetKey = Exclude<GoalKey, "spree">;
+
+/** Priority order IS the waterfall order — goal 1 fills before goal 2. */
+const GOAL_DEFS: { key: GoalKey; label: string }[] = [
+  { key: "docklands", label: "Docklands move" },
+  { key: "trip", label: "Sydney or QLD trip" },
+  { key: "crown", label: "Crown weekend" },
+  { key: "nightOut", label: "Night out" },
+  { key: "spree", label: "Shopping spree" },
+];
+
+const TARGET_KEYS: TargetKey[] = ["docklands", "trip", "crown", "nightOut"];
+
+interface GoalsState {
+  targets: Record<TargetKey, number | null>;
+  people: number;
+  saved: number | null;
+}
+
+/** Targets start unset — null, never 0, so "no target yet" reads as itself. */
+const EMPTY_GOALS: GoalsState = {
+  targets: { docklands: null, trip: null, crown: null, nightOut: null },
+  people: DEFAULT_PEOPLE,
+  saved: null,
+};
+
+const numOrNull = (x: unknown): boolean =>
+  x === null || (typeof x === "number" && Number.isFinite(x));
+
+/** Anything in localStorage is untrusted input — validate before adopting it. */
+function isGoalsState(v: unknown): v is GoalsState {
+  if (typeof v !== "object" || v === null) return false;
+  const o = v as Record<string, unknown>;
+  const t = o["targets"];
+  if (typeof t !== "object" || t === null) return false;
+  const tt = t as Record<string, unknown>;
+  if (!TARGET_KEYS.every((k) => numOrNull(tt[k]))) return false;
+  if (typeof o["people"] !== "number" || !Number.isFinite(o["people"])) return false;
+  return numOrNull(o["saved"]);
+}
+
+type GoalState = "funded" | "progress" | "next" | "pending" | "unset";
+
+const STATE_META: Record<GoalState, { label: string; cls: string; tone?: string; bar: string }> = {
+  funded: { label: "Funded", cls: "badge badge-green", bar: "var(--green)" },
+  progress: { label: "In progress", cls: "badge badge-cyan", bar: "var(--cyan)" },
+  next: { label: "Next", cls: "badge badge-amber", bar: "var(--amber)" },
+  pending: {
+    label: "Not started",
+    cls: "badge",
+    tone: "var(--text-muted)",
+    bar: "var(--text-muted)",
+  },
+  unset: {
+    label: "Set target",
+    cls: "badge",
+    tone: "var(--text-muted)",
+    bar: "var(--text-muted)",
+  },
+};
+
+interface GoalRow {
+  key: GoalKey;
+  label: string;
+  target: number | null;
+  pct: number;
+  state: GoalState;
+}
+
+/** Target for a goal — computed for the spree, stored for everything else. */
+function targetOf(state: GoalsState, key: GoalKey): number | null {
+  if (key !== "spree") return state.targets[key as TargetKey];
+  const people = Math.max(0, Math.floor(state.people));
+  return people > 0 ? people * SPREE_PER_PERSON : null;
+}
 
 /**
- * Names a section within a single card. The merged panel has ONE card-header,
- * so "Today" and "Inputs" demote from card titles to these labels — the only
- * reason this exists.
+ * Top-down waterfall: fill goal 1 to its target, spill the remainder into goal
+ * 2, and so on. An unset target cannot be filled and cannot stop the spill —
+ * otherwise one blank field would stall every goal below it.
  */
-function SectionLabel({ text, divider }: { text: string; divider?: boolean }) {
+function allocate(state: GoalsState): {
+  rows: GoalRow[];
+  totalTarget: number;
+  overallPct: number | null;
+} {
+  let remaining = Math.max(0, state.saved ?? 0);
+  let nextClaimed = false;
+
+  const rows: GoalRow[] = GOAL_DEFS.map((def) => {
+    const target = targetOf(state, def.key);
+    if (target === null || target <= 0) {
+      return { key: def.key, label: def.label, target: null, pct: 0, state: "unset" };
+    }
+    const allocated = Math.min(remaining, target);
+    remaining -= allocated;
+
+    let s: GoalState;
+    if (allocated >= target) s = "funded";
+    else if (allocated > 0) s = "progress";
+    else if (!nextClaimed) {
+      s = "next";
+      nextClaimed = true;
+    } else s = "pending";
+
+    return { key: def.key, label: def.label, target, pct: (allocated / target) * 100, state: s };
+  });
+
+  const totalTarget = rows.reduce((sum, r) => sum + (r.target ?? 0), 0);
+  const saved = Math.max(0, state.saved ?? 0);
+  return { rows, totalTarget, overallPct: totalTarget > 0 ? (saved / totalTarget) * 100 : null };
+}
+
+/* ── localStorage as an external store ────────────────────────────────────────
+   Read through useSyncExternalStore rather than an effect: it gives a stable
+   server snapshot (so hydration cannot mismatch), needs no "hydrated" flag, and
+   picks up edits made in another tab for free.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/** Referentially stable snapshot — useSyncExternalStore requires that. */
+let goalsCache: GoalsState | null = null;
+const goalsListeners = new Set<() => void>();
+
+function readGoals(): GoalsState {
+  if (goalsCache) return goalsCache;
+  try {
+    const raw = window.localStorage.getItem(GOALS_STORAGE_KEY);
+    if (raw) {
+      const parsed: unknown = JSON.parse(raw);
+      if (isGoalsState(parsed)) {
+        goalsCache = parsed;
+        return goalsCache;
+      }
+    }
+  } catch {
+    /* unreadable or blocked storage — fall through to the empty state */
+  }
+  goalsCache = EMPTY_GOALS;
+  return goalsCache;
+}
+
+/** The server has no storage, so it always renders the unset state. */
+const readGoalsServer = (): GoalsState => EMPTY_GOALS;
+
+function writeGoals(next: GoalsState): void {
+  goalsCache = next;
+  try {
+    window.localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    /* storage blocked — values hold for this session only */
+  }
+  goalsListeners.forEach((l) => l());
+}
+
+function subscribeGoals(onChange: () => void): () => void {
+  goalsListeners.add(onChange);
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === GOALS_STORAGE_KEY) {
+      goalsCache = null; // force a re-read of what the other tab wrote
+      onChange();
+    }
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    goalsListeners.delete(onChange);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+const numberInput: CSSProperties = {
+  width: 82,
+  background: "var(--bg-inner)",
+  border: "1px solid var(--border)",
+  borderRadius: 4,
+  color: "var(--text-primary)",
+  fontSize: 11,
+  fontFamily: "inherit",
+  fontVariantNumeric: "tabular-nums",
+  padding: "3px 6px",
+  flexShrink: 0,
+};
+
+/** One label + number input row, shown only while editing. */
+function EditRow({
+  label,
+  value,
+  onChange,
+  prefix,
+  whole,
+}: {
+  label: string;
+  value: number | null;
+  onChange: (raw: string) => void;
+  prefix?: string;
+  whole?: boolean;
+}) {
   return (
-    <div
+    <label
       style={{
-        fontSize: 9,
-        fontWeight: 700,
-        color: "var(--text-muted)",
-        textTransform: "uppercase",
-        letterSpacing: "0.08em",
-        lineHeight: 1.2,
-        flexShrink: 0,
-        ...(divider
-          ? { borderTop: "1px solid var(--border)", paddingTop: 5, marginTop: 1 }
-          : {}),
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        justifyContent: "space-between",
+        minWidth: 0,
       }}
     >
-      {text}
-    </div>
+      <span
+        style={{
+          fontSize: 10.5,
+          color: "var(--text-secondary)",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+          flex: 1,
+          minWidth: 0,
+        }}
+      >
+        {label}
+      </span>
+      <span style={{ display: "flex", alignItems: "center", gap: 3, flexShrink: 0 }}>
+        {prefix && <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{prefix}</span>}
+        <input
+          type="number"
+          inputMode="decimal"
+          min={whole ? 1 : 0}
+          step={whole ? 1 : 50}
+          value={value === null ? "" : value}
+          placeholder="—"
+          onChange={(e) => onChange(e.target.value)}
+          style={numberInput}
+        />
+      </span>
+    </label>
   );
 }
 
-/* ── Panel 1 — TODAY + INPUTS (merged) ────────────────────────────────────────
-   One card, one header, two labeled sections. Both data sources, both badges,
-   overdue flagging, streak counts, done-today state and both empty-states are
-   carried over verbatim from the two cards this replaces — presentation only.
+function FamilyGoalsPanel() {
+  const state = useSyncExternalStore(subscribeGoals, readGoals, readGoalsServer);
+  const [editing, setEditing] = useState(false);
 
-   Still zero currency: neither section renders a money value.
-   ──────────────────────────────────────────────────────────────────────────── */
+  /** Every edit writes straight through to storage — nothing to flush later. */
+  const update = (fn: (s: GoalsState) => GoalsState) => writeGoals(fn(readGoals()));
 
-function ActionsPanel({ data, settings }: { data: ActionsPayload; settings?: SettingsMap }) {
-  const actionsShown = getSetting(
-    settings,
-    "ACTION_ITEMS_SHOWN",
-    SETTING_DEFAULTS.ACTION_ITEMS_SHOWN,
-  );
-  const inputsShown = getSetting(
-    settings,
-    "INPUT_HABITS_SHOWN",
-    SETTING_DEFAULTS.INPUT_HABITS_SHOWN,
-  );
-  const { decisionDue, ranked, pendingCount, doneToday } = data.actions;
-  const visible = ranked.slice(0, actionsShown);
-  const more = Math.max(pendingCount - visible.length, 0);
-  const visibleInputs = data.inputs.slice(0, inputsShown);
+  const toNum = (raw: string): number | null => {
+    if (raw.trim() === "") return null;
+    const n = Number.parseFloat(raw);
+    return Number.isFinite(n) ? Math.max(0, n) : null;
+  };
+
+  const setTarget = (key: TargetKey, raw: string) =>
+    update((s) => ({ ...s, targets: { ...s.targets, [key]: toNum(raw) } }));
+
+  const setSaved = (raw: string) => update((s) => ({ ...s, saved: toNum(raw) }));
+
+  const setPeople = (raw: string) =>
+    update((s) => ({ ...s, people: Math.max(0, Math.floor(toNum(raw) ?? 0)) }));
+
+  const { rows, overallPct } = allocate(state);
+  const spreeTarget = targetOf(state, "spree");
+  const anyTargetSet = rows.some((r) => r.target !== null);
 
   return (
     <div className="card">
       <div className="card-header" style={{ marginBottom: 5 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
-          <div className="card-title">Actions</div>
-          <NotionBadge />
-        </div>
-        {/* Both badges survive the merge: sync state and tracked-input count. */}
+        <div className="card-title">Family Goals</div>
         <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-          <span className="badge badge-cyan">● Synced</span>
-          <span className="badge badge-cyan">{data.inputs.length} tracked</span>
+          <span className={`badge ${overallPct === null ? "badge-amber" : "badge-cyan"}`}>
+            {overallPct === null ? "No targets" : `${Math.round(Math.min(overallPct, 999))}%`}
+          </span>
+          <button
+            type="button"
+            onClick={() => setEditing((v) => !v)}
+            aria-pressed={editing}
+            title={editing ? "Hide the amounts" : "Edit targets and saved amount"}
+            style={{
+              appearance: "none",
+              border: "1px solid var(--border)",
+              background: editing ? "rgba(0,212,255,0.12)" : "transparent",
+              color: editing ? "var(--cyan)" : "var(--text-muted)",
+              borderRadius: 4,
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              padding: "3px 7px",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              lineHeight: 1.2,
+            }}
+          >
+            {editing ? "Done" : "Edit"}
+          </button>
         </div>
       </div>
 
-      {/* Outer column: the two sections share the card's height and each
-          compresses internally rather than pushing a row past the card edge. */}
       <div
         style={{
           display: "flex",
           flexDirection: "column",
-          gap: 5,
+          gap: 8,
           flex: 1,
           minHeight: 0,
-          overflow: "hidden",
+          overflowY: "auto",
         }}
       >
-      <SectionLabel text="Today" />
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 4,
-          flex: 1,
-          minHeight: 0,
-          overflow: "hidden",
-        }}
-      >
-        {/* The call to act only. The numbers behind it stay in column B. */}
-        {decisionDue && (
+        {/* Hero — the one number that answers "how close are we". Sits in its own
+            recessed block so it reads as a summary, not another goal row. */}
+        <div
+          style={{
+            flexShrink: 0,
+            background: "var(--bg-inner)",
+            borderRadius: 6,
+            padding: "8px 10px",
+          }}
+        >
           <div
             style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: "var(--amber)",
-              textTransform: "uppercase",
-              letterSpacing: "0.04em",
-              lineHeight: 1.3,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              flexShrink: 0,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              gap: 8,
+              marginBottom: 6,
             }}
-            title={decisionDue.reason}
           >
-            Decision due · {decisionDue.name}
+            <span
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                color: "var(--text-muted)",
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+              }}
+            >
+              How close are we
+            </span>
+            <span
+              style={{
+                fontSize: 24,
+                fontWeight: 800,
+                lineHeight: 1,
+                color: overallPct === null ? "var(--text-muted)" : "var(--cyan)",
+                fontVariantNumeric: "tabular-nums",
+                letterSpacing: "-0.02em",
+              }}
+            >
+              {overallPct === null ? "—" : `${Math.round(overallPct)}%`}
+            </span>
+          </div>
+          <div className="progress-track thick">
+            <div
+              className="progress-fill"
+              style={{
+                width: `${Math.min(100, overallPct ?? 0)}%`,
+                background: "var(--cyan)",
+              }}
+            />
+          </div>
+        </div>
+
+        {!anyTargetSet && (
+          <div
+            style={{
+              fontSize: 10,
+              color: "var(--text-muted)",
+              flexShrink: 0,
+              lineHeight: 1.4,
+            }}
+          >
+            No targets set yet — open Edit to add them.
           </div>
         )}
 
-        {visible.length === 0 ? (
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 13,
-              fontWeight: 700,
-              color: "var(--text-muted)",
-              letterSpacing: "0.04em",
-            }}
-          >
-            NOTHING QUEUED
-          </div>
-        ) : (
-          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", gap: 4 }}>
-            {visible.map((item) => (
+        {/* The five goals, in funding order. Bars and percentages only — the
+            amounts stay behind Edit. Hidden while editing so the form always
+            fits the card instead of forcing a scroll. */}
+        {!editing &&
+          rows.map((row, i) => {
+            const meta = STATE_META[row.state];
+            return (
               <div
-                key={item.id}
+                key={row.key}
                 style={{
                   display: "flex",
-                  alignItems: "center",
-                  gap: 8,
+                  flexDirection: "column",
+                  justifyContent: "center",
+                  gap: 5,
+                  // Shrinking The Clock to its content handed this card the
+                  // slack. The rows share it equally so the card is exactly
+                  // filled at any viewport height — no dead gap at the bottom,
+                  // and no scroll. Content is centred, so a taller row reads as
+                  // breathing room rather than a top-aligned row with a hole
+                  // under it. minHeight is the floor on short screens.
+                  flex: "1 1 0",
+                  minHeight: 38,
                   background: "var(--bg-inner)",
                   borderRadius: 6,
-                  padding: "5px 8px",
-                  borderLeft: `3px solid ${priorityTone(item.priority)}`,
-                  minWidth: 0,
+                  padding: "6px 9px",
                 }}
               >
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div
+                {/* Fixed columns so the percentage and state align down the
+                    list — a flex row let variable badge widths ragged them. */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "10px minmax(0, 1fr) 34px 72px",
+                    alignItems: "center",
+                    gap: 6,
+                    minWidth: 0,
+                  }}
+                >
+                  <span
                     style={{
-                      fontSize: 12,
+                      fontSize: 9,
+                      fontWeight: 700,
+                      color: "var(--text-muted)",
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {i + 1}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 11.5,
                       fontWeight: 600,
                       color: "var(--text-primary)",
-                      lineHeight: 1.25,
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
+                      minWidth: 0,
                     }}
                   >
-                    {item.title}
-                  </div>
-                  <div
+                    {row.label}
+                  </span>
+                  <span
                     style={{
-                      fontSize: 9,
-                      color: "var(--text-muted)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                      lineHeight: 1.3,
+                      fontSize: 10.5,
+                      fontWeight: 700,
+                      color: row.target === null ? "var(--text-muted)" : "var(--text-secondary)",
+                      fontVariantNumeric: "tabular-nums",
+                      textAlign: "right",
                     }}
                   >
-                    {item.area ?? "—"}
-                  </div>
+                    {row.target === null ? "—" : `${Math.round(row.pct)}%`}
+                  </span>
+                  <span
+                    className={meta.cls}
+                    style={{
+                      ...(meta.tone ? { color: meta.tone } : {}),
+                      justifySelf: "end",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {meta.label}
+                  </span>
                 </div>
-                {/* Server-computed: One-off past the grace window only. Daily and
-                    Recurring items never carry this flag. */}
-                {item.overdue && <span className="badge badge-red">Overdue</span>}
+                <div className="progress-track">
+                  <div
+                    className="progress-fill"
+                    style={{ width: `${Math.min(100, row.pct)}%`, background: meta.bar }}
+                  />
+                </div>
               </div>
-            ))}
-          </div>
-        )}
+            );
+          })}
 
-        <div
-          style={{
-            borderTop: "1px solid var(--border)",
-            paddingTop: 4,
-            fontSize: 10,
-            color: "var(--text-muted)",
-            flexShrink: 0,
-            whiteSpace: "nowrap",
-          }}
-        >
-          {more} more pending · {doneToday} done today
-        </div>
-      </div>
-
-      <SectionLabel text="Inputs" divider />
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 4,
-          flex: 1,
-          minHeight: 0,
-          overflow: "hidden",
-        }}
-      >
-        {visibleInputs.length === 0 ? (
+        {/* The only place amounts appear. Collapsed by default so the panel
+            itself stays currency-free. */}
+        {editing && (
           <div
             style={{
-              flex: 1,
+              borderTop: "1px solid var(--border)",
+              paddingTop: 5,
+              marginTop: 1,
               display: "flex",
               flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              textAlign: "center",
-              gap: 4,
+              gap: 3,
+              flexShrink: 0,
             }}
           >
+            <EditRow label="Saved so far" value={state.saved} onChange={setSaved} prefix="$" />
+            <EditRow
+              label="1 · Docklands move"
+              value={state.targets.docklands}
+              onChange={(r) => setTarget("docklands", r)}
+              prefix="$"
+            />
+            <EditRow
+              label="2 · Sydney or QLD trip"
+              value={state.targets.trip}
+              onChange={(r) => setTarget("trip", r)}
+              prefix="$"
+            />
+            <EditRow
+              label="3 · Crown weekend"
+              value={state.targets.crown}
+              onChange={(r) => setTarget("crown", r)}
+              prefix="$"
+            />
+            <EditRow
+              label="4 · Night out"
+              value={state.targets.nightOut}
+              onChange={(r) => setTarget("nightOut", r)}
+              prefix="$"
+            />
+            <EditRow
+              label="5 · Shopping spree — people"
+              value={state.people}
+              onChange={setPeople}
+              whole
+            />
+            {/* One line, so opening Edit does not push the form into a scroll. */}
             <div
               style={{
-                fontSize: 13,
-                fontWeight: 700,
+                fontSize: 9,
                 color: "var(--text-muted)",
-                letterSpacing: "0.04em",
+                lineHeight: 1.3,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
               }}
             >
-              NO INPUTS TRACKED
-            </div>
-            <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
-              tag items Daily or Recurring in Notion
+              Spree = ${SPREE_PER_PERSON} × {Math.max(0, Math.floor(state.people))} ={" "}
+              {spreeTarget === null ? "—" : `$${spreeTarget.toLocaleString("en-AU")}`} · saved fills
+              top-down
             </div>
           </div>
-        ) : (
-          visibleInputs.map((input) => (
-            <div
-              key={input.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 8,
-                background: "var(--bg-inner)",
-                borderRadius: 6,
-                padding: "5px 8px",
-                minWidth: 0,
-              }}
-            >
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: "var(--text-primary)",
-                    lineHeight: 1.25,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {input.title}
-                </div>
-                <div
-                  style={{
-                    fontSize: 9,
-                    color: "var(--text-muted)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                    lineHeight: 1.3,
-                  }}
-                >
-                  {input.area ?? "—"} · {input.type ?? "—"}
-                </div>
-              </div>
-
-              {input.doneToday ? (
-                <span
-                  style={{
-                    fontSize: 15,
-                    fontWeight: 700,
-                    color: "var(--green)",
-                    flexShrink: 0,
-                    lineHeight: 1.2,
-                  }}
-                >
-                  ✓
-                </span>
-              ) : (
-                <span
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 700,
-                    // A broken streak has to be visible, so zero is amber rather
-                    // than a quiet grey.
-                    color: input.streak > 0 ? "var(--green)" : "var(--amber)",
-                    fontVariantNumeric: "tabular-nums",
-                    flexShrink: 0,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {input.streak}d
-                </span>
-              )}
-            </div>
-          ))
         )}
-        </div>
       </div>
     </div>
   );
@@ -500,7 +710,12 @@ function ClockPanel({ data, settings }: { data: ActionsPayload; settings?: Setti
     gap > gapRed ? "var(--red)" : gap > gapAmber ? "var(--amber)" : "var(--text-secondary)";
 
   return (
-    <div className="card">
+    // flex "0 0 auto" so the card is only as tall as its content. `.card` is
+    // flex:1 by default, which stretched this panel to half the column and left
+    // a large gap under the stats. The slack now goes to Family Goals above,
+    // which has rows to breathe with. Padding is untouched, so the @media height
+    // tiers still apply.
+    <div className="card" style={{ flex: "0 0 auto" }}>
       <div className="card-header" style={{ marginBottom: 5 }}>
         <div className="card-title">The Clock</div>
         <span className="badge badge-cyan">{c.yearElapsedPct.toFixed(1)}% of year</span>
@@ -511,9 +726,7 @@ function ClockPanel({ data, settings }: { data: ActionsPayload; settings?: Setti
           display: "flex",
           flexDirection: "column",
           gap: 5,
-          flex: 1,
           minHeight: 0,
-          overflow: "hidden",
         }}
       >
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
@@ -534,8 +747,9 @@ function ClockPanel({ data, settings }: { data: ActionsPayload; settings?: Setti
           />
         </div>
 
-        {/* Product tests — counts, live from the Launchpad API. */}
-        <div style={{ borderTop: "1px solid var(--border)", paddingTop: 5, marginTop: "auto" }}>
+        {/* Product tests — counts, live from the Launchpad API. `marginTop:auto`
+            used to shove this to the card's bottom edge; that was the dead gap. */}
+        <div style={{ borderTop: "1px solid var(--border)", paddingTop: 5 }}>
           <div
             style={{
               fontSize: 9,
@@ -613,20 +827,19 @@ export default function PanelTodos() {
     };
   }, []);
 
-  // Two shells, matching the two rendered panels — a three-shell fallback would
-  // make the column reflow the moment data arrived.
+  // Family Goals has no API dependency, so it renders for real even when
+  // /api/actions is down — only THE CLOCK degrades to a shell. The column keeps
+  // two cards in every state, so it never reflows when data arrives.
   if (error) {
     return (
       <>
-        {["Actions", "The Clock"].map((title) => (
-          <ShellCard
-            key={title}
-            title={title}
-            badge="⚠ Error"
-            badgeClass="badge-red"
-            message={`Action data unavailable — ${error}`}
-          />
-        ))}
+        <FamilyGoalsPanel />
+        <ShellCard
+          title="The Clock"
+          badge="⚠ Error"
+          badgeClass="badge-red"
+          message={`Action data unavailable — ${error}`}
+        />
       </>
     );
   }
@@ -634,15 +847,8 @@ export default function PanelTodos() {
   if (!data) {
     return (
       <>
-        {["Actions", "The Clock"].map((title) => (
-          <ShellCard
-            key={title}
-            title={title}
-            badge="Loading…"
-            badgeClass="badge-cyan"
-            message="…"
-          />
-        ))}
+        <FamilyGoalsPanel />
+        <ShellCard title="The Clock" badge="Loading…" badgeClass="badge-cyan" message="…" />
       </>
     );
   }
@@ -651,7 +857,7 @@ export default function PanelTodos() {
 
   return (
     <>
-      <ActionsPanel data={data} settings={settings} />
+      <FamilyGoalsPanel />
       <ClockPanel data={data} settings={settings} />
     </>
   );
