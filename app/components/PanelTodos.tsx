@@ -183,24 +183,85 @@ function ClockStat({ value, label, tone }: { value: string; label: string; tone?
   );
 }
 
-/* ── Panel 1 — TODAY ──────────────────────────────────────────────────────── */
+/* ── Section label inside the merged panel ────────────────────────────────── */
 
-function TodayPanel({ data, settings }: { data: ActionsPayload; settings?: SettingsMap }) {
-  const shown = getSetting(settings, "ACTION_ITEMS_SHOWN", SETTING_DEFAULTS.ACTION_ITEMS_SHOWN);
+/**
+ * Names a section within a single card. The merged panel has ONE card-header,
+ * so "Today" and "Inputs" demote from card titles to these labels — the only
+ * reason this exists.
+ */
+function SectionLabel({ text, divider }: { text: string; divider?: boolean }) {
+  return (
+    <div
+      style={{
+        fontSize: 9,
+        fontWeight: 700,
+        color: "var(--text-muted)",
+        textTransform: "uppercase",
+        letterSpacing: "0.08em",
+        lineHeight: 1.2,
+        flexShrink: 0,
+        ...(divider
+          ? { borderTop: "1px solid var(--border)", paddingTop: 5, marginTop: 1 }
+          : {}),
+      }}
+    >
+      {text}
+    </div>
+  );
+}
+
+/* ── Panel 1 — TODAY + INPUTS (merged) ────────────────────────────────────────
+   One card, one header, two labeled sections. Both data sources, both badges,
+   overdue flagging, streak counts, done-today state and both empty-states are
+   carried over verbatim from the two cards this replaces — presentation only.
+
+   Still zero currency: neither section renders a money value.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+function ActionsPanel({ data, settings }: { data: ActionsPayload; settings?: SettingsMap }) {
+  const actionsShown = getSetting(
+    settings,
+    "ACTION_ITEMS_SHOWN",
+    SETTING_DEFAULTS.ACTION_ITEMS_SHOWN,
+  );
+  const inputsShown = getSetting(
+    settings,
+    "INPUT_HABITS_SHOWN",
+    SETTING_DEFAULTS.INPUT_HABITS_SHOWN,
+  );
   const { decisionDue, ranked, pendingCount, doneToday } = data.actions;
-  const visible = ranked.slice(0, shown);
+  const visible = ranked.slice(0, actionsShown);
   const more = Math.max(pendingCount - visible.length, 0);
+  const visibleInputs = data.inputs.slice(0, inputsShown);
 
   return (
     <div className="card">
       <div className="card-header" style={{ marginBottom: 5 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
-          <div className="card-title">Today</div>
+          <div className="card-title">Actions</div>
           <NotionBadge />
         </div>
-        <span className="badge badge-cyan">● Synced</span>
+        {/* Both badges survive the merge: sync state and tracked-input count. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+          <span className="badge badge-cyan">● Synced</span>
+          <span className="badge badge-cyan">{data.inputs.length} tracked</span>
+        </div>
       </div>
 
+      {/* Outer column: the two sections share the card's height and each
+          compresses internally rather than pushing a row past the card edge. */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 5,
+          flex: 1,
+          minHeight: 0,
+          overflow: "hidden",
+        }}
+      >
+      <SectionLabel text="Today" />
       <div
         style={{
           display: "flex",
@@ -310,23 +371,8 @@ function TodayPanel({ data, settings }: { data: ActionsPayload; settings?: Setti
           {more} more pending · {doneToday} done today
         </div>
       </div>
-    </div>
-  );
-}
 
-/* ── Panel 2 — INPUTS ─────────────────────────────────────────────────────── */
-
-function InputsPanel({ data, settings }: { data: ActionsPayload; settings?: SettingsMap }) {
-  const shown = getSetting(settings, "INPUT_HABITS_SHOWN", SETTING_DEFAULTS.INPUT_HABITS_SHOWN);
-  const visible = data.inputs.slice(0, shown);
-
-  return (
-    <div className="card">
-      <div className="card-header" style={{ marginBottom: 5 }}>
-        <div className="card-title">Inputs</div>
-        <span className="badge badge-cyan">{data.inputs.length} tracked</span>
-      </div>
-
+      <SectionLabel text="Inputs" divider />
       <div
         style={{
           display: "flex",
@@ -337,7 +383,7 @@ function InputsPanel({ data, settings }: { data: ActionsPayload; settings?: Sett
           overflow: "hidden",
         }}
       >
-        {visible.length === 0 ? (
+        {visibleInputs.length === 0 ? (
           <div
             style={{
               flex: 1,
@@ -364,7 +410,7 @@ function InputsPanel({ data, settings }: { data: ActionsPayload; settings?: Sett
             </div>
           </div>
         ) : (
-          visible.map((input) => (
+          visibleInputs.map((input) => (
             <div
               key={input.id}
               style={{
@@ -436,12 +482,13 @@ function InputsPanel({ data, settings }: { data: ActionsPayload; settings?: Sett
             </div>
           ))
         )}
+        </div>
       </div>
     </div>
   );
 }
 
-/* ── Panel 3 — THE CLOCK ──────────────────────────────────────────────────── */
+/* ── Panel 2 — THE CLOCK (untouched) ──────────────────────────────────────── */
 
 function ClockPanel({ data, settings }: { data: ActionsPayload; settings?: SettingsMap }) {
   const c = data.clock;
@@ -566,10 +613,12 @@ export default function PanelTodos() {
     };
   }, []);
 
+  // Two shells, matching the two rendered panels — a three-shell fallback would
+  // make the column reflow the moment data arrived.
   if (error) {
     return (
       <>
-        {["Today", "Inputs", "The Clock"].map((title) => (
+        {["Actions", "The Clock"].map((title) => (
           <ShellCard
             key={title}
             title={title}
@@ -585,7 +634,7 @@ export default function PanelTodos() {
   if (!data) {
     return (
       <>
-        {["Today", "Inputs", "The Clock"].map((title) => (
+        {["Actions", "The Clock"].map((title) => (
           <ShellCard
             key={title}
             title={title}
@@ -602,8 +651,7 @@ export default function PanelTodos() {
 
   return (
     <>
-      <TodayPanel data={data} settings={settings} />
-      <InputsPanel data={data} settings={settings} />
+      <ActionsPanel data={data} settings={settings} />
       <ClockPanel data={data} settings={settings} />
     </>
   );
