@@ -14,9 +14,17 @@ import {
    route rather than the Launchpad API cross-origin.
 
    Rendered per request — it reads a query param, so it cannot be `force-static`
-   like the sibling dashboard route. The 60s lifetime is declared per response
-   (same reason as /api/board: a baked response cannot be conditionally
-   uncacheable, and the error paths here must not be cached).
+   like the sibling dashboard route.
+
+   Every response is `no-store`, and that is load-bearing, not caution. With
+   `s-maxage` set, Netlify's edge cached ONE body and served it for every query
+   string: `?id=<other-uuid>` and even a missing `id` came back as the first
+   product with `"ok":true` (observed in production — the response carries
+   `netlify-vary: query=__nextDataReq|_rsc`, which does NOT include `id`, so the
+   param is absent from the cache key). Silently answering with the wrong
+   product is the worst failure this route has. Upstream calls still share the
+   Next data cache via launchpad()'s `revalidate`, so nothing re-hammers
+   Launchpad; only the CDN response cache is gone.
 
    Everything the calculator needs is COMPUTED, never copied:
      · orders / ad spend / COGS  → summed over the test's whole life, then
@@ -184,10 +192,8 @@ export async function GET(request: NextRequest) {
       /** No field on the calculator holds a fixed per-transaction fee. */
       unmapped: { fee_fixed: test.fee_fixed },
     },
-    {
-      headers: {
-        "Cache-Control": `public, max-age=0, s-maxage=${CACHE_SECONDS}`,
-      },
-    },
+    // no-store: the edge cache key omits `id`, so any shared caching here
+    // serves one product's figures for another's ID. See the header note.
+    { headers: { "Cache-Control": "no-store" } },
   );
 }
