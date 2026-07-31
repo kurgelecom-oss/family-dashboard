@@ -115,16 +115,17 @@ export default function OriginsStrip() {
   if (HIDDEN_ON.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null;
 
   // Reserve the row before the first payload lands, so nothing below it shifts
-  // when the data arrives.
+  // when the data arrives. No `.strip-compact` here on purpose: the placeholder
+  // reserves the taller 72px, so the switch can only ever hand height back.
   if (!data) return <div className="origins-strip" aria-hidden />;
 
-  // Emphasis goes to the larger gap against the weekly target. Ties favour
-  // Taylan, per spec.
-  const gap = (l: LaneSummary) => l.weeklyTarget - l.thisWeek;
-  const emphasised: Lane = gap(data.nihal) > gap(data.taylan) ? "nihal" : "taylan";
+  // The only thing the client derives, and it is not a state — it is a read of
+  // two the server already computed. Both lanes ON_PACE is the single case that
+  // earns the short strip; :root:has() in globals.css turns it into --strip-h.
+  const compact = data.taylan.state === "onpace" && data.nihal.state === "onpace";
 
   return (
-    <div className="origins-strip">
+    <div className={`origins-strip${compact ? " strip-compact" : ""}`}>
       {LANES.map(({ key, label }) => {
         const lane = data[key];
         const { text, isBuild } = laneText(lane);
@@ -133,47 +134,49 @@ export default function OriginsStrip() {
         const asking = proofFor === key;
 
         return (
-          <div
-            key={key}
-            className={`origins-lane state-${lane.state}${key === emphasised ? " emphasis" : ""}`}
-          >
-            <span className="origins-name">{label}</span>
-            <span className="origins-module">{lane.next?.module ?? "—"}</span>
-
-            {asking ? (
-              <span className="origins-proof">
-                <input
-                  autoFocus
-                  type="url"
-                  value={proof}
-                  placeholder="Proof URL — no URL, no tick"
-                  onChange={(e) => setProof(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") tick(key, lane, proof);
-                    if (e.key === "Escape") {
-                      setProofFor(null);
-                      setProof("");
-                      setError(null);
-                    }
-                  }}
-                />
+          <div key={key} className={`origins-lane state-${lane.state}`}>
+            <div className="origins-body">
+              <div className="origins-head">
+                <span className="origins-name">{label}</span>
+                <span className="origins-module">{lane.next?.module ?? "—"}</span>
+                {isSilent && lane.daysSinceLast !== null && (
+                  <span className="origins-silent">{lane.daysSinceLast} DAYS SILENT</span>
+                )}
                 {laneError && <span className="origins-error">{laneError}</span>}
-              </span>
-            ) : (
-              <>
+              </div>
+
+              {asking ? (
+                <span className="origins-proof">
+                  <input
+                    autoFocus
+                    type="url"
+                    value={proof}
+                    placeholder="Proof URL — no URL, no tick"
+                    onChange={(e) => setProof(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") tick(key, lane, proof);
+                      if (e.key === "Escape") {
+                        setProofFor(null);
+                        setProof("");
+                        setError(null);
+                      }
+                    }}
+                  />
+                </span>
+              ) : (
                 <span className="origins-lesson">
                   {isBuild && <span className="build-tag">BUILD: </span>}
                   {text}
                 </span>
-                {laneError && <span className="origins-error">{laneError}</span>}
-                {isSilent && lane.daysSinceLast !== null && (
-                  <span className="origins-silent">{lane.daysSinceLast} days</span>
-                )}
-                <span className="origins-count">
-                  {lane.thisWeek} / {lane.weeklyTarget} this week
-                </span>
-              </>
-            )}
+              )}
+            </div>
+
+            <span className="origins-count">
+              <span className="origins-count-num">
+                {lane.thisWeek}/{lane.weeklyTarget}
+              </span>
+              <span className="origins-count-label">this week</span>
+            </span>
 
             <button
               type="button"

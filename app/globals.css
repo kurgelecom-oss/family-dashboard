@@ -9,9 +9,22 @@
    Fixed-viewport surfaces subtract BOTH this and --nav-h. At 1920x1080 the
    dashboard grid previously filled the viewport exactly (40 + 1040 = 1080), so
    a strip that is not subtracted here pushes the bottom card row below the
-   fold. Three surfaces do that maths: `.dashboard` below, plus the inline
-   styles in app/board/page.tsx and app/week/page.tsx. */
-:root { --strip-h: 40px; }
+   fold. Five surfaces do that maths: `.dashboard` below, plus the inline styles
+   in app/board/page.tsx, app/week/page.tsx, app/budget/page.tsx and
+   app/origins/page.tsx. All five read this variable, so all five follow it.
+
+   72px is the BASE and 40px the exception, not the other way round. The strip
+   renders a reserved placeholder before its first payload lands, and reserving
+   the taller of the two heights means the switch can only ever hand space back.
+   Reserving 40px first would let a BEHIND lane grow down into the fold. */
+:root { --strip-h: 72px; }
+
+/* Both lanes ON_PACE — the only case that earns the short strip. The strip tags
+   itself `.strip-compact` and :has() lifts that one bit of state up to :root,
+   where every consumer already reads it. Deliberately not JS writing an inline
+   style onto <html>: an inline style out-specifies the mobile tier further down
+   and would silently break the stacked layout. */
+:root:has(.origins-strip.strip-compact) { --strip-h: 40px; }
 
 /* ── NIGHT THEME (default before JS runs) ─────────────────────── */
 :root,
@@ -33,6 +46,12 @@
      already carry — an Action Item is a different kind of thing from a lesson
      that is merely late, and amber could not say so. */
   --origins-build:  #ff7a1a;
+  /* ON_PACE is the one lane state with no fill, so its text carries the whole
+     signal: quieter than --text-muted (#5a6080) on purpose. A lane doing what
+     it is supposed to do should recede, not compete with the three that are
+     shouting. Defined here rather than inline in OriginsStrip so the day theme
+     can override it if white cards ever need a different value. */
+  --origins-onpace-text: #4a5070;
   --progress-track: rgba(255,255,255,0.1);
   --card-shadow:    none;
 
@@ -214,81 +233,115 @@ html, body {
   font-size: 11px;
 }
 
+/* A lane is a fill or it is nothing. ON_PACE gets the card background and the
+   quiet text token; the other three fill the full lane width, edge to edge, and
+   flip every descendant to --bg-base by inheritance. That inheritance is the
+   mechanism, not a convenience: children set `color: inherit`, so a state can
+   never leave one child readable and another invisible against its own fill. */
 .origins-lane {
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 10px;
+  gap: 12px;
+  padding: 0 12px;
   background: var(--bg-card);
-  /* Emphasis: the lane further behind its weekly target is the one being asked
-     for attention. The other is legible, not shouting. */
-  opacity: 0.6;
-  transition: opacity 0.2s ease;
-  border-left: 3px solid var(--lane-colour);
+  color: var(--origins-onpace-text);
 }
-.origins-lane.emphasis { opacity: 1; }
 
-/* State colours. Three of the four are existing ramp tokens; only build is new. */
-.origins-lane.state-onpace { --lane-colour: var(--cyan); }
-.origins-lane.state-behind { --lane-colour: var(--amber); }
-.origins-lane.state-build  { --lane-colour: var(--origins-build); }
-.origins-lane.state-silent { --lane-colour: var(--red); }
+/* ON_PACE deliberately declares nothing — no fill, no accent, no cyan. A lane
+   meeting its weekly target is not news, and on a wall display the absence of
+   colour is the fastest thing to read. */
+.origins-lane.state-behind { background: var(--amber); color: var(--bg-base); }
+.origins-lane.state-build  { background: var(--origins-build); color: var(--bg-base); }
+.origins-lane.state-silent { background: var(--red); color: var(--bg-base); }
 
-/* BUILD tints the whole lane, not just the rule — a deliverable should not read
-   as one more lesson in the list. */
-.origins-lane.state-build { background: color-mix(in srgb, var(--origins-build) 12%, var(--bg-card)); }
-.origins-lane.state-silent { background: color-mix(in srgb, var(--red) 10%, var(--bg-card)); }
+.origins-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+.origins-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
 
 .origins-name {
   font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: inherit;
+  opacity: 0.75;
   flex-shrink: 0;
 }
 
 .origins-module {
   font-size: 10px;
-  color: var(--text-muted);
+  color: inherit;
+  opacity: 0.7;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 150px;
-  flex-shrink: 0;
-}
-
-/* The one lesson. Never a list. */
-.origins-lesson {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1;
   min-width: 0;
 }
-.origins-lesson .build-tag { color: var(--origins-build); font-weight: 800; }
 
-.origins-count {
+/* The one lesson. Never a list. Smaller than it was: the weekly count is now
+   the headline and two 12px lines competing with it made neither win. */
+.origins-lesson {
   font-size: 11px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-secondary);
+  font-weight: 600;
+  color: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.origins-lesson .build-tag { color: inherit; font-weight: 800; }
+
+/* The largest thing on the strip, by design. Progress against the weekly target
+   is the number the two of them are actually running on. */
+.origins-count {
   flex-shrink: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: inherit;
+}
+.origins-count-num {
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.origins-count-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.75;
+  white-space: nowrap;
 }
 
 .origins-silent {
   font-size: 10px;
   font-weight: 800;
-  color: var(--red);
+  letter-spacing: 0.06em;
+  color: inherit;
   flex-shrink: 0;
   white-space: nowrap;
 }
 
+/* Shared with the tick buttons on /origins, which set --lane-colour inline per
+   row. Left exactly as it was — the strip overrides itself below rather than
+   changing this out from under that page. */
 .origins-tick {
   flex-shrink: 0;
   width: 22px;
@@ -308,7 +361,25 @@ html, body {
 .origins-tick:hover:not(:disabled) { background: var(--lane-colour); color: var(--bg-card); }
 .origins-tick:disabled { opacity: 0.45; cursor: default; }
 
-/* Proof prompt. Inline, in the strip, no modal — the tick is refused in place. */
+/* In the strip the tick carries no colour of its own: it takes the lane's text
+   colour, which is --bg-base on all three fills and the quiet token on ON_PACE.
+   `transition: none` because SILENT owns the only motion on this strip. */
+.origins-strip .origins-tick {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border-color: currentColor;
+  color: inherit;
+  font-size: 13px;
+  transition: none;
+}
+.origins-strip .origins-tick:hover:not(:disabled) {
+  background: color-mix(in srgb, currentColor 22%, transparent);
+  color: inherit;
+}
+
+/* Proof prompt. Inline, no modal — the tick is refused in place. Shared with
+   /origins, so the base rules stay as they were. */
 .origins-proof {
   flex: 1;
   min-width: 0;
@@ -337,6 +408,14 @@ html, body {
   text-overflow: ellipsis;
 }
 
+/* In the strip the input sits on a BUILD lane's solid orange, where an orange
+   border disappears — it punches back to --bg-base instead. Errors follow the
+   lane's text colour for the same reason: red on red is not a message. ON_PACE
+   is the one lane with no fill, so there red still reads as red. */
+.origins-strip .origins-proof input { border-color: var(--bg-base); }
+.origins-strip .origins-error { font-weight: 800; color: inherit; }
+.origins-strip .origins-lane.state-onpace .origins-error { color: var(--red); }
+
 .origins-notion {
   flex: 0 0 auto;
   display: flex;
@@ -349,13 +428,31 @@ html, body {
   text-decoration: none;
   white-space: nowrap;
 }
-.origins-notion:hover { color: var(--cyan); }
+.origins-notion:hover { color: var(--text-primary); }
+
+/* SILENT, and only SILENT, moves. Five days without a completion is the one
+   condition worth pulling the eye across a room for; anything else animating
+   would spend that attention on something cheaper. Reduced-motion users get the
+   red fill and the literal day count, which carry the same information. */
+@keyframes origins-silent-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .origins-lane.state-silent { animation: origins-silent-pulse 2s ease-in-out infinite; }
+}
 
 /* Mobile: lanes stack, so the strip is two rows tall. Module name and the week
    counter are dropped; lesson, tick and colour state survive — those are what
-   the strip is for. */
+   the strip is for.
+
+   `:root:has(...)` is repeated here because it out-specifies a bare `:root`:
+   the compact rule at the top of this file would otherwise win and squeeze two
+   stacked lanes into 40px. Same specificity, later in source order, so this one
+   takes it. */
 @media (max-width: 768px) {
-  :root { --strip-h: 72px; }
+  :root,
+  :root:has(.origins-strip.strip-compact) { --strip-h: 72px; }
   .origins-strip { flex-direction: column; gap: 1px; }
   .origins-lane { flex: 1; padding: 0 8px; }
   .origins-module,
