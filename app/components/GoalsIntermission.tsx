@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   allocate,
   readGoals,
@@ -10,6 +10,7 @@ import {
   useBusinessProfit,
   type GoalRow,
 } from "./PanelTodos";
+import { SETTING_DEFAULTS, type SettingsMap, getSetting } from "../lib/settings";
 
 /* ════════════════════════════════════════════════════════════════════════════
    GOALS INTERMISSION — a full-viewport reward card that interrupts the
@@ -29,19 +30,92 @@ import {
    all — if a "$" appears on this surface, something is wired wrong.
    ══════════════════════════════════════════════════════════════════════════ */
 
-/** How often the intermission fires. */
-const INTERMISSION_INTERVAL_MS = 5 * 60 * 1000;
+/* ── Timing ───────────────────────────────────────────────────────────────────
+   The three cadence values are tunable from the ⚙️ App Settings Notion DB
+   without a deploy. They are read through the mechanism that already exists —
+   /api/dashboard-settings (force-static, 30-minute cache) feeding the same
+   getSetting() + SETTING_DEFAULTS pair every other panel uses. No second
+   settings reader and no new route.
 
-/** How long it stays on screen once it does. */
-const INTERMISSION_HOLD_MS = 8000;
+   The defaults live in SETTING_DEFAULTS beside every other default rather than
+   being duplicated here, so there is exactly one place a fallback can be wrong.
+   With zero rows in the DB — which is the state today — the overlay runs
+   entirely on them.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/** Delay from MOUNT to the first appearance. */
+const DEFAULT_FIRST_FIRE_MS = SETTING_DEFAULTS.INTERMISSION_FIRST_FIRE_MS;
+
+/** Gap between subsequent appearances. */
+const DEFAULT_INTERVAL_MS = SETTING_DEFAULTS.INTERMISSION_INTERVAL_MS;
+
+/** How long each appearance stays on screen. */
+const DEFAULT_HOLD_MS = SETTING_DEFAULTS.INTERMISSION_HOLD_MS;
 
 /** Fade duration, both directions. Ignored under prefers-reduced-motion. */
 const FADE_MS = 600;
 
 /* Dev trigger — ONLY reachable via ?intermission=1. Without the query param
-   neither constant is read, so production keeps the real interval above. */
+   none of these are read, and the flag deliberately bypasses the settings
+   entirely so verification never waits on a network round-trip. */
+const DEV_FIRST_FIRE_MS = 0;
 const DEV_INTERVAL_MS = 4000;
 const DEV_HOLD_MS = 2500;
+
+interface Timing {
+  firstFireMs: number;
+  intervalMs: number;
+  holdMs: number;
+}
+
+const DEV_TIMING: Timing = {
+  firstFireMs: DEV_FIRST_FIRE_MS,
+  intervalMs: DEV_INTERVAL_MS,
+  holdMs: DEV_HOLD_MS,
+};
+
+const FALLBACK_TIMING: Timing = {
+  firstFireMs: DEFAULT_FIRST_FIRE_MS,
+  intervalMs: DEFAULT_INTERVAL_MS,
+  holdMs: DEFAULT_HOLD_MS,
+};
+
+/**
+ * A duration is only usable if it is a finite positive number. getSetting()
+ * already rejects a missing key and a wrong type; this additionally rejects
+ * zero, negatives and Infinity, any of which would either spam the overlay
+ * every tick or park it off screen forever.
+ */
+function usableMs(value: number, fallback: number): number {
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+/**
+ * Turn a settings map into a timing the cycle can trust.
+ *
+ * The hold is additionally clamped below the interval. A hold longer than the
+ * gap between appearances means the next appearance lands while the overlay is
+ * still up and the screen never clears — the "freeze" case. Clamping is not a
+ * preference here; an un-clamped bad row would cover the dashboard permanently.
+ */
+function resolveTiming(settings: SettingsMap | null): Timing {
+  const firstFireMs = usableMs(
+    getSetting(settings, "INTERMISSION_FIRST_FIRE_MS", DEFAULT_FIRST_FIRE_MS),
+    DEFAULT_FIRST_FIRE_MS,
+  );
+  const intervalMs = usableMs(
+    getSetting(settings, "INTERMISSION_INTERVAL_MS", DEFAULT_INTERVAL_MS),
+    DEFAULT_INTERVAL_MS,
+  );
+  const holdRaw = usableMs(
+    getSetting(settings, "INTERMISSION_HOLD_MS", DEFAULT_HOLD_MS),
+    DEFAULT_HOLD_MS,
+  );
+
+  // Leave at least the fade at each end, so a hold can never swallow the gap.
+  const maxHold = Math.max(1000, intervalMs - FADE_MS * 2);
+  return { firstFireMs, intervalMs, holdMs: Math.min(holdRaw, maxHold) };
+}
 
 /** Above TopNav (900), the origins strip (890) and the calendar popover (9999). */
 const OVERLAY_Z = 10000;
@@ -105,15 +179,70 @@ export default function GoalsIntermission() {
   const [index, setIndex] = useState(0);
   const [stamp, setStamp] = useState<string | null>(null);
 
-  /* The cycle. Read the dev flag inside the effect, never during render: the
-     server has no query string, so touching it in render would hydrate
-     differently than it rendered. */
+  /* Resolved ONCE, then never again. This is load-bearing: `timing` is the
+     cycle effect's only dependency, so anything that re-set it would tear down
+     and rebuild the timers and restart the countdown from zero. That is exactly
+     how a periodic overlay silently never fires. Settings are fetched a single
+     time on mount — no refresh interval — so the effect below runs at most
+     twice: once with the fallback, once with whatever the DB says. */
+  const [timing, setTiming] = useState<Timing | null>(null);
+
+  /* Anchor for "first fire N ms after MOUNT". Without it the first appearance
+     would be N ms after the settings fetch resolves, which drifts by however
+     long the network took. */
+  const mountedAt = useRef<number>(0);
   useEffect(() => {
+    mountedAt.current = Date.now();
+  }, []);
+
+  /* Read the dev flag inside an effect, never during render: the server has no
+     query string, so touching it in render would hydrate differently than it
+     rendered. The flag bypasses the fetch entirely — verification must not wait
+     on the network, and must not change behaviour if someone edits the DB. */
+  useEffect(() => {
+    let cancelled = false;
     const fast = new URLSearchParams(window.location.search).get("intermission") === "1";
-    const intervalMs = fast ? DEV_INTERVAL_MS : INTERMISSION_INTERVAL_MS;
-    const holdMs = fast ? DEV_HOLD_MS : INTERMISSION_HOLD_MS;
+
+    const resolve = async (): Promise<Timing> => {
+      // The flag short-circuits before the fetch: verification must not wait on
+      // the network, and must not change if someone edits the DB.
+      if (fast) return DEV_TIMING;
+      try {
+        // The route that already serves this DB to clients: force-static with a
+        // 30-minute revalidate, so this is a cache hit in all but the first
+        // request after a deploy.
+        const res = await fetch("/api/dashboard-settings");
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const payload = (await res.json()) as { settings?: SettingsMap; error?: string };
+        if (payload.error) throw new Error(String(payload.error));
+        return resolveTiming(payload.settings ?? null);
+      } catch {
+        // Unreachable settings must not disable the overlay — that is what the
+        // built-in defaults are for.
+        return FALLBACK_TIMING;
+      }
+    };
+
+    // Settled through a promise rather than assigned in the effect body, so the
+    // state update is never a synchronous cascade out of the effect.
+    resolve().then((t) => {
+      if (!cancelled) setTiming(t);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /* The cycle: first appearance at firstFireMs after mount, then every
+     intervalMs, each holding holdMs. */
+  useEffect(() => {
+    if (timing === null) return; // still resolving — nothing scheduled yet
+
+    const { firstFireMs, intervalMs, holdMs } = timing;
 
     let hideTimer: ReturnType<typeof setTimeout> | undefined;
+    let cycle: ReturnType<typeof setInterval> | undefined;
 
     const appear = () => {
       // Stamped on appearance, not during render — a value derived from the
@@ -128,16 +257,21 @@ export default function GoalsIntermission() {
       }, holdMs);
     };
 
-    // Only the dev flag shows something immediately; production waits a full
-    // interval before the first interruption.
-    if (fast) appear();
+    // Measured from mount, so the settings round-trip does not push it out.
+    const waited = mountedAt.current === 0 ? 0 : Date.now() - mountedAt.current;
+    const firstDelay = Math.max(0, firstFireMs - waited);
 
-    const cycle = setInterval(appear, intervalMs);
+    const first = setTimeout(() => {
+      appear();
+      cycle = setInterval(appear, intervalMs);
+    }, firstDelay);
+
     return () => {
-      clearInterval(cycle);
+      clearTimeout(first);
+      if (cycle !== undefined) clearInterval(cycle);
       if (hideTimer !== undefined) clearTimeout(hideTimer);
     };
-  }, []);
+  }, [timing]);
 
   const pot =
     profit.cumulative === null

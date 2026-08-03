@@ -59,6 +59,13 @@ export const SETTING_DEFAULTS = {
   TRACTION_END_DATE: "2026-12-31",
   LAUNCHPAD_GO_LIVE_DATE: "2026-07-09",
 
+  // Goals intermission overlay — milliseconds. Absent from Notion by design:
+  // the overlay ships working on these defaults and reads the DB only if
+  // someone adds a row later to retune the cadence without a deploy.
+  INTERMISSION_FIRST_FIRE_MS: 20000,
+  INTERMISSION_INTERVAL_MS: 180000,
+  INTERMISSION_HOLD_MS: 10000,
+
   // Present in Notion but deliberately unused: column C renders no currency.
   TARGET_ANNUAL_REVENUE: 180000,
   TARGET_WEEKLY_REVENUE: 3500,
