@@ -518,12 +518,18 @@ function lastEntryDate(entries: LaunchpadEntryRecord[]): string | null {
 /**
  * Does this test prove a product test was actually run?
  *
+ * Both rules first require the test to have been FED at least once — one shared
+ * check, not two, so the two paths can never drift apart:
+ *
  *   (a) Live/Iterating AND fed within GENUINE_TEST_MAX_STALE_DAYS — running now.
  *   (b) Killed/Scaled — a verdict was reached, so it was run A to Z.
  *
  * A Live test whose newest entry has gone stale is an abandoned test, not a
  * running one: nobody kills a test they walked away from, so status alone
  * would let a dead campaign unlock the reward forever. That was the bug.
+ *
+ * A verdict on a test with no entry rows is a verdict on nothing — a shell
+ * killed at setup was never run, whatever its status says.
  *
  * The fixture exclusion is upstream and untouched — only TRADING_STATUSES tests
  * are ever passed in here, so the Setup-status backtest artifact never reaches
@@ -534,11 +540,11 @@ function isGenuineTest(
   entries: LaunchpadEntryRecord[],
   todayISO: string,
 ): boolean {
-  if (COMPLETED_STATUSES.has(test.status)) return true;
-  if (!RUNNING_STATUSES.has(test.status)) return false;
-
   const last = lastEntryDate(entries);
   if (last === null) return false; // created-empty shell — never fed
+
+  if (COMPLETED_STATUSES.has(test.status)) return true;
+  if (!RUNNING_STATUSES.has(test.status)) return false;
 
   const staleDays = daysBetweenISO(last, todayISO);
   // An unparseable date is not evidence of freshness.
