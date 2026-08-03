@@ -3,14 +3,21 @@
 import { useEffect, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { SETTING_DEFAULTS, type SettingsMap, getSetting } from "../lib/settings";
 import { isActionsPayload } from "../lib/payload-guards";
+import {
+  LAUNCHPAD_API,
+  type LaunchpadEntryRecord,
+  type LaunchpadTestRecord,
+} from "../lib/launchpad";
 
 /* ════════════════════════════════════════════════════════════════════════════
    Column C — FAMILY GOALS / THE CLOCK.
 
-   Two panels. Family Goals is browser-local (localStorage, no API). THE CLOCK
-   still reads GET /api/actions — which is why this file keeps fetching that
-   route even though the Actions panel it used to feed has been removed from
-   this column. The route itself is untouched and still serves its other data.
+   Two panels. Family Goals keeps its TARGETS in localStorage but no longer
+   holds a hand-typed savings figure: the money side is funded from realised
+   business profit read live from Launchpad. THE CLOCK still reads
+   GET /api/actions — which is why this file keeps fetching that route even
+   though the Actions panel it used to feed has been removed from this column.
+   The route itself is untouched and still serves its other data.
 
    Goals and time only: this column renders ZERO currency in its panel bodies by
    design. Money lives in column B. The one sanctioned exception is the Family
@@ -144,17 +151,25 @@ function ClockStat({ value, label, tone }: { value: string; label: string; tone?
 }
 
 /* ── Panel 1 — FAMILY GOALS ───────────────────────────────────────────────────
-   A local savings tracker. It replaced the Actions panel in this column; the
-   /api/actions route is untouched and still fetched by this file, because THE
-   CLOCK below reads `clock` from that same payload.
+   Five goals, funded two different ways.
+
+   FOUR are auto-funded from money the business actually made. Nothing here is
+   typed by hand any more: the reward pot is a split of cumulative contribution
+   profit read live from Launchpad (see useBusinessProfit below), poured
+   top-down through the targets. A hand-entered "saved so far" was the previous
+   model and is gone — it let the panel claim progress no bank account backed.
+
+   ONE — Night out — is behaviour-linked, not money-linked. It is earned by
+   running product test #1 and nothing else, so it carries no dollar target and
+   takes no share of the pot.
 
    Zero currency in the body, per the column rule: every goal row shows a bar, a
    percentage and a state — never a dollar figure. The amounts live behind the
    Edit toggle, the only place a "$" is allowed to appear.
 
-   State is browser-local (localStorage). There is no goals API, so nothing here
-   syncs between devices — deliberate for now, and the reason no figure from this
-   panel should be quoted as a source of truth.
+   Targets stay browser-local (localStorage) — there is no goals API, so targets
+   do not sync between devices. The funding side does: it is derived from the
+   same Launchpad data every screen reads.
    ──────────────────────────────────────────────────────────────────────────── */
 
 const GOALS_STORAGE_KEY = "familyGoals.v1";
@@ -163,10 +178,21 @@ const GOALS_STORAGE_KEY = "familyGoals.v1";
 const SPREE_PER_PERSON = 250;
 const DEFAULT_PEOPLE = 4;
 
+/**
+ * The whole pot by default — the identity, not an invented fraction. There is
+ * no reward-split key in the Notion settings and no split convention anywhere
+ * in this repo, so inventing "20%" here would be fabricating a family rule.
+ * 100% is the honest starting point and the Edit form dials it down.
+ */
+const DEFAULT_REWARD_SPLIT_PCT = 100;
+
 type GoalKey = "docklands" | "trip" | "crown" | "nightOut" | "spree";
 
-/** Editable targets. The spree is computed from `people`, never stored. */
-type TargetKey = Exclude<GoalKey, "spree">;
+/**
+ * Editable dollar targets. The spree is computed from `people`, and `nightOut`
+ * is behaviour-linked — neither is stored, so neither is a TargetKey.
+ */
+type TargetKey = Exclude<GoalKey, "spree" | "nightOut">;
 
 /** Priority order IS the waterfall order — goal 1 fills before goal 2. */
 const GOAL_DEFS: { key: GoalKey; label: string }[] = [
@@ -177,37 +203,67 @@ const GOAL_DEFS: { key: GoalKey; label: string }[] = [
   { key: "spree", label: "Shopping spree" },
 ];
 
-const TARGET_KEYS: TargetKey[] = ["docklands", "trip", "crown", "nightOut"];
+const TARGET_KEYS: TargetKey[] = ["docklands", "trip", "crown"];
 
 interface GoalsState {
   targets: Record<TargetKey, number | null>;
   people: number;
-  saved: number | null;
+  /** Share of cumulative profit that becomes reward money, 0–100. */
+  rewardSplitPct: number;
 }
 
 /** Targets start unset — null, never 0, so "no target yet" reads as itself. */
 const EMPTY_GOALS: GoalsState = {
-  targets: { docklands: null, trip: null, crown: null, nightOut: null },
+  targets: { docklands: null, trip: null, crown: null },
   people: DEFAULT_PEOPLE,
-  saved: null,
+  rewardSplitPct: DEFAULT_REWARD_SPLIT_PCT,
 };
 
 const numOrNull = (x: unknown): boolean =>
   x === null || (typeof x === "number" && Number.isFinite(x));
 
-/** Anything in localStorage is untrusted input — validate before adopting it. */
-function isGoalsState(v: unknown): v is GoalsState {
+/**
+ * Anything in localStorage is untrusted input — validate before adopting it.
+ * `rewardSplitPct` is tolerated when absent so records written before the
+ * auto-funding rework still load with their targets intact; normaliseGoals
+ * fills it in. Retired keys (`saved`, `targets.nightOut`) are simply ignored
+ * and drop out on the next write.
+ */
+function isGoalsState(v: unknown): boolean {
   if (typeof v !== "object" || v === null) return false;
   const o = v as Record<string, unknown>;
   const t = o["targets"];
   if (typeof t !== "object" || t === null) return false;
   const tt = t as Record<string, unknown>;
-  if (!TARGET_KEYS.every((k) => numOrNull(tt[k]))) return false;
+  if (!TARGET_KEYS.every((k) => tt[k] === undefined || numOrNull(tt[k]))) return false;
   if (typeof o["people"] !== "number" || !Number.isFinite(o["people"])) return false;
-  return numOrNull(o["saved"]);
+  const split = o["rewardSplitPct"];
+  return split === undefined || (typeof split === "number" && Number.isFinite(split));
 }
 
-type GoalState = "funded" | "progress" | "next" | "pending" | "unset";
+const clampPct = (n: number) => Math.min(100, Math.max(0, n));
+
+/** Coerce a validated record into a complete, in-range GoalsState. */
+function normaliseGoals(v: unknown): GoalsState {
+  const o = v as Record<string, unknown>;
+  const tt = o["targets"] as Record<string, unknown>;
+  const targets = { docklands: null, trip: null, crown: null } as Record<TargetKey, number | null>;
+  for (const k of TARGET_KEYS) {
+    const raw = tt[k];
+    targets[k] = typeof raw === "number" && Number.isFinite(raw) ? raw : null;
+  }
+  const split = o["rewardSplitPct"];
+  return {
+    targets,
+    people: o["people"] as number,
+    rewardSplitPct:
+      typeof split === "number" && Number.isFinite(split)
+        ? clampPct(split)
+        : DEFAULT_REWARD_SPLIT_PCT,
+  };
+}
+
+type GoalState = "funded" | "progress" | "next" | "pending" | "unset" | "earned" | "locked";
 
 const STATE_META: Record<GoalState, { label: string; cls: string; tone?: string; bar: string }> = {
   funded: { label: "Funded", cls: "badge badge-green", bar: "var(--green)" },
@@ -225,6 +281,13 @@ const STATE_META: Record<GoalState, { label: string; cls: string; tone?: string;
     tone: "var(--text-muted)",
     bar: "var(--text-muted)",
   },
+  earned: { label: "Earned", cls: "badge badge-green", bar: "var(--green)" },
+  locked: {
+    label: "Locked",
+    cls: "badge",
+    tone: "var(--text-muted)",
+    bar: "var(--text-muted)",
+  },
 };
 
 interface GoalRow {
@@ -233,10 +296,13 @@ interface GoalRow {
   target: number | null;
   pct: number;
   state: GoalState;
+  /** Set on behaviour-linked rows only — the sentence under the bar. */
+  note?: string;
 }
 
-/** Target for a goal — computed for the spree, stored for everything else. */
+/** Dollar target for a goal — computed for the spree, stored for the rest. */
 function targetOf(state: GoalsState, key: GoalKey): number | null {
+  if (key === "nightOut") return null; // behaviour-linked, never a dollar goal
   if (key !== "spree") return state.targets[key as TargetKey];
   const people = Math.max(0, Math.floor(state.people));
   return people > 0 ? people * SPREE_PER_PERSON : null;
@@ -246,16 +312,57 @@ function targetOf(state: GoalsState, key: GoalKey): number | null {
  * Top-down waterfall: fill goal 1 to its target, spill the remainder into goal
  * 2, and so on. An unset target cannot be filled and cannot stop the spill —
  * otherwise one blank field would stall every goal below it.
+ *
+ * `pot` is the reward money available, or null while the profit read is still
+ * in flight / has failed. Null is NOT zero: a null pot renders "—" rather than
+ * asserting nothing has been earned.
+ *
+ * Night out is skipped entirely — it consumes no pot and is decided by
+ * `testRunning`, which is null until the Launchpad read resolves.
  */
-function allocate(state: GoalsState): {
+function allocate(
+  state: GoalsState,
+  pot: number | null,
+  testRunning: boolean | null,
+): {
   rows: GoalRow[];
   totalTarget: number;
   overallPct: number | null;
 } {
-  let remaining = Math.max(0, state.saved ?? 0);
+  let remaining = Math.max(0, pot ?? 0);
   let nextClaimed = false;
 
   const rows: GoalRow[] = GOAL_DEFS.map((def) => {
+    if (def.key === "nightOut") {
+      if (testRunning === null) {
+        return {
+          key: def.key,
+          label: def.label,
+          target: null,
+          pct: 0,
+          state: "locked",
+          note: "Checking Launchpad…",
+        };
+      }
+      return testRunning
+        ? {
+            key: def.key,
+            label: def.label,
+            target: null,
+            pct: 100,
+            state: "earned",
+            note: "Test #1 is running — earned",
+          }
+        : {
+            key: def.key,
+            label: def.label,
+            target: null,
+            pct: 0,
+            state: "locked",
+            note: "Run test #1 to unlock",
+          };
+    }
+
     const target = targetOf(state, def.key);
     if (target === null || target <= 0) {
       return { key: def.key, label: def.label, target: null, pct: 0, state: "unset" };
@@ -275,8 +382,159 @@ function allocate(state: GoalsState): {
   });
 
   const totalTarget = rows.reduce((sum, r) => sum + (r.target ?? 0), 0);
-  const saved = Math.max(0, state.saved ?? 0);
-  return { rows, totalTarget, overallPct: totalTarget > 0 ? (saved / totalTarget) * 100 : null };
+  const funded = Math.max(0, pot ?? 0);
+  return {
+    rows,
+    totalTarget,
+    overallPct: totalTarget > 0 && pot !== null ? (funded / totalTarget) * 100 : null,
+  };
+}
+
+/* ── Business profit — the funding source ─────────────────────────────────────
+   Cumulative CONTRIBUTION PROFIT (revenue − COGS − ad spend) summed over every
+   Launchpad test that represents real trading. This is not a new definition of
+   profit: it is the same arithmetic app/api/ecom/product/route.ts already
+   performs per test, and the same contribution figure /api/ecom reports for the
+   month, just accumulated over each test's whole life.
+
+   WHICH TESTS COUNT is the repo's own existing status convention, mirrored from
+   app/api/actions/route.ts — running (Live, Iterating) plus finished (Killed,
+   Scaled). That is load-bearing, not tidiness: Launchpad permanently holds a
+   "Setup" fixture (GHKCU-BACKTEST-REPLAY, a Phase D verification artifact)
+   whose replayed entries carry hundreds of dollars of synthetic profit. Summing
+   every test indiscriminately would pour that fiction straight into the family
+   reward pot.
+
+   Read client-side, cross-origin: the Launchpad API answers with
+   `access-control-allow-origin: *`, so the browser reaches it directly and no
+   new server route is needed.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+const RUNNING_STATUSES = new Set(["Live", "Iterating"]);
+const COMPLETED_STATUSES = new Set(["Killed", "Scaled"]);
+const TRADING_STATUSES = new Set([...RUNNING_STATUSES, ...COMPLETED_STATUSES]);
+
+interface ProfitRead {
+  /** Cumulative contribution profit; null while loading or after a failure. */
+  cumulative: number | null;
+  /** True once a Live/Iterating test has at least one real entry row. */
+  testRunning: boolean | null;
+  /** Sydney wall-clock stamp of the successful read. */
+  readAt: string | null;
+  error: string | null;
+}
+
+const EMPTY_PROFIT: ProfitRead = {
+  cumulative: null,
+  testRunning: null,
+  readAt: null,
+  error: null,
+};
+
+/** Contribution profit over a test's whole life — the /api/ecom/product math. */
+function testContribution(test: LaunchpadTestRecord, entries: LaunchpadEntryRecord[]): number {
+  const bundles = test.bundles_config ?? [];
+  let revenue = 0;
+  let spend = 0;
+  let orders = 0;
+  let bundleUnits = 0;
+  let bundleCogs = 0;
+
+  for (const e of entries) {
+    revenue += e.revenue ?? 0;
+    spend += e.meta_spend ?? 0;
+    orders += e.orders ?? 0;
+    for (const b of e.bundle_breakdown ?? []) {
+      const n = b.count ?? 0;
+      if (n <= 0) continue;
+      bundleUnits += n;
+      // A 2x line is a 2-pack with its own COGS, not two singles.
+      const def = bundles.find((x) => x.id === b.bundle_id);
+      if (def) bundleCogs += n * def.cogs;
+    }
+  }
+
+  // Bundle mix is the accurate basis; per-unit × orders is the flat estimate.
+  const cogs = bundleUnits > 0 ? bundleCogs : (test.cogs_per_unit ?? 0) * orders;
+  return revenue - cogs - spend;
+}
+
+/** Sydney wall clock via Intl — never a fixed offset, which is wrong half the year. */
+function sydneyStamp(at: Date): string {
+  return new Intl.DateTimeFormat("en-AU", {
+    timeZone: "Australia/Sydney",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(at);
+}
+
+function useBusinessProfit(): ProfitRead {
+  const [read, setRead] = useState<ProfitRead>(EMPTY_PROFIT);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const testsRes = await fetch(`${LAUNCHPAD_API}/tests`, {
+          headers: { Accept: "application/json" },
+        });
+        if (!testsRes.ok) throw new Error(`HTTP ${testsRes.status}`);
+        const tests = (await testsRes.json()) as LaunchpadTestRecord[];
+        if (!Array.isArray(tests)) throw new Error("Unexpected tests payload");
+
+        const trading = tests.filter((t) => TRADING_STATUSES.has(t.status));
+
+        // /entries requires test_id — omitting it is a 400 upstream, not an
+        // empty list. One request per trading test, in parallel.
+        const loaded = await Promise.all(
+          trading.map(async (t) => {
+            const res = await fetch(
+              `${LAUNCHPAD_API}/entries?test_id=${encodeURIComponent(t.id)}`,
+              { headers: { Accept: "application/json" } },
+            );
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const entries = (await res.json()) as LaunchpadEntryRecord[];
+            return { test: t, entries: Array.isArray(entries) ? entries : [] };
+          }),
+        );
+
+        // A test that exists but has never been fed is a created-empty shell,
+        // not a running test. One real entry row is the bar.
+        const testRunning = loaded.some(
+          (x) => RUNNING_STATUSES.has(x.test.status) && x.entries.length > 0,
+        );
+        const cumulative = loaded.reduce((s, x) => s + testContribution(x.test, x.entries), 0);
+
+        if (!cancelled) {
+          setRead({
+            cumulative: Math.round(cumulative * 100) / 100,
+            testRunning,
+            readAt: sydneyStamp(new Date()),
+            error: null,
+          });
+        }
+      } catch (e) {
+        // No invented fallback: an unknown pot stays null and renders as "—".
+        if (!cancelled) {
+          setRead({
+            ...EMPTY_PROFIT,
+            error: e instanceof Error ? e.message : "Unknown error",
+          });
+        }
+      }
+    };
+
+    load();
+    const id = setInterval(load, REFRESH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
+
+  return read;
 }
 
 /* ── localStorage as an external store ────────────────────────────────────────
@@ -296,7 +554,7 @@ function readGoals(): GoalsState {
     if (raw) {
       const parsed: unknown = JSON.parse(raw);
       if (isGoalsState(parsed)) {
-        goalsCache = parsed;
+        goalsCache = normaliseGoals(parsed);
         return goalsCache;
       }
     }
@@ -405,6 +663,7 @@ function EditRow({
 function FamilyGoalsPanel() {
   const state = useSyncExternalStore(subscribeGoals, readGoals, readGoalsServer);
   const [editing, setEditing] = useState(false);
+  const profit = useBusinessProfit();
 
   /** Every edit writes straight through to storage — nothing to flush later. */
   const update = (fn: (s: GoalsState) => GoalsState) => writeGoals(fn(readGoals()));
@@ -418,12 +677,23 @@ function FamilyGoalsPanel() {
   const setTarget = (key: TargetKey, raw: string) =>
     update((s) => ({ ...s, targets: { ...s.targets, [key]: toNum(raw) } }));
 
-  const setSaved = (raw: string) => update((s) => ({ ...s, saved: toNum(raw) }));
-
   const setPeople = (raw: string) =>
     update((s) => ({ ...s, people: Math.max(0, Math.floor(toNum(raw) ?? 0)) }));
 
-  const { rows, overallPct } = allocate(state);
+  const setSplit = (raw: string) =>
+    update((s) => ({ ...s, rewardSplitPct: clampPct(toNum(raw) ?? DEFAULT_REWARD_SPLIT_PCT) }));
+
+  /**
+   * The reward pot. A loss is not negative reward money — it is no reward
+   * money — so the pot floors at zero rather than running the waterfall
+   * backwards. Null (loading/failed) stays null and is rendered as "—".
+   */
+  const pot =
+    profit.cumulative === null
+      ? null
+      : (Math.max(0, profit.cumulative) * state.rewardSplitPct) / 100;
+
+  const { rows, overallPct } = allocate(state, pot, profit.testRunning);
   const spreeTarget = targetOf(state, "spree");
   const anyTargetSet = rows.some((r) => r.target !== null);
 
@@ -433,7 +703,13 @@ function FamilyGoalsPanel() {
         <div className="card-title">Family Goals</div>
         <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
           <span className={`badge ${overallPct === null ? "badge-amber" : "badge-cyan"}`}>
-            {overallPct === null ? "No targets" : `${Math.round(Math.min(overallPct, 999))}%`}
+            {/* Two different reasons for "no number", named separately — the
+                badge previously said "No targets" for both. */}
+            {overallPct !== null
+              ? `${Math.round(Math.min(overallPct, 999))}%`
+              : anyTargetSet
+                ? "No data"
+                : "No targets"}
           </span>
           <button
             type="button"
@@ -525,18 +801,26 @@ function FamilyGoalsPanel() {
           </div>
         </div>
 
-        {!anyTargetSet && (
-          <div
-            style={{
-              fontSize: 10,
-              color: "var(--text-muted)",
-              flexShrink: 0,
-              lineHeight: 1.4,
-            }}
-          >
-            No targets set yet — open Edit to add them.
-          </div>
-        )}
+        {/* One honest line about the funding source. Percentages and states,
+            never a dollar figure — the amounts stay behind Edit. */}
+        <div
+          style={{
+            fontSize: 10,
+            color: profit.error ? "var(--amber)" : "var(--text-muted)",
+            flexShrink: 0,
+            lineHeight: 1.4,
+          }}
+        >
+          {profit.error
+            ? `Profit read failed — ${profit.error}. Funded % unknown.`
+            : profit.cumulative === null
+              ? "Reading business profit…"
+              : !anyTargetSet
+                ? "Auto-funded from business profit — open Edit to set targets."
+                : `Auto-funded from business profit · ${state.rewardSplitPct}% split${
+                    profit.readAt ? ` · read ${profit.readAt} Sydney` : ""
+                  }`}
+        </div>
 
         {/* The five goals, in funding order. Bars and percentages only — the
             amounts stay behind Edit. Hidden while editing so the form always
@@ -603,12 +887,19 @@ function FamilyGoalsPanel() {
                     style={{
                       fontSize: 10.5,
                       fontWeight: 700,
-                      color: row.target === null ? "var(--text-muted)" : "var(--text-secondary)",
+                      color:
+                        row.target === null && row.note === undefined
+                          ? "var(--text-muted)"
+                          : "var(--text-secondary)",
                       fontVariantNumeric: "tabular-nums",
                       textAlign: "right",
                     }}
                   >
-                    {row.target === null ? "—" : `${Math.round(row.pct)}%`}
+                    {/* Behaviour-linked rows (note set) carry a real 0/100 —
+                        only a money goal with no target renders as unknown. */}
+                    {row.target === null && row.note === undefined
+                      ? "—"
+                      : `${Math.round(row.pct)}%`}
                   </span>
                   <span
                     className={meta.cls}
@@ -627,6 +918,22 @@ function FamilyGoalsPanel() {
                     style={{ width: `${Math.min(100, row.pct)}%`, background: meta.bar }}
                   />
                 </div>
+                {/* Behaviour-linked rows say what earns them. Money rows have
+                    nothing to add here — their bar is the whole story. */}
+                {row.note && (
+                  <div
+                    style={{
+                      fontSize: 9,
+                      lineHeight: 1.2,
+                      color: row.state === "earned" ? "var(--green)" : "var(--text-muted)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {row.note}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -645,7 +952,8 @@ function FamilyGoalsPanel() {
               flexShrink: 0,
             }}
           >
-            <EditRow label="Saved so far" value={state.saved} onChange={setSaved} prefix="$" />
+            {/* No "saved so far" input: the pot is business profit, not a
+                number anyone types. Targets and the split are the only knobs. */}
             <EditRow
               label="1 · Docklands move"
               value={state.targets.docklands}
@@ -665,31 +973,40 @@ function FamilyGoalsPanel() {
               prefix="$"
             />
             <EditRow
-              label="4 · Night out"
-              value={state.targets.nightOut}
-              onChange={(r) => setTarget("nightOut", r)}
-              prefix="$"
-            />
-            <EditRow
               label="5 · Shopping spree — people"
               value={state.people}
               onChange={setPeople}
               whole
             />
-            {/* One line, so opening Edit does not push the form into a scroll. */}
+            <EditRow
+              label="Reward split of profit (%)"
+              value={state.rewardSplitPct}
+              onChange={setSplit}
+              whole
+            />
+            {/* Two lines, so opening Edit does not push the form into a scroll. */}
             <div
               style={{
                 fontSize: 9,
                 color: "var(--text-muted)",
                 lineHeight: 1.3,
-                whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
               }}
             >
               Spree = ${SPREE_PER_PERSON} × {Math.max(0, Math.floor(state.people))} ={" "}
-              {spreeTarget === null ? "—" : `$${spreeTarget.toLocaleString("en-AU")}`} · saved fills
+              {spreeTarget === null ? "—" : `$${spreeTarget.toLocaleString("en-AU")}`} · pot fills
               top-down
+              <br />
+              Profit{" "}
+              {profit.cumulative === null
+                ? "—"
+                : // Sign outside the symbol — "$-93.84" reads as a typo.
+                  `${profit.cumulative < 0 ? "−" : ""}$${Math.abs(
+                    profit.cumulative,
+                  ).toLocaleString("en-AU")}`} · pot{" "}
+              {pot === null ? "—" : `$${Math.round(pot).toLocaleString("en-AU")}`} · 4 · Night out is
+              earned by running test #1
             </div>
           </div>
         )}
