@@ -318,12 +318,12 @@ function targetOf(state: GoalsState, key: GoalKey): number | null {
  * asserting nothing has been earned.
  *
  * Night out is skipped entirely — it consumes no pot and is decided by
- * `testRunning`, which is null until the Launchpad read resolves.
+ * `genuineTest`, which is null until the Launchpad read resolves.
  */
 function allocate(
   state: GoalsState,
   pot: number | null,
-  testRunning: boolean | null,
+  genuineTest: boolean | null,
 ): {
   rows: GoalRow[];
   totalTarget: number;
@@ -334,7 +334,7 @@ function allocate(
 
   const rows: GoalRow[] = GOAL_DEFS.map((def) => {
     if (def.key === "nightOut") {
-      if (testRunning === null) {
+      if (genuineTest === null) {
         return {
           key: def.key,
           label: def.label,
@@ -344,14 +344,14 @@ function allocate(
           note: "Checking Launchpad…",
         };
       }
-      return testRunning
+      return genuineTest
         ? {
             key: def.key,
             label: def.label,
             target: null,
             pct: 100,
             state: "earned",
-            note: "Test #1 is running — earned",
+            note: "Test #1 counts — earned",
           }
         : {
             key: def.key,
@@ -414,11 +414,23 @@ const RUNNING_STATUSES = new Set(["Live", "Iterating"]);
 const COMPLETED_STATUSES = new Set(["Killed", "Scaled"]);
 const TRADING_STATUSES = new Set([...RUNNING_STATUSES, ...COMPLETED_STATUSES]);
 
+/**
+ * How long a Live/Iterating test may go unfed before it stops counting as a
+ * test anyone is actually running. Not a fresh magic number: TEST_STALE_RED_DAYS
+ * is the repo's existing "this test is dead" threshold, already used by
+ * /api/ecom to decide whether a stale test still proves activity.
+ */
+const GENUINE_TEST_MAX_STALE_DAYS = SETTING_DEFAULTS.TEST_STALE_RED_DAYS;
+
 interface ProfitRead {
   /** Cumulative contribution profit; null while loading or after a failure. */
   cumulative: number | null;
-  /** True once a Live/Iterating test has at least one real entry row. */
-  testRunning: boolean | null;
+  /**
+   * True once a GENUINE test exists — see isGenuineTest. Null while loading.
+   * Named for the question it answers: not "is something Live" (an abandoned
+   * test stays Live forever) but "has a test actually been run".
+   */
+  genuineTest: boolean | null;
   /** Sydney wall-clock stamp of the successful read. */
   readAt: string | null;
   error: string | null;
@@ -426,7 +438,7 @@ interface ProfitRead {
 
 const EMPTY_PROFIT: ProfitRead = {
   cumulative: null,
-  testRunning: null,
+  genuineTest: null,
   readAt: null,
   error: null,
 };
@@ -469,6 +481,71 @@ function sydneyStamp(at: Date): string {
   }).format(at);
 }
 
+/** Today's Sydney civil date as "YYYY-MM-DD". en-CA formats exactly that way. */
+function sydneyTodayISO(at: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Australia/Sydney",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(at);
+}
+
+/**
+ * Whole days between two civil dates. Both are plain "YYYY-MM-DD" strings, so
+ * this is pure calendar arithmetic through Date.UTC — no timezone and no offset
+ * constant (which would be wrong for the months Sydney is on AEDT). Same helper
+ * shape as inclusiveDays in /api/ecom/product.
+ */
+function daysBetweenISO(fromISO: string, toISO: string): number | null {
+  const [fy, fm, fd] = fromISO.split("-").map(Number);
+  const [ty, tm, td] = toISO.split("-").map(Number);
+  if ([fy, fm, fd, ty, tm, td].some((n) => !Number.isFinite(n))) return null;
+  return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86_400_000);
+}
+
+/** Newest entry_date for a test, or null if it has never been fed. */
+function lastEntryDate(entries: LaunchpadEntryRecord[]): string | null {
+  let newest: string | null = null;
+  for (const e of entries) {
+    if (typeof e.entry_date !== "string" || !e.entry_date) continue;
+    // Ordering is not guaranteed by the API, so take the max rather than .at(-1).
+    if (newest === null || e.entry_date.localeCompare(newest) > 0) newest = e.entry_date;
+  }
+  return newest;
+}
+
+/**
+ * Does this test prove a product test was actually run?
+ *
+ *   (a) Live/Iterating AND fed within GENUINE_TEST_MAX_STALE_DAYS — running now.
+ *   (b) Killed/Scaled — a verdict was reached, so it was run A to Z.
+ *
+ * A Live test whose newest entry has gone stale is an abandoned test, not a
+ * running one: nobody kills a test they walked away from, so status alone
+ * would let a dead campaign unlock the reward forever. That was the bug.
+ *
+ * The fixture exclusion is upstream and untouched — only TRADING_STATUSES tests
+ * are ever passed in here, so the Setup-status backtest artifact never reaches
+ * this check.
+ */
+function isGenuineTest(
+  test: LaunchpadTestRecord,
+  entries: LaunchpadEntryRecord[],
+  todayISO: string,
+): boolean {
+  if (COMPLETED_STATUSES.has(test.status)) return true;
+  if (!RUNNING_STATUSES.has(test.status)) return false;
+
+  const last = lastEntryDate(entries);
+  if (last === null) return false; // created-empty shell — never fed
+
+  const staleDays = daysBetweenISO(last, todayISO);
+  // An unparseable date is not evidence of freshness.
+  if (staleDays === null) return false;
+  return staleDays <= GENUINE_TEST_MAX_STALE_DAYS;
+}
+
 function useBusinessProfit(): ProfitRead {
   const [read, setRead] = useState<ProfitRead>(EMPTY_PROFIT);
 
@@ -500,17 +577,16 @@ function useBusinessProfit(): ProfitRead {
           }),
         );
 
-        // A test that exists but has never been fed is a created-empty shell,
-        // not a running test. One real entry row is the bar.
-        const testRunning = loaded.some(
-          (x) => RUNNING_STATUSES.has(x.test.status) && x.entries.length > 0,
-        );
+        // Today resolved once, in Sydney, and shared by every staleness check.
+        const todayISO = sydneyTodayISO(new Date());
+        const genuineTest = loaded.some((x) => isGenuineTest(x.test, x.entries, todayISO));
+
         const cumulative = loaded.reduce((s, x) => s + testContribution(x.test, x.entries), 0);
 
         if (!cancelled) {
           setRead({
             cumulative: Math.round(cumulative * 100) / 100,
-            testRunning,
+            genuineTest,
             readAt: sydneyStamp(new Date()),
             error: null,
           });
@@ -693,7 +769,7 @@ function FamilyGoalsPanel() {
       ? null
       : (Math.max(0, profit.cumulative) * state.rewardSplitPct) / 100;
 
-  const { rows, overallPct } = allocate(state, pot, profit.testRunning);
+  const { rows, overallPct } = allocate(state, pot, profit.genuineTest);
   const spreeTarget = targetOf(state, "spree");
   const anyTargetSet = rows.some((r) => r.target !== null);
 
