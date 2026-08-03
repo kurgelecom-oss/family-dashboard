@@ -290,7 +290,7 @@ const STATE_META: Record<GoalState, { label: string; cls: string; tone?: string;
   },
 };
 
-interface GoalRow {
+export interface GoalRow {
   key: GoalKey;
   label: string;
   target: number | null;
@@ -320,7 +320,7 @@ function targetOf(state: GoalsState, key: GoalKey): number | null {
  * Night out is skipped entirely — it consumes no pot and is decided by
  * `genuineTest`, which is null until the Launchpad read resolves.
  */
-function allocate(
+export function allocate(
   state: GoalsState,
   pot: number | null,
   genuineTest: boolean | null,
@@ -472,7 +472,7 @@ function testContribution(test: LaunchpadTestRecord, entries: LaunchpadEntryReco
 }
 
 /** Sydney wall clock via Intl — never a fixed offset, which is wrong half the year. */
-function sydneyStamp(at: Date): string {
+export function sydneyStamp(at: Date): string {
   return new Intl.DateTimeFormat("en-AU", {
     timeZone: "Australia/Sydney",
     hour: "2-digit",
@@ -552,7 +552,7 @@ function isGenuineTest(
   return staleDays <= GENUINE_TEST_MAX_STALE_DAYS;
 }
 
-function useBusinessProfit(): ProfitRead {
+export function useBusinessProfit(): ProfitRead {
   const [read, setRead] = useState<ProfitRead>(EMPTY_PROFIT);
 
   useEffect(() => {
@@ -629,7 +629,7 @@ function useBusinessProfit(): ProfitRead {
 let goalsCache: GoalsState | null = null;
 const goalsListeners = new Set<() => void>();
 
-function readGoals(): GoalsState {
+export function readGoals(): GoalsState {
   if (goalsCache) return goalsCache;
   try {
     const raw = window.localStorage.getItem(GOALS_STORAGE_KEY);
@@ -648,7 +648,7 @@ function readGoals(): GoalsState {
 }
 
 /** The server has no storage, so it always renders the unset state. */
-const readGoalsServer = (): GoalsState => EMPTY_GOALS;
+export const readGoalsServer = (): GoalsState => EMPTY_GOALS;
 
 function writeGoals(next: GoalsState): void {
   goalsCache = next;
@@ -660,7 +660,7 @@ function writeGoals(next: GoalsState): void {
   goalsListeners.forEach((l) => l());
 }
 
-function subscribeGoals(onChange: () => void): () => void {
+export function subscribeGoals(onChange: () => void): () => void {
   goalsListeners.add(onChange);
   const onStorage = (e: StorageEvent) => {
     if (e.key === GOALS_STORAGE_KEY) {

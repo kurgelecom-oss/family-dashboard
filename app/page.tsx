@@ -6,10 +6,12 @@ import PanelCalendar from "./components/PanelCalendar";
 import PanelHabits from "./components/PanelHabits";
 import PanelTodos from "./components/PanelTodos";
 import PanelHomeschoolWeek from "./components/PanelHomeschoolWeek";
+import GoalsIntermission from "./components/GoalsIntermission";
 
 export default function Dashboard() {
   return (
     <div className="dashboard">
+      <GoalsIntermission />
       <Header />
       <div className="dashboard-grid">
         {/* Column 1 — Spending & Accounts (PocketSmith) */}
