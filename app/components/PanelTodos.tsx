@@ -300,6 +300,114 @@ export interface GoalRow {
   note?: string;
 }
 
+/* ── Quest-log presentation ───────────────────────────────────────────────────
+   Everything below here is DECORATION. Not one value feeds a calculation: the
+   rows still come from allocate(), the percentages are still its percentages,
+   and the Night out state is still whatever the gate decided. A tier stamp is
+   a sticker on a card, not a fact about the goal.
+
+   The tier hexes are deliberately LOCAL. Gold/silver/bronze are cosmetic
+   labels, so promoting them to globals.css would put three decorative colours
+   next to --cyan and --green, which are semantic and load-bearing. They stay
+   here where their scope is obvious.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+const TIER_GOLD = "#d4af37";
+const TIER_SILVER = "#c0c0c0";
+const TIER_BRONZE = "#cd7f32";
+
+const QUEST_TIER: Record<GoalKey, { label: string; colour: string }> = {
+  docklands: { label: "Gold", colour: TIER_GOLD },
+  trip: { label: "Gold", colour: TIER_GOLD },
+  crown: { label: "Silver", colour: TIER_SILVER },
+  nightOut: { label: "Starter", colour: "var(--cyan)" },
+  spree: { label: "Bronze", colour: TIER_BRONZE },
+};
+
+/**
+ * One glyph per quest, drawn inline. No icon package and no emoji: emoji
+ * render at the mercy of the platform font and would land differently on the
+ * Samsung Flip than on the Mac mini, which is the one thing a wall display
+ * cannot afford.
+ */
+const QUEST_GLYPH: Record<GoalKey, string> = {
+  docklands: "M3 11 L12 4 L21 11 M5.5 9.5 V20 H18.5 V9.5",
+  trip: "M2 13 L22 4 L14 21 L11.5 14.5 Z",
+  crown: "M3 19 L5 7 L9.5 12 L12 5 L14.5 12 L19 7 L21 19 Z",
+  nightOut: "M20.5 14.5 A8.5 8.5 0 1 1 9.5 3.5 A6.8 6.8 0 0 0 20.5 14.5 Z",
+  spree: "M6 8 H18 L19 20.5 H5 Z M9 8 V6.2 A3 3 0 0 1 15 6.2 V8",
+};
+
+function QuestGlyph({ path, colour }: { path: string; colour: string }) {
+  return (
+    <svg
+      width={14}
+      height={14}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={colour}
+      strokeWidth={1.9}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      style={{ flexShrink: 0, display: "block" }}
+    >
+      <path d={path} />
+    </svg>
+  );
+}
+
+/** Shown on quests that cannot be worked on yet. */
+function LockGlyph({ colour }: { colour: string }) {
+  return (
+    <svg
+      width={9}
+      height={9}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={colour}
+      strokeWidth={2.2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      style={{ flexShrink: 0, display: "block" }}
+    >
+      <path d="M7.5 10.5 V7 A4.5 4.5 0 0 1 16.5 7 V10.5" />
+      <rect x="4.5" y="10.5" width="15" height="10" rx="2" />
+    </svg>
+  );
+}
+
+/** The accent a quest card is drawn in. Derived from state, never from tier. */
+function questAccent(state: GoalState): string {
+  if (state === "earned" || state === "funded") return "var(--green)";
+  if (state === "next" || state === "progress") return "var(--cyan)";
+  return "var(--text-muted)";
+}
+
+/** Quests nobody can act on yet recede, so the active one reads first. */
+const isDimmed = (state: GoalState): boolean =>
+  state === "locked" || state === "pending" || state === "unset";
+
+/**
+ * The quest objective, phrased as an instruction.
+ *
+ * Behaviour-linked rows are keyed off `row.state` — the same state the row
+ * badge and the overlay read, so the objective cannot say "run test #1" while
+ * the badge says EARNED. The gate itself is not consulted here; by the time a
+ * row exists the gate has already spoken.
+ */
+function objectiveOf(row: GoalRow): string {
+  if (row.key === "nightOut") {
+    if (row.state === "earned") return "Objective complete: test #1 run";
+    // The in-flight row carries its own copy; anything else is the locked case.
+    if (row.note === "Checking Launchpad…") return row.note;
+    return "Objective: run test #1";
+  }
+  if (row.target === null) return "Objective: set a target";
+  return "Objective: fund from profit";
+}
+
 /** Dollar target for a goal — computed for the spree, stored for the rest. */
 function targetOf(state: GoalsState, key: GoalKey): number | null {
   if (key === "nightOut") return null; // behaviour-linked, never a dollar goal
@@ -904,12 +1012,28 @@ function FamilyGoalsPanel() {
                   }`}
         </div>
 
-        {/* The five goals, in funding order. Bars and percentages only — the
+        {/* The five quests, in funding order. Bars and percentages only — the
             amounts stay behind Edit. Hidden while editing so the form always
-            fits the card instead of forcing a scroll. */}
+            fits the card instead of forcing a scroll.
+
+            The percentage and the status label live on SEPARATE LINES, and that
+            is the fix, not a style preference: they used to share one grid whose
+            badge track was a fixed 72px. "NOT STARTED" needs 93px, so it
+            overflowed 15px left across the 34px percentage cell and the two
+            rendered on top of each other as "0%OT STARTED". Nothing here pins a
+            text width — the name flexes and truncates, the chips size to their
+            own content, and the percentage owns its own row end. */}
         {!editing &&
-          rows.map((row, i) => {
+          rows.map((row) => {
             const meta = STATE_META[row.state];
+            const tier = QUEST_TIER[row.key];
+            const accent = questAccent(row.state);
+            const dimmed = isDimmed(row.state);
+            const active = row.state === "next";
+            // Behaviour-linked rows carry a real 0/100; only a money goal with
+            // no target has no honest percentage to show.
+            const showPct = row.target !== null || row.note !== undefined;
+
             return (
               <div
                 key={row.key}
@@ -917,49 +1041,41 @@ function FamilyGoalsPanel() {
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "center",
-                  gap: 5,
+                  gap: 4,
                   // Shrinking The Clock to its content handed this card the
-                  // slack. The rows share it equally so the card is exactly
+                  // slack. The quests share it equally so the card is exactly
                   // filled at any viewport height — no dead gap at the bottom,
-                  // and no scroll. Content is centred, so a taller row reads as
-                  // breathing room rather than a top-aligned row with a hole
+                  // and no scroll. Content is centred, so a taller card reads as
+                  // breathing room rather than a top-aligned one with a hole
                   // under it. minHeight is the floor on short screens.
                   flex: "1 1 0",
-                  minHeight: 38,
-                  background: "var(--bg-inner)",
+                  minHeight: 44,
+                  background: active
+                    ? "color-mix(in srgb, var(--cyan) 8%, var(--bg-inner))"
+                    : "var(--bg-inner)",
+                  // The active quest is the only card that earns a border.
+                  border: `1px solid ${active ? "var(--cyan)" : "transparent"}`,
+                  borderLeft: `2px solid ${active ? "var(--cyan)" : accent}`,
                   borderRadius: 6,
-                  padding: "6px 9px",
+                  padding: "5px 8px",
+                  opacity: dimmed ? 0.66 : 1,
+                  minWidth: 0,
                 }}
               >
-                {/* Fixed columns so the percentage and state align down the
-                    list — a flex row let variable badge widths ragged them. */}
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "10px minmax(0, 1fr) 34px 72px",
-                    alignItems: "center",
-                    gap: 6,
-                    minWidth: 0,
-                  }}
-                >
+                {/* Line 1 — glyph, quest name, tier stamp. */}
+                <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                  <QuestGlyph path={QUEST_GLYPH[row.key]} colour={accent} />
                   <span
                     style={{
-                      fontSize: 9,
-                      fontWeight: 700,
-                      color: "var(--text-muted)",
-                      fontVariantNumeric: "tabular-nums",
-                    }}
-                  >
-                    {i + 1}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: 11.5,
-                      fontWeight: 600,
+                      fontSize: active ? 12.5 : 11.5,
+                      fontWeight: active ? 700 : 600,
                       color: "var(--text-primary)",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
+                      // minWidth:0 is what lets the NAME give way instead of
+                      // shoving a neighbour, which is how the old overlap began.
+                      flex: 1,
                       minWidth: 0,
                     }}
                   >
@@ -967,55 +1083,78 @@ function FamilyGoalsPanel() {
                   </span>
                   <span
                     style={{
-                      fontSize: 10.5,
+                      flexShrink: 0,
+                      fontSize: 8,
                       fontWeight: 700,
-                      color:
-                        row.target === null && row.note === undefined
-                          ? "var(--text-muted)"
-                          : "var(--text-secondary)",
-                      fontVariantNumeric: "tabular-nums",
-                      textAlign: "right",
-                    }}
-                  >
-                    {/* Behaviour-linked rows (note set) carry a real 0/100 —
-                        only a money goal with no target renders as unknown. */}
-                    {row.target === null && row.note === undefined
-                      ? "—"
-                      : `${Math.round(row.pct)}%`}
-                  </span>
-                  <span
-                    className={meta.cls}
-                    style={{
-                      ...(meta.tone ? { color: meta.tone } : {}),
-                      justifySelf: "end",
+                      letterSpacing: "0.09em",
+                      textTransform: "uppercase",
+                      color: tier.colour,
+                      border: `1px solid ${tier.colour}`,
+                      borderRadius: 3,
+                      padding: "1px 4px",
+                      lineHeight: 1.35,
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {meta.label}
+                    {tier.label}
                   </span>
                 </div>
-                <div className="progress-track">
-                  <div
-                    className="progress-fill"
-                    style={{ width: `${Math.min(100, row.pct)}%`, background: meta.bar }}
-                  />
-                </div>
-                {/* Behaviour-linked rows say what earns them. Money rows have
-                    nothing to add here — their bar is the whole story. */}
-                {row.note && (
-                  <div
+
+                {/* Line 2 — objective on the left, percentage on the right.
+                    Both flex children: the objective truncates, the percentage
+                    never shrinks, so they cannot collide at any width. */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                  {dimmed && <LockGlyph colour="var(--text-muted)" />}
+                  <span
                     style={{
-                      fontSize: 9,
-                      lineHeight: 1.2,
+                      flex: 1,
+                      minWidth: 0,
+                      fontSize: 9.5,
+                      lineHeight: 1.25,
                       color: row.state === "earned" ? "var(--green)" : "var(--text-muted)",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {row.note}
-                  </div>
-                )}
+                    {objectiveOf(row)}
+                  </span>
+                  <span
+                    style={{
+                      flexShrink: 0,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: showPct ? accent : "var(--text-muted)",
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {showPct ? `${Math.round(row.pct)}%` : "—"}
+                  </span>
+                </div>
+
+                <div className="progress-track">
+                  <div
+                    className="progress-fill"
+                    style={{ width: `${Math.min(100, row.pct)}%`, background: meta.bar }}
+                  />
+                </div>
+
+                {/* Line 3 — the status word, on its own line and nowhere near
+                    the percentage. */}
+                <div style={{ display: "flex", minWidth: 0 }}>
+                  <span
+                    className={meta.cls}
+                    style={{
+                      ...(meta.tone ? { color: meta.tone } : {}),
+                      whiteSpace: "nowrap",
+                      maxWidth: "100%",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {meta.label}
+                  </span>
+                </div>
               </div>
             );
           })}
