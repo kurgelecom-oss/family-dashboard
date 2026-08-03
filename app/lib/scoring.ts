@@ -22,8 +22,15 @@
 
 export const SOCCER_DAYS = ["Monday", "Wednesday"];
 
-/** Weekly max = 56 (incl. +3 streak bonus for 5 Perfect Days Mon–Fri). */
-export const WEEKLY_MAX = 56;
+/**
+ * Weekly max = 55 (incl. +3 streak bonus for 5 Perfect Days Mon–Fri).
+ *
+ * 55, not 56, because 56 was never reachable. A perfect week is Mon 11 + Tue 10
+ * + Wed 11 + Thu 10 + Fri 10 = 52 — 11 on the two SOCCER_DAYS, 10 otherwise —
+ * plus the 3-point streak bonus. The old 56 left one point no combination of
+ * ticks could earn, so "Week total / 56" could never read full.
+ */
+export const WEEKLY_MAX = 55;
 
 /**
  * Tier boundaries. Only `min` and `label` live here — the point at which a tier
