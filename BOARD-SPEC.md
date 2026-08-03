@@ -78,7 +78,7 @@ Running state lives in `BOARD-LEDGER.md`. This file does not get ticked.
 ## PARITY WITH /week (all must exist on /board)
 
 - Schedule render from Notion.
-- ANSAR FC strip: points today, week total out of 56, day streak, four tier thresholds.
+- ANSAR FC strip: points today, week total out of 55, day streak, four tier thresholds.
 - Edit in Notion link.
 
 ## SCORING
@@ -91,7 +91,7 @@ Running state lives in `BOARD-LEDGER.md`. This file does not get ticked.
   - `app/components/PanelHabits.tsx`
   - ansar-habits-tracker `app/page.tsx`
 - Canonical logic is ansar-habits-tracker's: `homeschool_session` alone awards 5.
-- `WEEKLY_MAX` 56 and existing tier thresholds unchanged.
+- `WEEKLY_MAX` 55 and existing tier thresholds unchanged.
 
 ## STYLE
 
