@@ -2,6 +2,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase, getTodayDate, getWeekStart } from "../lib/supabase";
 import { scoreDay } from "../lib/scoring";
+// Mirrored byte-for-byte with ansar-habits-tracker/app/lib/streak.ts — see the
+// header there, and scripts/check-scoring-sync.sh which guards the pair.
+import { calculateStreak, STREAK_LOOKBACK_DAYS } from "../lib/streak";
+// addDays is aliased: this file already has a local string-based addDays used by
+// the weekly scoring below, and lib/time's operates on CivilDate. Two different
+// functions, so the civil one is renamed rather than shadowing anything.
+import { zoneToday, isoDate, addDays as addCivilDays } from "../lib/time";
 
 // ─── ANSAR FC scoring now lives in app/lib/scoring.ts ───────────────────────
 // One canonical implementation, mirrored into ansar-habits-tracker. It was
@@ -106,29 +113,29 @@ export default function WeekProgressStrip() {
       setTodayPerfect(todayScore.perfect);
     }
 
-    // Day streak: consecutive days with ≥5 completions (same rule as the tracker)
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - 60);
+    // Day streak. The rule now lives in app/lib/streak.ts, mirrored
+    // byte-for-byte with ansar-habits-tracker. It used to sit inline here and in
+    // PanelHabits.tsx, held in step with the tracker by a comment reading "same
+    // rule as the tracker" — which is exactly how all three drifted: when the
+    // tracker moved to a weekday-only streak these two kept counting calendar
+    // days and reported 8 where the tracker reported 14 off the same rows.
+    //
+    // The dates are Sydney civil dates via Intl (zoneToday → HOUSEHOLD_TZ),
+    // replacing a `new Date()` + `toISOString().split("T")[0]` round-trip that
+    // read the day in UTC. CLAUDE.md forbids that pattern and it was
+    // load-bearing here: for the first ten hours of every Sydney day it named
+    // yesterday, so the streak could read a day stale every morning.
+    const todaySydney = zoneToday(new Date());
     const { data: streakData } = await supabase
       .from("habit_completions")
       .select("completed_date")
-      .gte("completed_date", cutoff.toISOString().split("T")[0]);
+      .gte("completed_date", isoDate(addCivilDays(todaySydney, -STREAK_LOOKBACK_DAYS)));
     if (streakData) {
       const counts: Record<string, number> = {};
       streakData.forEach((r: { completed_date: string }) => {
         counts[r.completed_date] = (counts[r.completed_date] || 0) + 1;
       });
-      let s = 0;
-      const check = new Date();
-      for (let i = 0; i <= 60; i++) {
-        const d = new Date(check);
-        d.setDate(check.getDate() - i);
-        const ds = d.toISOString().split("T")[0];
-        if ((counts[ds] || 0) >= 5) s++;
-        else if (i === 0) continue;
-        else break;
-      }
-      setStreak(s);
+      setStreak(calculateStreak(counts, isoDate(todaySydney)));
     }
   }, []);
 
