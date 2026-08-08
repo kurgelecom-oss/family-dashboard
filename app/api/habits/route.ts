@@ -25,6 +25,18 @@ interface Habit {
   order: number;
   points: number;
   pointType: string;
+  /**
+   * Notion "Days" multi-select, three-letter form, e.g. ["Mon","Sat"]. Empty
+   * means every day — the same reading ansar-habits-tracker's lib/days.ts
+   * applies, and the reason an empty value is not the same as "no days".
+   *
+   * The panels did not have this field at all, which is how a Saturday's
+   * completions came to be scored against the weekday roster. They now scope the
+   * weekly total by DATE (Mon–Fri only), so nothing here is load-bearing for the
+   * /55 — this exists so both surfaces see the same habit shape, and so a
+   * per-date roster is possible here without another round trip.
+   */
+  days: string[];
 }
 
 async function fetchHabits(): Promise<Habit[]> {
@@ -61,6 +73,7 @@ async function fetchHabits(): Promise<Habit[]> {
       order: props.Order?.number ?? 0,
       points: props.Points?.number ?? 0,
       pointType: props["Point Type"]?.select?.name || "",
+      days: (props.Days?.multi_select ?? []).map((o: { name: string }) => o.name),
     };
   });
 }

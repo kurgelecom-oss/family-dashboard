@@ -23,7 +23,26 @@ interface Habit {
   order: number;
   points: number;
   pointType: string;
+  /** Notion "Days", three-letter form, e.g. ["Mon","Sat"]. Empty = every day. */
+  days: string[];
 }
+
+/**
+ * The days the squad total is made of. Mon–Fri, and nothing else, ever.
+ *
+ * Mirrors SQUAD_DAYS in ansar-habits-tracker/app/page.tsx — the two surfaces read
+ * the same habit_completions rows and must report the same /55, which is the
+ * whole reason lib/scoring.ts is hash-synced in the first place.
+ *
+ * This panel had NO day filter of any kind. It summed every date returned
+ * between Monday and today and scored each against the full weekday roster,
+ * which was harmless only while every habit was Mon–Fri and a weekend therefore
+ * had no completions to find. Morning Habits and Afternoon/Evening are now
+ * scheduled seven days a week, so without this a fully-ticked Saturday would add
+ * up to 5 points to a ceiling with no room for them, and the dashboard would
+ * disagree with the tracker about the same week.
+ */
+const SQUAD_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
 // Weekly max = 55 (incl. +3 streak bonus for 5 Perfect Days Mon–Fri):
 // Mon 11 + Tue 10 + Wed 11 + Thu 10 + Fri 10 = 52, plus 3. It was 56, which no
@@ -100,6 +119,9 @@ export default function WeekProgressStrip() {
 
       let total = 0;
       Object.keys(byDate).forEach(ds => {
+        // Weekend rows are skipped because of the DATE. Weekend habits exist and
+        // are ticked; they earn the Stretch Wallet, not the squad total.
+        if (!SQUAD_DAYS.includes(dayNameOf(ds))) return;
         total += scoreDay(byDate[ds], dayNameOf(ds), preIds, baseIds).total;
       });
 
