@@ -9,6 +9,10 @@ import { calculateStreak, STREAK_LOOKBACK_DAYS } from "../lib/streak";
 // the weekly scoring below, and lib/time's operates on CivilDate. Two different
 // functions, so the civil one is renamed rather than shadowing anything.
 import { zoneToday, isoDate, addDays as addCivilDays } from "../lib/time";
+// The per-date roster rule, shared with PanelHabits. Weekday and weekend no
+// longer schedule the same habits, so "which habits count today" is a real
+// question rather than "all of them".
+import { habitsOnDay } from "../lib/habit-days";
 
 // ─── ANSAR FC scoring now lives in app/lib/scoring.ts ───────────────────────
 // One canonical implementation, mirrored into ansar-habits-tracker. It was
@@ -100,9 +104,20 @@ export default function WeekProgressStrip() {
     }
   }, []);
 
-  const loadHabits = useCallback(async (preIds: string[], baseIds: string[]) => {
+  // Takes the habit LIST rather than pre-resolved id arrays, because the weekly
+  // total and the daily number no longer want the same roster: the /55 is a
+  // Mon–Fri number scored against the weekday list, while "Points today" has to
+  // be scored against whatever is actually scheduled today.
+  const loadHabits = useCallback(async (habits: Habit[]) => {
     const ws = getWeekStart();
     const today = getTodayDate();
+
+    // The weekly roster, unchanged. Every date this loop scores is Mon–Fri (see
+    // SQUAD_DAYS), and every non-conditional habit is scheduled Mon–Fri, so a
+    // per-date resolve would return this same set — deriving it once keeps the
+    // /55 provably identical to what it was.
+    const preIds = habits.filter(h => h.block === "pre").map(h => h.id);
+    const baseIds = habits.filter(h => h.block !== "conditional").map(h => h.id);
 
     const { data, error } = await supabase
       .from("habit_completions")
@@ -133,7 +148,17 @@ export default function WeekProgressStrip() {
       if (allWeekdaysPerfect) total += 3;
       setWeeklyPts(total);
 
-      const todayScore = scoreDay(byDate[today] ?? new Set(), dayNameOf(today), preIds, baseIds);
+      // TODAY'S roster, not the week's. Homeschool is Mon–Fri and soccer is
+      // Mon/Wed, so scoring a Saturday against the weekday list reported a
+      // perfect Saturday as 4 — homeschool_session missing from `completedIds`
+      // kept `perfect` false — where the tracker read 5/5 off the same rows.
+      const todayHabits = habitsOnDay(habits, dayNameOf(today));
+      const todayScore = scoreDay(
+        byDate[today] ?? new Set(),
+        dayNameOf(today),
+        todayHabits.filter(h => h.block === "pre").map(h => h.id),
+        todayHabits.filter(h => h.block !== "conditional").map(h => h.id),
+      );
       setTodayPts(todayScore.total);
       setTodayPerfect(todayScore.perfect);
     }
@@ -172,10 +197,8 @@ export default function WeekProgressStrip() {
 
   useEffect(() => {
     if (habits.length === 0) return;
-    const preIds = habits.filter(h => h.block === "pre").map(h => h.id);
-    const baseIds = habits.filter(h => h.block !== "conditional").map(h => h.id);
-    loadHabits(preIds, baseIds);
-    const id = setInterval(() => loadHabits(preIds, baseIds), 60_000);
+    loadHabits(habits);
+    const id = setInterval(() => loadHabits(habits), 60_000);
     return () => clearInterval(id);
   }, [habits, loadHabits]);
 

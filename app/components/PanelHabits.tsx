@@ -9,6 +9,10 @@ import { calculateStreak, STREAK_LOOKBACK_DAYS } from "../lib/streak";
 // the weekly scoring below, and lib/time's operates on CivilDate. Two different
 // functions, so the civil one is renamed rather than shadowing anything.
 import { zoneToday, isoDate, addDays as addCivilDays } from "../lib/time";
+// The per-date roster rule, shared with WeekProgressStrip. Weekday and weekend
+// no longer schedule the same habits, so "which habits count today" is a real
+// question rather than "all of them".
+import { habitsOnDay } from "../lib/habit-days";
 
 // ─── ANSAR FC scoring now lives in app/lib/scoring.ts ───────────────────────
 // One canonical implementation, mirrored into ansar-habits-tracker. It was
@@ -182,18 +186,34 @@ export default function PanelHabits() {
 
   useEffect(() => {
     if (habits.length === 0) return;
-    const preIds = habits.filter(h => h.block === "pre").map(h => h.id);
-    const baseIds = habits.filter(h => h.block !== "conditional").map(h => h.id);
-    load(preIds, baseIds);
-    const interval = setInterval(() => load(preIds, baseIds), 10000);
+    // The WEEKLY roster, and deliberately not today's. Every date load() scores
+    // is Mon–Fri (see SQUAD_DAYS), and every non-conditional habit is scheduled
+    // Mon–Fri, so resolving per-date would return this same set — deriving it
+    // once here keeps the /55 provably identical to what it was. Today's roster
+    // is a different question, answered below with habitsOnDay().
+    const weekPreIds = habits.filter(h => h.block === "pre").map(h => h.id);
+    const weekBaseIds = habits.filter(h => h.block !== "conditional").map(h => h.id);
+    load(weekPreIds, weekBaseIds);
+    const interval = setInterval(() => load(weekPreIds, weekBaseIds), 10000);
     return () => clearInterval(interval);
   }, [habits, load]);
 
-  const baseHabits = habits.filter(h => h.block !== "conditional");
+  // TODAY'S ROSTER, not the whole habit list. Homeschool is Mon–Fri and soccer
+  // is Mon/Wed, so on a Saturday `habits` contains rows that are not scheduled
+  // and must not be counted. Scoring the full list on a weekend was reporting a
+  // perfect Saturday as 4 (homeschool_session missing kept `perfect` false) where
+  // the tracker read 5/5 off the same rows — the two surfaces disagreeing about
+  // the same day, which is the bug class this whole area keeps producing.
+  //
+  // The weekday name is the SYDNEY civil day, not the device's. `new Date()`
+  // .toLocaleDateString() was reading the viewer's zone, so a dashboard open on
+  // a laptop set to UTC would resolve Saturday's roster on a Sunday morning.
+  const todayName = dayNameOf(isoDate(zoneToday(new Date())));
+  const todayHabits = habitsOnDay(habits, todayName);
+
+  const baseHabits = todayHabits.filter(h => h.block !== "conditional");
   const preIds = baseHabits.filter(h => h.block === "pre").map(h => h.id);
   const baseIds = baseHabits.map(h => h.id);
-
-  const todayName = new Date().toLocaleDateString("en-AU", { weekday: "long" });
   const todayScore = scoreDay(new Set(Object.keys(completed).filter(k => completed[k])), todayName, preIds, baseIds);
   const todayPts = todayScore.total;
   const todayDone = baseHabits.filter(h => completed[h.id]).length;
@@ -247,7 +267,12 @@ export default function PanelHabits() {
 
       {/* Block progress */}
       <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-        {BLOCKS.map(block => {
+        {/* Only blocks that actually schedule something today. "Homeschool 0/1"
+            on a Saturday reads as a job left undone; there is no homeschool on a
+            Saturday, so the row is omitted rather than shown at zero. Filtering
+            on length also removes the 0/0 division that would otherwise drive the
+            progress bar's width. */}
+        {BLOCKS.filter(block => baseHabits.some(h => h.block === block.id)).map(block => {
           const bHabits = baseHabits.filter(h => h.block === block.id);
           const bDone = bHabits.filter(h => completed[h.id]).length;
           return (
