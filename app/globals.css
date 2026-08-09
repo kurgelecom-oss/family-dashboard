@@ -978,3 +978,11 @@ html, body {
   0%, 100% { opacity: 1; box-shadow: 0 0 6px #00ff00; }
   50%      { opacity: 0.4; box-shadow: 0 0 2px #00ff00; }
 }
+
+.incident-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+.incident-link:hover { opacity: 0.75; }

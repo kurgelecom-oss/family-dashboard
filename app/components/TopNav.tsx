@@ -43,7 +43,7 @@ function IncidentCounter() {
   return (
     <div className="incident-counter">
       <span className="incident-dot"></span>
-      <span className="incident-text">{daysSince} days since last incident</span>
+      <span className="incident-text">{daysSince} days since last <a href="https://tally.so/forms/68Ygxo/submissions" target="_blank" rel="noopener noreferrer" className="incident-link">incident</a></span>
     </div>
   );
 }
