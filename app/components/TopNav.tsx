@@ -43,7 +43,7 @@ function IncidentCounter() {
   return (
     <div className="incident-counter">
       <span className="incident-dot"></span>
-      <span className="incident-text">{daysSince} days</span>
+      <span className="incident-text">{daysSince} days since last incident</span>
     </div>
   );
 }
