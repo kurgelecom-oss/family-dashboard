@@ -941,3 +941,40 @@ html, body {
 ::-webkit-scrollbar { width: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ── INCIDENT COUNTER ──────────────────────────────────────────────── */
+.incident-counter {
+  position: relative;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0 10px;
+  line-height: var(--nav-h);
+  font-size: 12px;
+  font-weight: 600;
+  color: #00ff00;
+  text-decoration: none;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.incident-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #00ff00;
+  box-shadow: 0 0 6px #00ff00;
+  flex-shrink: 0;
+  animation: pulse-green 2s ease-in-out infinite;
+}
+
+.incident-text {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px #00ff00; }
+  50%      { opacity: 0.4; box-shadow: 0 0 2px #00ff00; }
+}

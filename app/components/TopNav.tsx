@@ -1,13 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 
-// Canonical nav shared across all six surfaces. Absolute URLs throughout —
-// including self-links — so this list stays byte-identical in every repo.
 const LINKS = [
   { label: "Family Dashboard",      href: "https://kurgel-dashboard.netlify.app/" },
   { label: "ECOM Launchpad",        href: "https://ecom-launchpad-mentor.netlify.app/" },
-  // Absolute, not "/profit.html": this list is copied verbatim into the other
-  // five surfaces, where a relative path would resolve against the wrong origin.
   { label: "Calculator",            href: "https://kurgel-dashboard.netlify.app/profit.html" },
   { label: "Ansar · ANSAR FC",      href: "https://ansar-habits-tracker.netlify.app/" },
   { label: "Time Allocation Board", href: "https://kurgel-dashboard.netlify.app/board" },
@@ -15,15 +11,44 @@ const LINKS = [
   { label: "Link Board",            href: "https://luxury-kringle-cf4171.netlify.app/" },
 ];
 
-// "/week/" and "/week" are the same page; "" is "/".
 function normPath(p: string): string {
   const trimmed = p.replace(/\/+$/, "");
   return trimmed === "" ? "/" : trimmed;
 }
 
+function IncidentCounter() {
+  const [daysSince, setDaysSince] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchIncident = async () => {
+      try {
+        const res = await fetch("/api/incident");
+        const data = await res.json();
+        setDaysSince(data.daysSince);
+      } catch (err) {
+        console.error("Failed to fetch incident data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchIncident();
+    const interval = setInterval(fetchIncident, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (loading || daysSince === null) return null;
+
+  return (
+    <div className="incident-counter">
+      <span className="incident-dot"></span>
+      <span className="incident-text">{daysSince} days</span>
+    </div>
+  );
+}
+
 export default function TopNav() {
-  // Resolved after mount: window doesn't exist during SSR, and matching on it
-  // during render would desync hydration. Nothing is active on the first paint.
   const [active, setActive] = useState<string | null>(null);
 
   useEffect(() => {
@@ -39,7 +64,7 @@ export default function TopNav() {
   return (
     <nav className="topnav">
       {LINKS.map((link) => (
-        <a
+        
           key={link.href}
           href={link.href}
           className={link.href === active ? "topnav-link active" : "topnav-link"}
@@ -47,6 +72,7 @@ export default function TopNav() {
           {link.label}
         </a>
       ))}
+      <IncidentCounter />
     </nav>
   );
 }
