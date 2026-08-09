@@ -64,7 +64,7 @@ export default function TopNav() {
   return (
     <nav className="topnav">
       {LINKS.map((link) => (
-        
+        <a
           key={link.href}
           href={link.href}
           className={link.href === active ? "topnav-link active" : "topnav-link"}
