@@ -41,6 +41,12 @@ const REQUEST_TIMEOUT_MS = 10_000;
 
 const DAILY_POINTS_ID = "4431302a-75ed-479f-a5f4-3bfd5e0a4e68";
 const PRODUCT_VALIDATION_ID = "1d35429a-fa90-81a0-bf47-000b7fe8803d";
+const MISSION_GOALS_ID = "22f0eed5-7556-4758-b171-328d273485f3";
+
+// The all-failed threshold for the 503. Named rather than inlined as `=== 3` so
+// that adding a fourth source surfaces this line as something to update, instead
+// of silently leaving a route that can never report a total outage again.
+const SOURCE_COUNT = 3;
 
 /* ── payload ─────────────────────────────────────────────────────────────── */
 
@@ -58,6 +64,29 @@ export interface QueuedValidation {
   ageDays: number;
 }
 
+/** What a counted goal reads its number from. "none" is a text-only goal. */
+export type CountsFrom =
+  | "tests_logged"
+  | "validations_logged"
+  | "validation_queue"
+  | "none";
+
+export interface Goal {
+  goal: string;
+  /** Numeric target, or null when the goal has no number behind it. */
+  target: number | null;
+  /** Shown in place of a number — "1-3", "2/day". "" when absent. */
+  targetText: string;
+  countsFrom: CountsFrom;
+  sort: number;
+}
+
+export interface GoalsPayload {
+  weekly: { T: Goal[]; N: Goal[]; Both: Goal[] };
+  monthly: Goal[];
+  longTerm: Goal[];
+}
+
 export interface SourceError {
   source: string;
   error: string;
@@ -67,11 +96,14 @@ export interface MissionPayload {
   today: string;
   weekStart: string;
   daily: { T: DailyPoint[]; N: DailyPoint[] };
+  // These three names are load-bearing: the page maps a goal's countsFrom onto
+  // them. Renaming one silently turns every counted goal into a zero.
   weekly: {
     validationsThisWeek: number;
     testsLoggedThisWeek: number;
     validationQueue: QueuedValidation[];
   };
+  goals: GoalsPayload;
   errors: SourceError[];
 }
 
@@ -144,6 +176,31 @@ function textOf(prop: NotionProp): string {
   if (typeof p.number === "number") return String(p.number);
   if (typeof p.name === "string") return p.name.trim();
   return "";
+}
+
+/**
+ * A numeric property, or null when it is genuinely blank.
+ *
+ * null and 0 must stay distinguishable: a blank Target means "this goal has no
+ * number behind it" and must render as text, while 0 would be a real target
+ * that is already met. Coercing one into the other is how a text-only goal ends
+ * up displaying a fabricated "0 / 0".
+ */
+function numberOf(prop: NotionProp): number | null {
+  if (prop === undefined || prop === null) return null;
+  const p = prop as { number?: number | null; formula?: { number?: number | null } };
+  if (typeof p.number === "number") return p.number;
+  if (typeof p.formula?.number === "number") return p.formula.number;
+  return null;
+}
+
+/** A checkbox property. Absent reads as false — an unset Active is not active. */
+function boolOf(prop: NotionProp): boolean {
+  if (prop === undefined || prop === null) return false;
+  const p = prop as { checkbox?: boolean; formula?: { boolean?: boolean } };
+  if (typeof p.checkbox === "boolean") return p.checkbox;
+  if (typeof p.formula?.boolean === "boolean") return p.formula.boolean;
+  return false;
 }
 
 /** A UTC instant → the calendar date it falls on in Sydney. */
@@ -330,6 +387,71 @@ function shapeWeekly(
   return { validationsThisWeek, testsLoggedThisWeek, validationQueue };
 }
 
+/** Notion's "Counts From" value → the union, defaulting to text-only. */
+function countsFromOf(raw: string): CountsFrom {
+  const v = raw.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (v === "tests_logged" || v === "validations_logged" || v === "validation_queue") {
+    return v;
+  }
+  // Anything unrecognised is text-only on purpose. A typo'd select option must
+  // not silently bind a goal to the wrong counter — showing no number is a
+  // visible gap, showing the wrong number is not.
+  return "none";
+}
+
+/**
+ * Active goals, grouped by band and owner, sorted by Sort ascending.
+ *
+ * Band and Owner are matched case-insensitively so renaming a select option's
+ * capitalisation in Notion cannot empty a band.
+ */
+function shapeGoals(rows: NotionPage[]): GoalsPayload {
+  const out: GoalsPayload = {
+    weekly: { T: [], N: [], Both: [] },
+    monthly: [],
+    longTerm: [],
+  };
+
+  for (const row of rows) {
+    if (!boolOf(propOf(row, "Active"))) continue;
+
+    const goal: Goal = {
+      goal: textOf(propOf(row, "Goal", "Name", "Title")) || "(untitled)",
+      target: numberOf(propOf(row, "Target")),
+      targetText: textOf(propOf(row, "Target Text")),
+      countsFrom: countsFromOf(textOf(propOf(row, "Counts From"))),
+      // Unsorted rows sink to the bottom rather than jumping to the top, which
+      // is what 0 would do.
+      sort: numberOf(propOf(row, "Sort")) ?? Number.MAX_SAFE_INTEGER,
+    };
+
+    const band = textOf(propOf(row, "Band")).trim().toLowerCase();
+
+    if (band === "weekly") {
+      const owner = textOf(propOf(row, "Owner")).trim().toLowerCase();
+      if (owner.startsWith("both")) out.weekly.Both.push(goal);
+      else if (owner === "t" || owner.startsWith("taylan")) out.weekly.T.push(goal);
+      else if (owner === "n" || owner.startsWith("nihal")) out.weekly.N.push(goal);
+      // A Weekly goal with no recognised Owner has no column to live in. It is
+      // dropped rather than guessed at — a goal shown under the wrong person is
+      // worse than one that is visibly missing from Notion.
+    } else if (band === "monthly") {
+      out.monthly.push(goal);
+    } else if (band === "long term" || band === "longterm" || band === "long-term") {
+      out.longTerm.push(goal);
+    }
+  }
+
+  const bySort = (a: Goal, b: Goal) => a.sort - b.sort;
+  out.weekly.T.sort(bySort);
+  out.weekly.N.sort(bySort);
+  out.weekly.Both.sort(bySort);
+  out.monthly.sort(bySort);
+  out.longTerm.sort(bySort);
+
+  return out;
+}
+
 /* ── handler ─────────────────────────────────────────────────────────────── */
 
 export async function GET() {
@@ -337,12 +459,13 @@ export async function GET() {
   const todayIso = isoDate(today);
   const weekStart = isoDate(mondayOfWeek(today));
 
-  // Settled, not raced: Daily and Weekly are independent sections and one dead
-  // source must degrade only itself. A 500 here would take down a page whose
-  // other half is perfectly healthy.
-  const [dailyResult, weeklyResult] = await Promise.allSettled([
+  // Settled, not raced: the three sections are independent and one dead source
+  // must degrade only itself. A 500 here would take down a page whose other two
+  // thirds are perfectly healthy.
+  const [dailyResult, weeklyResult, goalsResult] = await Promise.allSettled([
     fetchSource(DAILY_POINTS_ID, "Daily points"),
     fetchSource(PRODUCT_VALIDATION_ID, "Product Validation"),
+    fetchSource(MISSION_GOALS_ID, "Mission Goals"),
   ]);
 
   const errors: SourceError[] = [];
@@ -375,13 +498,36 @@ export async function GET() {
     errors.push({ source: "Product Validation", error: message });
   }
 
-  const payload: MissionPayload = { today: todayIso, weekStart, daily, weekly, errors };
+  let goals: GoalsPayload = {
+    weekly: { T: [], N: [], Both: [] },
+    monthly: [],
+    longTerm: [],
+  };
+  if (goalsResult.status === "fulfilled") {
+    goals = shapeGoals(goalsResult.value);
+  } else {
+    const message =
+      goalsResult.reason instanceof Error
+        ? goalsResult.reason.message
+        : String(goalsResult.reason);
+    console.error("Error fetching Mission Goals:", message);
+    errors.push({ source: "Mission Goals", error: message });
+  }
 
-  // Both sources down is an outage, not a quiet week: returning 200 would make a
+  const payload: MissionPayload = {
+    today: todayIso,
+    weekStart,
+    daily,
+    weekly,
+    goals,
+    errors,
+  };
+
+  // Every source down is an outage, not a quiet week: returning 200 would make a
   // dead token indistinguishable from a genuinely empty board to anything that
   // does not read `errors`. One survivor is still a 200 — that is the whole
   // point of degrading per section.
-  const status = errors.length === 2 ? 503 : 200;
+  const status = errors.length === SOURCE_COUNT ? 503 : 200;
 
   return NextResponse.json(payload, {
     status,

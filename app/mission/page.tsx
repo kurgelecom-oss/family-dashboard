@@ -1,7 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { MissionPayload, DailyPoint, QueuedValidation } from "../api/mission/route";
+import type {
+  MissionPayload,
+  DailyPoint,
+  QueuedValidation,
+  Goal,
+} from "../api/mission/route";
 
 /* ────────────────────────────────────────────────────────────────────────────
    /mission — read-only. Four bands, in descending order of urgency:
@@ -25,40 +30,40 @@ const NOTION_DAILY = "https://app.notion.com/p/3805429afa9080039d26c02e7e06bc38"
 // Parent page for every counted weekly goal.
 const NOTION_WEEKLY = "https://app.notion.com/p/f27260c1c1884727ae9bbdc0518e18cf";
 
-const MONTHLY =
-  "By 10 September 2026 — a product test and validation in motion, and profitability in motion.";
-const LONG_TERM =
-  "Ecom profit covers continuous reinvestment and all monthly household expenses.";
+// Where an empty band sends you to add goals.
+const NOTION_GOALS = "https://app.notion.com/p/5f953f15384149cc8e44f85de71b04f6";
 
-/* ── weekly goals ────────────────────────────────────────────────────────────
-   Fixed, hardcoded, identical every week — they are the standing definition of
-   the week, not data. Only `count` moves, and only on the rows that have a real
-   number behind them.
+/* ── goals ───────────────────────────────────────────────────────────────────
+   Every goal on this page now comes from the Mission Goals database. Nothing
+   below the daily band is hardcoded: the wording, the ordering, which person
+   owns a row, and whether a row has a number behind it are all editable in
+   Notion without a deploy.
 
-   `kind` is what stops this page from lying. A "text" row shows its target as
-   plain words with no number and no bar, because no count exists for it. The
-   alternative — rendering "0 / 5" for mentorship calls watched — would invent a
-   measurement the system cannot make, and a zero meaning "not tracked" is
-   indistinguishable on a wall from a zero meaning "did nothing".
+   `countsFrom` is what stops the page from lying. It is the only thing that
+   grants a goal a number: a goal with countsFrom "none" renders its Target Text
+   as plain words, never a count and never a bar. The alternative — rendering
+   "0 / 5" for mentorship calls watched — would invent a measurement the system
+   cannot make, and on a wall a zero meaning "not tracked" is indistinguishable
+   from a zero meaning "did nothing".
    ──────────────────────────────────────────────────────────────────────────── */
 
-type WeeklyRow =
-  | { kind: "counted"; label: string; target: string; targetMax: number }
-  | { kind: "queue"; label: string }
-  | { kind: "text"; label: string; target?: string };
+/** The live number behind a counted goal, or null when it is text-only. */
+function countFor(goal: Goal, weekly: MissionPayload["weekly"]): number | null {
+  switch (goal.countsFrom) {
+    case "tests_logged":
+      return weekly.testsLoggedThisWeek;
+    case "validations_logged":
+      return weekly.validationsThisWeek;
+    default:
+      return null;
+  }
+}
 
-const NIHAL_ROWS: WeeklyRow[] = [
-  { kind: "counted", label: "Product tests logged", target: "2", targetMax: 2 },
-  { kind: "counted", label: "Validations logged", target: "1-3", targetMax: 3 },
-  { kind: "text", label: "Mentorship videos or calls", target: "2/day" },
-  { kind: "text", label: "Live mentor call", target: "1" },
-];
-
-const TAYLAN_ROWS: WeeklyRow[] = [
-  { kind: "text", label: "Mentorship calls watched", target: "5" },
-  { kind: "queue", label: "Validate Nihal's rows" },
-  { kind: "text", label: "Accountability / tech / systems / marketing" },
-];
+/** What follows the "n / " — the numeric Target, else Target Text, else "". */
+function targetLabel(goal: Goal): string {
+  if (goal.target !== null) return String(goal.target);
+  return goal.targetText;
+}
 
 /* ── helpers ─────────────────────────────────────────────────────────────── */
 
@@ -125,7 +130,8 @@ function DailyColumn({
   );
 }
 
-function QueueRow({ queue }: { queue: QueuedValidation[] }) {
+/** The validation-queue goal: an outstanding count and the rows behind it. */
+function QueueRow({ goal, queue }: { goal: Goal; queue: QueuedValidation[] }) {
   return (
     <li className="mn-row">
       <div className="mn-row-head">
@@ -135,7 +141,7 @@ function QueueRow({ queue }: { queue: QueuedValidation[] }) {
           target="_blank"
           rel="noopener noreferrer"
         >
-          Validate Nihal&rsquo;s rows
+          {goal.goal}
         </a>
         <span className={queue.length === 0 ? "mn-clear" : "mn-count"}>
           {queue.length === 0 ? "Queue clear." : `${queue.length} outstanding`}
@@ -155,62 +161,149 @@ function QueueRow({ queue }: { queue: QueuedValidation[] }) {
   );
 }
 
-function WeeklyList({
-  rows,
-  counts,
-  queue,
+/** One weekly goal, rendered according to its countsFrom. */
+function GoalRow({
+  goal,
+  weekly,
 }: {
-  rows: WeeklyRow[];
-  counts: Record<string, number>;
-  queue: QueuedValidation[];
+  goal: Goal;
+  weekly: MissionPayload["weekly"];
 }) {
+  if (goal.countsFrom === "validation_queue") {
+    return <QueueRow goal={goal} queue={weekly.validationQueue} />;
+  }
+
+  const count = countFor(goal, weekly);
+
+  // Text-only: the target as plain words, or nothing at all. No number reaches
+  // this branch, so none can be rendered.
+  if (count === null) {
+    return (
+      <li className="mn-row">
+        <div className="mn-row-head">
+          <span className="mn-row-label">{goal.goal}</span>
+          {goal.targetText ? <span className="mn-target">{goal.targetText}</span> : null}
+        </div>
+      </li>
+    );
+  }
+
+  const label = targetLabel(goal);
+  // A bar needs a numeric denominator. "1-3" is a range, not a number, so that
+  // goal shows its count without one rather than inventing a percentage.
+  const hasBar = goal.target !== null && goal.target > 0;
+  const pct = hasBar ? Math.min(100, Math.round((count / (goal.target as number)) * 100)) : 0;
+  const met = goal.target !== null && count >= goal.target;
+
+  return (
+    <li className="mn-row">
+      <div className="mn-row-head">
+        <a
+          className="mn-row-label mn-row-link"
+          href={NOTION_WEEKLY}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {goal.goal}
+        </a>
+        <span className="mn-count">
+          <strong style={{ color: met ? "var(--green)" : "var(--text-primary)" }}>{count}</strong>
+          {label ? <span className="mn-slash"> / {label}</span> : null}
+        </span>
+      </div>
+      {hasBar ? (
+        <div className="mn-track">
+          <div
+            className="mn-fill"
+            style={{ width: `${pct}%`, background: met ? "var(--green)" : "var(--cyan)" }}
+          />
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
+/** A weekly column's goals, or its empty state. Never collapses. */
+function WeeklyList({
+  goals,
+  weekly,
+}: {
+  goals: Goal[];
+  weekly: MissionPayload["weekly"];
+}) {
+  if (goals.length === 0) return <NothingSet variant="row" />;
   return (
     <ul className="mn-rows">
-      {rows.map((row) => {
-        if (row.kind === "queue") return <QueueRow key={row.label} queue={queue} />;
+      {goals.map((g, i) => (
+        <GoalRow key={`${g.goal}-${g.sort}-${i}`} goal={g} weekly={weekly} />
+      ))}
+    </ul>
+  );
+}
 
-        if (row.kind === "text") {
-          return (
-            <li className="mn-row" key={row.label}>
-              <div className="mn-row-head">
-                <span className="mn-row-label">{row.label}</span>
-                {row.target ? <span className="mn-target">{row.target}</span> : null}
-              </div>
-            </li>
-          );
-        }
+/**
+ * The empty state for any band.
+ *
+ * Two variants only so the message inherits its band's type size — `row` sits
+ * on .mn-row-label, `static` on .mn-static. A band with nothing in it still
+ * renders its label and this line; collapsing it would make "no goals set"
+ * look identical to "this band does not exist".
+ */
+function NothingSet({ variant }: { variant: "row" | "static" }) {
+  const link = (
+    <a className="mn-empty-link" href={NOTION_GOALS} target="_blank" rel="noopener noreferrer">
+      Add a goal →
+    </a>
+  );
+  if (variant === "static") {
+    return (
+      <p className="mn-static mn-nothing">
+        Nothing set {link}
+      </p>
+    );
+  }
+  return (
+    <ul className="mn-rows">
+      <li className="mn-row">
+        <div className="mn-row-head">
+          <span className="mn-row-label mn-nothing">Nothing set</span>
+          {link}
+        </div>
+      </li>
+    </ul>
+  );
+}
 
-        const count = counts[row.label] ?? 0;
-        const pct = Math.min(100, Math.round((count / row.targetMax) * 100));
-        const met = count >= row.targetMax;
+/** Monthly and Long term rows — .mn-static carries each band's type size. */
+function StaticGoals({
+  goals,
+  weekly,
+}: {
+  goals: Goal[];
+  weekly: MissionPayload["weekly"];
+}) {
+  if (goals.length === 0) return <NothingSet variant="static" />;
+  return (
+    <>
+      {goals.map((g, i) => {
+        const count = countFor(g, weekly);
+        const label = targetLabel(g);
         return (
-          <li className="mn-row" key={row.label}>
-            <div className="mn-row-head">
-              <a
-                className="mn-row-label mn-row-link"
-                href={NOTION_WEEKLY}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {row.label}
-              </a>
-              <span className="mn-count">
-                <strong style={{ color: met ? "var(--green)" : "var(--text-primary)" }}>
-                  {count}
-                </strong>
-                <span className="mn-slash"> / {row.target}</span>
+          <p className="mn-static" key={`${g.goal}-${g.sort}-${i}`}>
+            {g.goal}
+            {count !== null ? (
+              <span className="mn-count-inline">
+                {" "}
+                {count}
+                {label ? ` / ${label}` : ""}
               </span>
-            </div>
-            <div className="mn-track">
-              <div
-                className="mn-fill"
-                style={{ width: `${pct}%`, background: met ? "var(--green)" : "var(--cyan)" }}
-              />
-            </div>
-          </li>
+            ) : g.targetText ? (
+              <span className="mn-count-inline"> {g.targetText}</span>
+            ) : null}
+          </p>
         );
       })}
-    </ul>
+    </>
   );
 }
 
@@ -258,10 +351,10 @@ export default function MissionPage() {
     validationQueue: [],
   };
   const errors = payload?.errors ?? [];
-
-  const counts: Record<string, number> = {
-    "Product tests logged": weekly.testsLoggedThisWeek,
-    "Validations logged": weekly.validationsThisWeek,
+  const goals = payload?.goals ?? {
+    weekly: { T: [], N: [], Both: [] },
+    monthly: [],
+    longTerm: [],
   };
 
   return (
@@ -300,25 +393,36 @@ export default function MissionPage() {
         <div className="mn-cols">
           <div className="mn-col" style={{ ["--col-accent" as string]: "var(--amber)" }}>
             <h3 className="mn-col-name">Nihal</h3>
-            <WeeklyList rows={NIHAL_ROWS} counts={counts} queue={weekly.validationQueue} />
+            <WeeklyList goals={goals.weekly.N} weekly={weekly} />
           </div>
           <div className="mn-col" style={{ ["--col-accent" as string]: "var(--cyan)" }}>
             <h3 className="mn-col-name">Taylan</h3>
-            <WeeklyList rows={TAYLAN_ROWS} counts={counts} queue={weekly.validationQueue} />
+            <WeeklyList goals={goals.weekly.T} weekly={weekly} />
           </div>
         </div>
+        {/* Shared goals, full width below the two columns. Rendered only when
+            rows exist: an always-present empty "Both" group would imply the
+            household has shared weekly goals it has simply failed to meet. */}
+        {goals.weekly.Both.length > 0 ? (
+          <div className="mn-both">
+            <div className="mn-col" style={{ ["--col-accent" as string]: "var(--green)" }}>
+              <h3 className="mn-col-name">Both</h3>
+              <WeeklyList goals={goals.weekly.Both} weekly={weekly} />
+            </div>
+          </div>
+        ) : null}
       </section>
 
       {/* ── BAND 3 · MONTHLY ───────────────────────────────────────────── */}
       <section className="mn-band mn-band-monthly">
         <h2 className="mn-band-title">Monthly</h2>
-        <p className="mn-static">{MONTHLY}</p>
+        <StaticGoals goals={goals.monthly} weekly={weekly} />
       </section>
 
       {/* ── BAND 4 · LONG TERM ─────────────────────────────────────────── */}
       <section className="mn-band mn-band-long">
         <h2 className="mn-band-title">Long term</h2>
-        <p className="mn-static">{LONG_TERM}</p>
+        <StaticGoals goals={goals.longTerm} weekly={weekly} />
       </section>
 
       {loading ? <div className="mn-loading">Loading…</div> : null}
@@ -558,6 +662,16 @@ const CSS = `
   overflow: hidden;
 }
 .mn-fill { height: 100%; border-radius: 999px; }
+
+/* Shared weekly goals, full width under the two owner columns. */
+.mn-both { margin-top: clamp(10px, 1.4vw, 26px); }
+
+/* Empty-band text and the inline suffix on a static goal. Deliberately carry no
+   font-size of their own: they sit inside .mn-row-label or .mn-static and must
+   inherit whichever band they land in, or the descending band order would break
+   exactly when a band happened to be empty. */
+.mn-nothing { color: var(--text-muted); }
+.mn-count-inline { color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
 .mn-queue { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
 .mn-queue-item {
