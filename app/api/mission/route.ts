@@ -32,6 +32,19 @@ export const dynamic = "force-dynamic";
 // failure, is uncacheable at both the browser and the CDN.
 const NO_STORE = "no-store";
 
+// The single browser origin allowed to read this route cross-origin: the wall
+// display at jade-bombolone-82d172.netlify.app. Exact, never "*" — this payload
+// is family data, and "*" would let any page on the internet read it.
+const ALLOWED_ORIGIN = "https://jade-bombolone-82d172.netlify.app";
+
+// Carried by every response path, including the 503. `Vary: Origin` is not
+// decoration: without it a CDN is free to hand one origin's cached response to
+// another, which is how an allowlist of one silently degrades into "*".
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+  "Vary": "Origin",
+} as const;
+
 const NOTION_TOKEN = process.env.NOTION_TOKEN;
 const NOTION_VERSION = "2025-09-03";
 
@@ -529,8 +542,29 @@ export async function GET() {
   // point of degrading per section.
   const status = errors.length === SOURCE_COUNT ? 503 : 200;
 
+  // One return serves both statuses, so the CORS pair is on the 503 by
+  // construction rather than by remembering to repeat it.
   return NextResponse.json(payload, {
     status,
-    headers: { "Cache-Control": NO_STORE },
+    headers: { "Cache-Control": NO_STORE, ...CORS_HEADERS },
+  });
+}
+
+/**
+ * CORS preflight. 204 with no body — the browser reads only the headers.
+ *
+ * Methods are GET and OPTIONS and nothing more: this route has no other verb,
+ * and advertising one it does not implement is how a read-only surface starts
+ * looking writable. No-store for the same reason every other path is: this file
+ * caches nothing anywhere.
+ */
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Cache-Control": NO_STORE,
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      ...CORS_HEADERS,
+    },
   });
 }
