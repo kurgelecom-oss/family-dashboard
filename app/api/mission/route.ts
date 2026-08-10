@@ -76,13 +76,17 @@ export interface MissionPayload {
 }
 
 /* ── Notion property readers ─────────────────────────────────────────────────
-   Written tolerant of the underlying property TYPE on purpose. The two data
-   sources below are not currently shared with the integration this token
-   belongs to, so their schemas could not be inspected while building — only
-   their property NAMES are known, from the spec. A reader that accepts
-   status|select|multi_select|people|rich_text|title for a text field costs
-   nothing and means the route starts returning real rows the moment the
-   databases are shared, without a second deploy to correct a type guess.
+   Tolerant of the underlying property TYPE on purpose. Both schemas have since
+   been read back from the live sources and match what these readers expect:
+
+     Daily Discussion Points — Point:title, Owner:select [T|N|Both],
+       Pillar:select, Raised:date, Status:select [Open|Discussed|Closed]
+     Product Validation — Product Name:title, Created time:created_time,
+       Validated by T:date
+
+   The breadth is kept rather than narrowed to those exact types: a Notion
+   select promoted to a status, or a text field retyped, is a one-click change
+   in the UI that would otherwise silently empty a column on the wall.
    ──────────────────────────────────────────────────────────────────────────── */
 
 type NotionProp = unknown;
@@ -310,7 +314,9 @@ function shapeWeekly(
     if (inWeek(createdIso) && validatedIso === null) {
       const created = parseCivilDate(createdIso);
       validationQueue.push({
-        name: textOf(propOf(row, "Name", "Product", "Title")) || "(untitled)",
+        // "Product Name" is the actual title property, confirmed against the
+        // live schema. The fallbacks stay for the usual Notion title spellings.
+        name: textOf(propOf(row, "Product Name", "Name", "Product", "Title")) || "(untitled)",
         createdIso,
         ageDays: created ? daysBetween(created, today) : 0,
       });
