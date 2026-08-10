@@ -573,10 +573,20 @@ const CSS = `
 .mn-point:last-child { border-bottom: none; }
 
 .mn-point-text {
-  font-size: clamp(22px, 2.4vw, 40px);
+  font-size: clamp(16px, 1.25vw, 24px);
   line-height: 1.25;
   font-weight: 400;
   color: var(--text-primary);
+  /* A readable measure, not a truncation. At 1920 the column is ~850px wide;
+     unconstrained, a long point runs the full width and becomes a single
+     hard-to-track line at TV distance. 46ch caps the line length so a typical
+     point lands in two lines. Nothing is ever clipped — the text wraps to a
+     third line if it has to, which is the correct failure: a point you can
+     read in three lines beats half a point in one. */
+  max-width: 46ch;
+  /* A single unbroken token (a pasted URL) breaks rather than pushing the
+     column wide enough to overflow the page horizontally. */
+  overflow-wrap: anywhere;
 }
 
 .mn-point-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -603,7 +613,7 @@ const CSS = `
    shrinking its only text would let WEEKLY out-rank it on the exact days
    nothing has been set — which are the days the prompt to set something needs
    to be loudest. */
-.mn-empty-text { font-size: clamp(22px, 2.4vw, 40px); color: var(--text-muted); }
+.mn-empty-text { font-size: clamp(16px, 1.25vw, 24px); color: var(--text-muted); }
 .mn-empty-link {
   font-size: clamp(12px, 0.9vw, 15px);
   color: var(--cyan);
@@ -623,7 +633,7 @@ const CSS = `
 }
 
 .mn-row-label {
-  font-size: clamp(16px, 1.5vw, 26px);
+  font-size: clamp(14px, 1.05vw, 20px);
   line-height: 1.3;
   color: var(--text-primary);
 }
@@ -687,13 +697,13 @@ const CSS = `
 /* BANDS 3 & 4 — static, and deliberately quieter each step down.
 
    The four band sizes are strictly descending in ALL THREE clamp components —
-   min 22>16>13>11, preferred 2.4>1.5>1.15>0.85vw, max 40>26>20>15. That is what
-   makes DAILY > WEEKLY > MONTHLY > LONG TERM hold at every viewport width
+   min 16>14>12>11, preferred 1.25>1.05>0.90>0.75vw, max 24>20>17>14. That is
+   what makes DAILY > WEEKLY > MONTHLY > LONG TERM hold at every viewport width
    rather than only at the two that happen to get measured: if any one component
    crossed over, the order would invert somewhere in between. */
 .mn-static { margin: 6px 0 0; color: var(--text-secondary); line-height: 1.45; }
-.mn-band-monthly .mn-static { font-size: clamp(13px, 1.15vw, 20px); }
-.mn-band-long .mn-static { font-size: clamp(11px, 0.85vw, 15px); color: var(--text-muted); }
+.mn-band-monthly .mn-static { font-size: clamp(12px, 0.90vw, 17px); }
+.mn-band-long .mn-static { font-size: clamp(11px, 0.75vw, 14px); color: var(--text-muted); }
 
 .mn-loading {
   color: var(--text-muted);
