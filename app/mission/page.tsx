@@ -267,6 +267,7 @@ export default function MissionPage() {
   return (
     <div className="mn-page">
       <style>{CSS}</style>
+      <div className="mn-inner">
 
       {loadError ? <div className="mn-banner">{loadError}</div> : null}
       {errors.map((e) => (
@@ -321,6 +322,7 @@ export default function MissionPage() {
       </section>
 
       {loading ? <div className="mn-loading">Loading…</div> : null}
+      </div>
     </div>
   );
 }
@@ -337,15 +339,34 @@ export default function MissionPage() {
    ──────────────────────────────────────────────────────────────────────────── */
 
 const CSS = `
+/* Offset copied from app/origins/page.tsx:150-157 — the scrolling-surface
+   pattern (height + overflow-y + padding-top), as opposed to the fixed-viewport
+   marginTop pattern /board and /week use.
+
+   TopNav (--nav-h) and OriginsStrip (--strip-h) are both position: fixed, so
+   they occupy no flow space. Subtracting their heights from min-height, as this
+   rule used to, shortens the page without ever moving its content out from
+   under them. Measured before the fix: the DAILY label sat at y=31.5 while the
+   strip's bottom edge was y=112 — the band that matters most was the one buried
+   deepest. padding-top is the only thing that actually pushes content clear. */
 .mn-page {
-  min-height: calc(100vh - var(--nav-h) - var(--strip-h));
+  height: 100vh;
+  overflow-y: auto;
+  padding-top: calc(var(--nav-h) + var(--strip-h));
   background: var(--bg-base);
   color: var(--text-primary);
+  box-sizing: border-box;
+}
+
+/* The page's own padding lives here, not on .mn-page, so it composes with the
+   fixed-chrome offset above instead of overwriting it. Same two-element shape
+   /origins uses: outer scroll container carries the offset, inner wrapper
+   carries the layout. */
+.mn-inner {
   padding: clamp(12px, 1.6vw, 28px);
   display: flex;
   flex-direction: column;
   gap: clamp(10px, 1.2vw, 20px);
-  box-sizing: border-box;
 }
 
 .mn-banner {
@@ -363,6 +384,24 @@ const CSS = `
   border-radius: 12px;
   box-shadow: var(--card-shadow);
   padding: clamp(12px, 1.4vw, 24px);
+}
+
+/* The band read every morning, given the weight its position implies. This is
+   the same treatment the weekly cards carry one level down — card surface plus
+   a 3px left accent rule — lifted to the band container so DAILY announces
+   itself before you have read a word of it. Both values are existing tokens;
+   nothing new is defined here. */
+.mn-band-daily {
+  border-left: 3px solid var(--cyan);
+  background: var(--bg-card);
+  padding: clamp(16px, 1.8vw, 30px);
+}
+
+/* Only the daily band's own label is promoted. The other three keep the quiet
+   uniform label so the hierarchy reads top-down at a glance. */
+.mn-band-daily .mn-band-title {
+  color: var(--cyan);
+  font-size: clamp(13px, 1vw, 17px);
 }
 
 .mn-band-head {
@@ -430,7 +469,7 @@ const CSS = `
 .mn-point:last-child { border-bottom: none; }
 
 .mn-point-text {
-  font-size: clamp(19px, 2.05vw, 34px);
+  font-size: clamp(22px, 2.4vw, 40px);
   line-height: 1.25;
   font-weight: 400;
   color: var(--text-primary);
@@ -456,7 +495,11 @@ const CSS = `
 }
 
 .mn-empty { display: flex; flex-direction: column; gap: 6px; padding: clamp(8px, 1vw, 16px) 0; }
-.mn-empty-text { font-size: clamp(17px, 1.7vw, 28px); color: var(--text-muted); }
+/* Same size as a real point: an empty daily column is still the daily band, and
+   shrinking its only text would let WEEKLY out-rank it on the exact days
+   nothing has been set — which are the days the prompt to set something needs
+   to be loudest. */
+.mn-empty-text { font-size: clamp(22px, 2.4vw, 40px); color: var(--text-muted); }
 .mn-empty-link {
   font-size: clamp(12px, 0.9vw, 15px);
   color: var(--cyan);
@@ -476,7 +519,7 @@ const CSS = `
 }
 
 .mn-row-label {
-  font-size: clamp(14px, 1.35vw, 23px);
+  font-size: clamp(16px, 1.5vw, 26px);
   line-height: 1.3;
   color: var(--text-primary);
 }
@@ -527,10 +570,16 @@ const CSS = `
 }
 .mn-queue-name { min-width: 0; overflow-wrap: anywhere; }
 
-/* BANDS 3 & 4 — static, and deliberately quieter each step down. */
+/* BANDS 3 & 4 — static, and deliberately quieter each step down.
+
+   The four band sizes are strictly descending in ALL THREE clamp components —
+   min 22>16>13>11, preferred 2.4>1.5>1.15>0.85vw, max 40>26>20>15. That is what
+   makes DAILY > WEEKLY > MONTHLY > LONG TERM hold at every viewport width
+   rather than only at the two that happen to get measured: if any one component
+   crossed over, the order would invert somewhere in between. */
 .mn-static { margin: 6px 0 0; color: var(--text-secondary); line-height: 1.45; }
 .mn-band-monthly .mn-static { font-size: clamp(13px, 1.15vw, 20px); }
-.mn-band-long .mn-static { font-size: clamp(12px, 0.95vw, 16px); color: var(--text-muted); }
+.mn-band-long .mn-static { font-size: clamp(11px, 0.85vw, 15px); color: var(--text-muted); }
 
 .mn-loading {
   color: var(--text-muted);
@@ -538,9 +587,11 @@ const CSS = `
   text-align: center;
 }
 
+/* Only the column collapse. The two font-size overrides that used to live here
+   are gone on purpose: fixed px at this breakpoint sat below the clamp minimums
+   and silently reopened the inversion on phones, which is the one place the
+   bands are read stacked and the size ordering is the only cue left. */
 @media (max-width: 768px) {
   .mn-cols { grid-template-columns: 1fr; }
-  .mn-point-text { font-size: 19px; }
-  .mn-row-label { font-size: 15px; }
 }
 `;
