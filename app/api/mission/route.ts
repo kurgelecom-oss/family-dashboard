@@ -10,7 +10,7 @@ import {
 } from "../../lib/time";
 
 /* ────────────────────────────────────────────────────────────────────────────
-   /api/mission — read-only. Two Notion sources, no database, no Supabase.
+   /api/mission — read-only. Four Notion sources, no database, no Supabase.
 
    Mirrors app/api/board/route.ts's Notion posture exactly (same endpoint shape,
    same Notion-Version, same AbortSignal timeout, same allSettled degradation)
@@ -55,11 +55,15 @@ const REQUEST_TIMEOUT_MS = 10_000;
 const DAILY_POINTS_ID = "4431302a-75ed-479f-a5f4-3bfd5e0a4e68";
 const PRODUCT_VALIDATION_ID = "1d35429a-fa90-81a0-bf47-000b7fe8803d";
 const MISSION_GOALS_ID = "22f0eed5-7556-4758-b171-328d273485f3";
+const BOARD_NOTES_ID = "89bc2000-11da-4bcf-bc4b-ef37c7359abe";
 
-// The all-failed threshold for the 503. Named rather than inlined as `=== 3` so
-// that adding a fourth source surfaces this line as something to update, instead
-// of silently leaving a route that can never report a total outage again.
-const SOURCE_COUNT = 3;
+// The all-failed threshold for the 503. Named rather than inlined as `=== 4` so
+// that adding a fifth source surfaces this line as something to update, instead
+// of silently leaving a route that can never report a total outage again. Board
+// Notes is what made it four: left at three, a route with every source dead
+// would count four errors, miss the threshold, and hand back a 200 full of
+// empty sections — exactly the outage this number exists to catch.
+const SOURCE_COUNT = 4;
 
 /* ── payload ─────────────────────────────────────────────────────────────── */
 
@@ -100,6 +104,13 @@ export interface GoalsPayload {
   longTerm: Goal[];
 }
 
+export interface Note {
+  note: string;
+  /** `YYYY-MM-DD` in Sydney, or null when Added is blank. */
+  addedIso: string | null;
+  pinned: boolean;
+}
+
 export interface SourceError {
   source: string;
   error: string;
@@ -117,6 +128,7 @@ export interface MissionPayload {
     validationQueue: QueuedValidation[];
   };
   goals: GoalsPayload;
+  notes: Note[];
   errors: SourceError[];
 }
 
@@ -465,6 +477,46 @@ function shapeGoals(rows: NotionPage[]): GoalsPayload {
   return out;
 }
 
+/**
+ * Active notes, pinned first, then newest Added first.
+ *
+ * Active is read through boolOf(), which treats an absent checkbox as false —
+ * a row that has not been deliberately switched on does not reach the wall.
+ *
+ * Sorting is done here rather than by a Notion `sorts` clause so the order is a
+ * property of this route, not of a database view anyone can reorder in the UI.
+ * Both keys are compared as strings: addedIso is `YYYY-MM-DD`, so lexicographic
+ * comparison is chronological and needs no Date objects and no zone.
+ */
+function shapeNotes(rows: NotionPage[]): Note[] {
+  const out: Note[] = [];
+
+  for (const row of rows) {
+    if (!boolOf(propOf(row, "Active"))) continue;
+
+    out.push({
+      note: textOf(propOf(row, "Note", "Name", "Title")) || "(untitled)",
+      addedIso: dateIsoOf(propOf(row, "Added")),
+      pinned: boolOf(propOf(row, "Pinned")),
+    });
+  }
+
+  out.sort((a, b) => {
+    // Pinned is the primary key and outranks recency entirely: a pinned note
+    // from last month still sits above an unpinned one added this morning.
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+    // Undated notes sink below every dated one rather than floating to the top,
+    // which is where an empty string would put them under a plain descending
+    // compare.
+    if (a.addedIso === b.addedIso) return 0;
+    if (a.addedIso === null) return 1;
+    if (b.addedIso === null) return -1;
+    return a.addedIso > b.addedIso ? -1 : 1;
+  });
+
+  return out;
+}
+
 /* ── handler ─────────────────────────────────────────────────────────────── */
 
 export async function GET() {
@@ -472,13 +524,14 @@ export async function GET() {
   const todayIso = isoDate(today);
   const weekStart = isoDate(mondayOfWeek(today));
 
-  // Settled, not raced: the three sections are independent and one dead source
-  // must degrade only itself. A 500 here would take down a page whose other two
-  // thirds are perfectly healthy.
-  const [dailyResult, weeklyResult, goalsResult] = await Promise.allSettled([
+  // Settled, not raced: the four sections are independent and one dead source
+  // must degrade only itself. A 500 here would take down a page whose other
+  // three quarters are perfectly healthy.
+  const [dailyResult, weeklyResult, goalsResult, notesResult] = await Promise.allSettled([
     fetchSource(DAILY_POINTS_ID, "Daily points"),
     fetchSource(PRODUCT_VALIDATION_ID, "Product Validation"),
     fetchSource(MISSION_GOALS_ID, "Mission Goals"),
+    fetchSource(BOARD_NOTES_ID, "Board Notes"),
   ]);
 
   const errors: SourceError[] = [];
@@ -527,12 +580,25 @@ export async function GET() {
     errors.push({ source: "Mission Goals", error: message });
   }
 
+  let notes: Note[] = [];
+  if (notesResult.status === "fulfilled") {
+    notes = shapeNotes(notesResult.value);
+  } else {
+    const message =
+      notesResult.reason instanceof Error
+        ? notesResult.reason.message
+        : String(notesResult.reason);
+    console.error("Error fetching Board Notes:", message);
+    errors.push({ source: "Board Notes", error: message });
+  }
+
   const payload: MissionPayload = {
     today: todayIso,
     weekStart,
     daily,
     weekly,
     goals,
+    notes,
     errors,
   };
 
