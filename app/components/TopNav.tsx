@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 
-const LINKS = [
+const LINKS: { label: string; href: string; external?: boolean }[] = [
   { label: "Family Dashboard",      href: "https://kurgel-dashboard.netlify.app/" },
   // Second, not last: .topnav scrolls horizontally on a phone and only the
   // first couple of entries are reachable without swiping, so the daily
@@ -18,6 +18,10 @@ const LINKS = [
   { label: "Time Allocation Board", href: "https://kurgel-dashboard.netlify.app/board" },
   { label: "ORIGINS",               href: "https://kurgel-dashboard.netlify.app/origins" },
   { label: "Link Board",            href: "https://luxury-kringle-cf4171.netlify.app/" },
+  // Off-network surface, unlike every entry above it: opens in its own tab so
+  // the dashboard stays put on the TV. `external` is the only per-link flag —
+  // className and wrapper stay identical to the siblings.
+  { label: "Wellness Wire",         href: "https://dashboard.wellnesswire.co/app", external: true },
 ];
 
 function normPath(p: string): string {
@@ -77,6 +81,7 @@ export default function TopNav() {
           key={link.href}
           href={link.href}
           className={link.href === active ? "topnav-link active" : "topnav-link"}
+          {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
         >
           {link.label}
         </a>
