@@ -21,7 +21,7 @@ const LINKS: { label: string; href: string; external?: boolean }[] = [
   // Off-network surface, unlike every entry above it: opens in its own tab so
   // the dashboard stays put on the TV. `external` is the only per-link flag —
   // className and wrapper stay identical to the siblings.
-  { label: "Wellness Wire",         href: "https://dashboard.wellnesswire.co/app", external: true },
+  { label: "kdgm",                  href: "https://dashboard.kdgm.com.au/", external: true },
 ];
 
 function normPath(p: string): string {
