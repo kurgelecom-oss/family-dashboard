@@ -989,19 +989,18 @@ html, body {
 
 /* ── WEEKLY SPEND THRESHOLD GLOW ──────────────────────────────────────────────
    Four bands on the LAST WEEK hero figure, driven by app/components/
-   spend-tier.ts. Colour says how bad, the pulse rate says how urgent, and the
-   size says it from across the room — a 65" panel read at ten paces gets the
-   first two before it can read the digits.
+   spend-tier.ts. Colour says how bad and the pulse rate says how urgent — a 65"
+   panel read at ten paces gets both before it can read the digits.
 
    The glow is a text-SHADOW pulse, never an opacity fade on the text. Shadows
    render behind the glyph, so the digits sit at full opacity at every point in
    the cycle; fading the element itself would make the number hardest to read
    exactly when it matters most.
 
-   Scale is a transform, so it costs no layout: a transformed box keeps its
-   original border box, the card's flex maths never sees the 1.06, and the panel
-   measures identically at tier 0 and tier 3. `transform-origin: left center`
-   keeps the growth off the left edge, where the "$" is anchored.
+   The figure never changes size and never moves. Two things are deliberately
+   absent and must stay absent: any `transform`, and any blur wide enough to
+   reach across the glyph edge. Both were tried and both made the number look
+   like it was bobbing rather than pulsing.
 
    Colours are the existing palette tokens: --green, --amber, --origins-build
    (the palette's only orange) and --red. The shadow layers repeat those values
@@ -1014,11 +1013,13 @@ html, body {
    ────────────────────────────────────────────────────────────────────────── */
 
 .spend-tier {
-  transform-origin: left center;
-  /* The hero is a block-level flex child; a transform applies to it directly and
-     is deliberately the ONLY property here that changes its apparent size. */
-  transform: scale(1);
-  will-change: transform, text-shadow;
+  /* No transform, at any tier. The figure is the same size in every band and its
+     box never moves; urgency is carried by colour and by how fast the halo
+     breathes, which costs the reader nothing in legibility. An earlier version
+     scaled each tier 1.02/1.04/1.06 — static per tier, never animated — and it
+     still read as a bob, because a halo swelling around a bigger glyph is
+     indistinguishable from the glyph itself moving. */
+  will-change: text-shadow;
 }
 
 /* Tier 0 — calm. No shadow, no animation, nothing moving. Silence is the
@@ -1032,40 +1033,48 @@ html, body {
 
 .spend-tier-1 {
   color: var(--amber);
-  transform: scale(1.02);
   animation: spend-glow-amber 3.2s ease-in-out infinite;
 }
 
 .spend-tier-2 {
   color: var(--origins-build);
-  transform: scale(1.04);
   animation: spend-glow-orange 2s ease-in-out infinite;
 }
 
 .spend-tier-3 {
   color: var(--red);
-  transform: scale(1.06);
   animation: spend-glow-red 1.1s ease-in-out infinite;
 }
 
-/* Blur and alpha breathe together; the glyph never does. Peak alpha climbs with
-   the tier so the red halo reads hotter than the amber one at the same blur. */
+/* The halo breathes; the digits never do.
+   `color` is fixed per tier and is NOT in any keyframe, so the glyph fill is
+   painted 100% opaque and identical on every frame — text-shadow renders behind
+   the glyph, so nothing the animation does can reach the fill.
+
+   Blur is capped at 10px. The earlier 14/18/22px radii were the fuzz: a halo in
+   the same hue as the fill, spread that far, washes over the antialiased edge
+   and the contour disappears into its own glow. At 4-10px the halo sits in the
+   gap outside the stroke and the edge keeps its contrast.
+
+   Only two things vary — blur radius and alpha. No opacity, no filter, no
+   colour, no font-weight, no letter-spacing: every one of those repaints the
+   glyph itself and brings the fuzz straight back. */
 @keyframes spend-glow-amber {
-  0%, 100% { text-shadow: 0 0 4px rgba(245, 166, 35, 0.25); }
-  50%      { text-shadow: 0 0 14px rgba(245, 166, 35, 0.65); }
+  0%, 100% { text-shadow: 0 0 4px rgba(245, 166, 35, 0.20); }
+  50%      { text-shadow: 0 0 10px rgba(245, 166, 35, 0.55); }
 }
 @keyframes spend-glow-orange {
-  0%, 100% { text-shadow: 0 0 5px rgba(255, 122, 26, 0.30); }
-  50%      { text-shadow: 0 0 18px rgba(255, 122, 26, 0.75); }
+  0%, 100% { text-shadow: 0 0 4px rgba(255, 122, 26, 0.25); }
+  50%      { text-shadow: 0 0 10px rgba(255, 122, 26, 0.65); }
 }
 @keyframes spend-glow-red {
-  0%, 100% { text-shadow: 0 0 6px rgba(231, 76, 60, 0.35); }
-  50%      { text-shadow: 0 0 22px rgba(231, 76, 60, 0.85); }
+  0%, 100% { text-shadow: 0 0 4px rgba(231, 76, 60, 0.30); }
+  50%      { text-shadow: 0 0 10px rgba(231, 76, 60, 0.75); }
 }
 
-/* Reduced motion keeps the colour and the size — those are the information.
-   Only the movement goes. The static shadow goes with it: a frozen halo is one
-   arbitrary frame of an animation nobody asked to see. */
+/* Reduced motion keeps the colour — that is the information. Only the movement
+   goes. The static shadow goes with it: a frozen halo is one arbitrary frame of
+   an animation nobody asked to see. */
 @media (prefers-reduced-motion: reduce) {
   .spend-tier {
     animation: none;
