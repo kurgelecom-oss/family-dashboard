@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { SETTING_DEFAULTS, type SettingsMap, getSetting } from "../lib/settings";
 import { isPocketSmithPayload } from "../lib/payload-guards";
+import { spendTierClass } from "./spend-tier";
 
 /* ════════════════════════════════════════════════════════════════════════════
    Left column — LAST WEEK / LAST MONTH / ACCOUNTS.
@@ -262,6 +263,7 @@ function PeriodPanel({
   tone,
   headerLink,
   includeUncategorised,
+  glow = false,
 }: {
   title: string;
   period: PeriodSummary;
@@ -269,6 +271,12 @@ function PeriodPanel({
   tone: string;
   headerLink?: string;
   includeUncategorised: boolean;
+  /**
+   * Opt-in threshold tiering on the hero figure. Off by default and passed only
+   * by LAST WEEK: a month's spend runs an order of magnitude past the weekly
+   * bands, so tiering it would pin it to red forever and say nothing.
+   */
+  glow?: boolean;
 }) {
   // The route already reports uncategorised separately; filter defensively so a
   // shape change can never render the same money twice.
@@ -300,13 +308,17 @@ function PeriodPanel({
       >
         {/* Hero — total spent */}
         <div
+          className={glow ? spendTierClass(period.totalSpending) : undefined}
           style={{
             // 34 -> 28. Still comfortably the largest thing in the card (the next
             // is 18px), and the line-height below is unchanged: the height comes
             // out of the glyph, never out of the line box.
             fontSize: 28,
             fontWeight: 700,
-            color: tone,
+            // The tier class owns the colour when tiering is on. Leaving `tone`
+            // here would win outright — an inline style beats any stylesheet
+            // rule — and the figure would sit cyan through every band.
+            ...(glow ? null : { color: tone }),
             // 1.2 keeps the glyph ink inside the line box; at 1.1 the "$" tail
             // overhangs by 2px and reads as clipped.
             lineHeight: 1.2,
@@ -597,6 +609,7 @@ export default function PanelFinance() {
         tone="var(--cyan)"
         headerLink={pocketsmithUrl}
         includeUncategorised={includeUncategorised}
+        glow
       />
       <PeriodPanel
         title="Last Month"

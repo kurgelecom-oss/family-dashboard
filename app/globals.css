@@ -986,3 +986,89 @@ html, body {
   text-decoration-thickness: 1px;
 }
 .incident-link:hover { opacity: 0.75; }
+
+/* ── WEEKLY SPEND THRESHOLD GLOW ──────────────────────────────────────────────
+   Four bands on the LAST WEEK hero figure, driven by app/components/
+   spend-tier.ts. Colour says how bad, the pulse rate says how urgent, and the
+   size says it from across the room — a 65" panel read at ten paces gets the
+   first two before it can read the digits.
+
+   The glow is a text-SHADOW pulse, never an opacity fade on the text. Shadows
+   render behind the glyph, so the digits sit at full opacity at every point in
+   the cycle; fading the element itself would make the number hardest to read
+   exactly when it matters most.
+
+   Scale is a transform, so it costs no layout: a transformed box keeps its
+   original border box, the card's flex maths never sees the 1.06, and the panel
+   measures identically at tier 0 and tier 3. `transform-origin: left center`
+   keeps the growth off the left edge, where the "$" is anchored.
+
+   Colours are the existing palette tokens: --green, --amber, --origins-build
+   (the palette's only orange) and --red. The shadow layers repeat those values
+   as rgba literals because the halo needs an alpha the tokens do not carry, and
+   color-mix() is off the table on the Samsung's engine (same reason the /board
+   block tints are hand-written rgba). All three glowing tiers use colours that
+   are identical in the night and day themes, so the literals cannot drift from
+   the tokens — the green tier, the one colour that DOES differ per theme, has
+   no shadow at all.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.spend-tier {
+  transform-origin: left center;
+  /* The hero is a block-level flex child; a transform applies to it directly and
+     is deliberately the ONLY property here that changes its apparent size. */
+  transform: scale(1);
+  will-change: transform, text-shadow;
+}
+
+/* Tier 0 — calm. No shadow, no animation, nothing moving. Silence is the
+   signal: if the green figure ever breathes, the other three stop meaning
+   anything. */
+.spend-tier-0 {
+  color: var(--green);
+  text-shadow: none;
+  animation: none;
+}
+
+.spend-tier-1 {
+  color: var(--amber);
+  transform: scale(1.02);
+  animation: spend-glow-amber 3.2s ease-in-out infinite;
+}
+
+.spend-tier-2 {
+  color: var(--origins-build);
+  transform: scale(1.04);
+  animation: spend-glow-orange 2s ease-in-out infinite;
+}
+
+.spend-tier-3 {
+  color: var(--red);
+  transform: scale(1.06);
+  animation: spend-glow-red 1.1s ease-in-out infinite;
+}
+
+/* Blur and alpha breathe together; the glyph never does. Peak alpha climbs with
+   the tier so the red halo reads hotter than the amber one at the same blur. */
+@keyframes spend-glow-amber {
+  0%, 100% { text-shadow: 0 0 4px rgba(245, 166, 35, 0.25); }
+  50%      { text-shadow: 0 0 14px rgba(245, 166, 35, 0.65); }
+}
+@keyframes spend-glow-orange {
+  0%, 100% { text-shadow: 0 0 5px rgba(255, 122, 26, 0.30); }
+  50%      { text-shadow: 0 0 18px rgba(255, 122, 26, 0.75); }
+}
+@keyframes spend-glow-red {
+  0%, 100% { text-shadow: 0 0 6px rgba(231, 76, 60, 0.35); }
+  50%      { text-shadow: 0 0 22px rgba(231, 76, 60, 0.85); }
+}
+
+/* Reduced motion keeps the colour and the size — those are the information.
+   Only the movement goes. The static shadow goes with it: a frozen halo is one
+   arbitrary frame of an animation nobody asked to see. */
+@media (prefers-reduced-motion: reduce) {
+  .spend-tier {
+    animation: none;
+    text-shadow: none;
+  }
+}
