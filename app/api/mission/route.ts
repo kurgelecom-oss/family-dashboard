@@ -3,6 +3,7 @@ import {
   HOUSEHOLD_TZ,
   zoneToday,
   mondayOfWeek,
+  addDays,
   isoDate,
   daysBetween,
   parseCivilDate,
@@ -125,6 +126,12 @@ export interface MissionPayload {
   weekly: {
     validationsThisWeek: number;
     testsLoggedThisWeek: number;
+    /**
+     * Rows whose Submission Date — or Created time, when Submission Date is
+     * blank — falls in the current Sydney week. Purely additive: the three
+     * fields either side keep their names and their meanings exactly.
+     */
+    productsLoggedThisWeek: number;
     validationQueue: QueuedValidation[];
   };
   goals: GoalsPayload;
@@ -369,6 +376,7 @@ function shapeDaily(rows: NotionPage[], today: CivilDate): { T: DailyPoint[]; N:
 function shapeWeekly(
   rows: NotionPage[],
   weekStart: string,
+  weekEnd: string,
   todayIso: string,
   today: CivilDate,
 ): MissionPayload["weekly"] {
@@ -377,8 +385,23 @@ function shapeWeekly(
   const inWeek = (iso: string | null): iso is string =>
     iso !== null && iso >= weekStart && iso <= todayIso;
 
+  /**
+   * Monday 00:00 to Sunday 23:59:59, which is a wider window than inWeek()'s
+   * Monday-to-today and deliberately so. Submission Date is a user-typed date
+   * and can be set ahead; a product submitted today FOR Friday is logged in
+   * this week and must count in it. Created time cannot be in the future, so
+   * for the fallback path the two windows coincide anyway.
+   *
+   * Comparing whole calendar dates is what makes "23:59:59" exact rather than
+   * approximate: a date equal to weekEnd is inside the window no matter what
+   * time of day it carries, so there is no last-second gap to fall through.
+   */
+  const inFullWeek = (iso: string | null): iso is string =>
+    iso !== null && iso >= weekStart && iso <= weekEnd;
+
   let validationsThisWeek = 0;
   let testsLoggedThisWeek = 0;
+  let productsLoggedThisWeek = 0;
   const validationQueue: QueuedValidation[] = [];
 
   for (const row of rows) {
@@ -392,6 +415,18 @@ function shapeWeekly(
 
     if (inWeek(createdIso)) validationsThisWeek++;
     if (inWeek(validatedIso)) testsLoggedThisWeek++;
+
+    // "Submission Date" when the user filled it in, "Created time" when they
+    // did not. `??` and not `||`: dateIsoOf returns null for absent, never "",
+    // so there is no empty string that could fall through to the fallback and
+    // no valid date that could be mistaken for one.
+    //
+    // Both are confirmed against the live schema — 'Submission Date': date and
+    // 'Created time': created_time. createdIso already carries the page's own
+    // created_time as its own last resort, so this pair cannot both be null on
+    // a real row and the count never silently drops one.
+    const submissionIso = dateIsoOf(propOf(row, "Submission Date"));
+    if (inFullWeek(submissionIso ?? createdIso)) productsLoggedThisWeek++;
 
     if (inWeek(createdIso) && validatedIso === null) {
       const created = parseCivilDate(createdIso);
@@ -409,7 +444,7 @@ function shapeWeekly(
     a.createdIso < b.createdIso ? -1 : a.createdIso > b.createdIso ? 1 : 0,
   );
 
-  return { validationsThisWeek, testsLoggedThisWeek, validationQueue };
+  return { validationsThisWeek, testsLoggedThisWeek, productsLoggedThisWeek, validationQueue };
 }
 
 /** Notion's "Counts From" value → the union, defaulting to text-only. */
@@ -522,7 +557,12 @@ function shapeNotes(rows: NotionPage[]): Note[] {
 export async function GET() {
   const today = zoneToday(new Date());
   const todayIso = isoDate(today);
-  const weekStart = isoDate(mondayOfWeek(today));
+  const monday = mondayOfWeek(today);
+  const weekStart = isoDate(monday);
+  // Sunday of the same week. Derived from the same Monday rather than computed
+  // independently, so the two ends of the window can never disagree about which
+  // week they belong to.
+  const weekEnd = isoDate(addDays(monday, 6));
 
   // Settled, not raced: the four sections are independent and one dead source
   // must degrade only itself. A 500 here would take down a page whose other
@@ -551,10 +591,11 @@ export async function GET() {
   let weekly: MissionPayload["weekly"] = {
     validationsThisWeek: 0,
     testsLoggedThisWeek: 0,
+    productsLoggedThisWeek: 0,
     validationQueue: [],
   };
   if (weeklyResult.status === "fulfilled") {
-    weekly = shapeWeekly(weeklyResult.value, weekStart, todayIso, today);
+    weekly = shapeWeekly(weeklyResult.value, weekStart, weekEnd, todayIso, today);
   } else {
     const message =
       weeklyResult.reason instanceof Error

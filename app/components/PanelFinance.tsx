@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { SETTING_DEFAULTS, type SettingsMap, getSetting } from "../lib/settings";
 import { isPocketSmithPayload } from "../lib/payload-guards";
-import { spendTierClass } from "./spend-tier";
+import { spendTierClass, type SpendTier } from "./spend-tier";
 
 /* ════════════════════════════════════════════════════════════════════════════
    Left column — LAST WEEK / LAST MONTH / ACCOUNTS.
@@ -256,6 +256,43 @@ function OpenLink({ href }: { href: string }) {
   );
 }
 
+/* ── ?tier= preview override ──────────────────────────────────────────────────
+   Lets a tier be seen on the real panel without waiting for a week that spends
+   its way there. Styling only: the figure keeps showing whatever PocketSmith
+   actually returned, so a screenshot taken with the param on still carries the
+   true number and can never be mistaken for a $1,700 week.
+
+   `useSyncExternalStore` is what keeps it off the server: the third argument is
+   the server snapshot, so SSR and the hydrating render both see `null` and match
+   exactly, and `window` is only ever touched by the client snapshot. An effect
+   with setState would work too, but it earns a react-hooks error in this repo
+   and costs a second render to say something already knowable.
+
+   Deliberately not `useSearchParams()`: that hook opts the whole route into
+   dynamic rendering, and `/` is statically prerendered today. A preview toggle
+   is not worth changing how the dashboard is served. */
+
+/** The URL cannot change under us without a navigation that remounts this tree,
+    so there is nothing to subscribe to. */
+const NEVER_CHANGES = () => () => {};
+
+const readTierParam = () => new URLSearchParams(window.location.search).get("tier");
+
+/** No URL on the server, and no override either — the clean-URL path. */
+const NO_PARAM = () => null;
+
+function useTierOverride(): SpendTier | null {
+  const raw = useSyncExternalStore(NEVER_CHANGES, readTierParam, NO_PARAM);
+
+  // Whitelist, not a parse: "1e0", " 2" and "3.0" all survive Number() and none
+  // of them is a tier. Anything not on this list leaves the real tier alone,
+  // which is also what a bare URL does.
+  if (raw === "0" || raw === "1" || raw === "2" || raw === "3") {
+    return Number(raw) as SpendTier;
+  }
+  return null;
+}
+
 function PeriodPanel({
   title,
   period,
@@ -264,6 +301,7 @@ function PeriodPanel({
   headerLink,
   includeUncategorised,
   glow = false,
+  tierOverride = null,
 }: {
   title: string;
   period: PeriodSummary;
@@ -277,6 +315,9 @@ function PeriodPanel({
    * bands, so tiering it would pin it to red forever and say nothing.
    */
   glow?: boolean;
+  /** `?tier=` preview override. Null — the default and the clean-URL case —
+   *  means the figure tiers itself off its own number, as normal. */
+  tierOverride?: SpendTier | null;
 }) {
   // The route already reports uncategorised separately; filter defensively so a
   // shape change can never render the same money twice.
@@ -308,7 +349,13 @@ function PeriodPanel({
       >
         {/* Hero — total spent */}
         <div
-          className={glow ? spendTierClass(period.totalSpending) : undefined}
+          className={
+            glow
+              ? tierOverride === null
+                ? spendTierClass(period.totalSpending)
+                : `spend-tier spend-tier-${tierOverride}`
+              : undefined
+          }
           style={{
             // 34 -> 28. Still comfortably the largest thing in the card (the next
             // is 18px), and the line-height below is unchanged: the height comes
@@ -528,6 +575,10 @@ function isRenderable(p: unknown): p is PocketSmithPayload {
 export default function PanelFinance() {
   const [data, setData] = useState<PocketSmithPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Called unconditionally, above the early returns — the error and loading
+  // branches below return before the panels render, and a hook that only runs
+  // on some paths is a hook that changes order between them.
+  const tierOverride = useTierOverride();
 
   useEffect(() => {
     let cancelled = false;
@@ -610,6 +661,7 @@ export default function PanelFinance() {
         headerLink={pocketsmithUrl}
         includeUncategorised={includeUncategorised}
         glow
+        tierOverride={tierOverride}
       />
       <PeriodPanel
         title="Last Month"

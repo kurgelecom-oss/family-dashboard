@@ -87,6 +87,27 @@ export function daysBetween(from: CivilDate, to: CivilDate): number {
 }
 
 /**
+ * The ISO-8601 week key containing `c` — `2026-W33`.
+ *
+ * Built on mondayOfWeek() rather than beside it: there is exactly one
+ * Monday-start rule in this repo and this reuses it instead of restating it.
+ *
+ * The year in the key is the ISO WEEK-year, not the calendar year, and the two
+ * genuinely differ at the turn: 2027-01-01 is a Friday, so it belongs to the
+ * week whose Thursday is 2026-12-31 and its key is `2026-W53`. Taking the
+ * calendar year instead would emit `2027-W53`, a key that does not exist and
+ * which would strand that week's ticks in a row nothing ever reads back.
+ * Anchoring on the week's Thursday is what makes the week-year correct: the
+ * Thursday always falls in the ISO year the whole week belongs to.
+ */
+export function isoWeekKey(c: CivilDate): string {
+  const thursday = addDays(mondayOfWeek(c), 3);
+  const jan1: CivilDate = { y: thursday.y, m: 1, d: 1 };
+  const week = Math.floor(daysBetween(jan1, thursday) / 7) + 1;
+  return `${thursday.y}-W${String(week).padStart(2, "0")}`;
+}
+
+/**
  * Parse a `YYYY-MM-DD` prefix into a CivilDate.
  *
  * Notion date values arrive either bare ("2026-07-28") or with a time and
