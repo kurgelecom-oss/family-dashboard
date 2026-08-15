@@ -86,6 +86,7 @@ export interface QueuedValidation {
 export type CountsFrom =
   | "tests_logged"
   | "validations_logged"
+  | "products_logged"
   | "validation_queue"
   | "none";
 
@@ -450,7 +451,12 @@ function shapeWeekly(
 /** Notion's "Counts From" value → the union, defaulting to text-only. */
 function countsFromOf(raw: string): CountsFrom {
   const v = raw.trim().toLowerCase().replace(/[\s-]+/g, "_");
-  if (v === "tests_logged" || v === "validations_logged" || v === "validation_queue") {
+  if (
+    v === "tests_logged" ||
+    v === "validations_logged" ||
+    v === "products_logged" ||
+    v === "validation_queue"
+  ) {
     return v;
   }
   // Anything unrecognised is text-only on purpose. A typo'd select option must
