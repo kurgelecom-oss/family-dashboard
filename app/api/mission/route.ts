@@ -9,6 +9,7 @@ import {
   parseCivilDate,
   type CivilDate,
 } from "../../lib/time";
+import { fetchSource, type NotionPage, type NotionProp } from "../../lib/notion";
 
 /* ────────────────────────────────────────────────────────────────────────────
    /api/mission — read-only. Four Notion sources, no database, no Supabase.
@@ -46,12 +47,9 @@ const CORS_HEADERS = {
   "Vary": "Origin",
 } as const;
 
-const NOTION_TOKEN = process.env.NOTION_TOKEN;
-const NOTION_VERSION = "2025-09-03";
-
-const PAGE_SIZE = 100;
-const MAX_PAGES = 10;
-const REQUEST_TIMEOUT_MS = 10_000;
+// The token, the pinned API version, the page size and the two pagination
+// bounds moved to app/lib/notion.ts with fetchSource, which was the only thing
+// in this file that ever read them.
 
 const DAILY_POINTS_ID = "4431302a-75ed-479f-a5f4-3bfd5e0a4e68";
 const PRODUCT_VALIDATION_ID = "1d35429a-fa90-81a0-bf47-000b7fe8803d";
@@ -154,12 +152,8 @@ export interface MissionPayload {
    in the UI that would otherwise silently empty a column on the wall.
    ──────────────────────────────────────────────────────────────────────────── */
 
-type NotionProp = unknown;
-type NotionPage = {
-  id?: string;
-  created_time?: string;
-  properties?: Record<string, NotionProp>;
-};
+// NotionProp and NotionPage are imported from app/lib/notion.ts — same two
+// declarations, moved next to the function that produces them.
 
 /** First property present under any of `names`. Notion names are exact. */
 function propOf(page: NotionPage, ...names: string[]): NotionProp {
@@ -278,47 +272,10 @@ function dateIsoOf(prop: NotionProp): string | null {
 
 /* ── fetch ───────────────────────────────────────────────────────────────── */
 
-/**
- * Every row of one data source. Verbatim the request shape /api/board uses:
- * POST /v1/data_sources/{id}/query, bearer token, Notion-Version 2025-09-03,
- * cursor pagination bounded by MAX_PAGES, and a per-request abort so one
- * unresponsive source cannot hold the whole route open.
- */
-async function fetchSource(id: string, label: string): Promise<NotionPage[]> {
-  if (!NOTION_TOKEN) {
-    throw new Error("Missing NOTION_TOKEN");
-  }
-
-  const rows: NotionPage[] = [];
-  let cursor: string | undefined;
-
-  for (let page = 0; page < MAX_PAGES; page++) {
-    const response = await fetch(`https://api.notion.com/v1/data_sources/${id}/query`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${NOTION_TOKEN}`,
-        "Notion-Version": NOTION_VERSION,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(
-        cursor ? { page_size: PAGE_SIZE, start_cursor: cursor } : { page_size: PAGE_SIZE },
-      ),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Notion API ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    rows.push(...((data.results ?? []) as NotionPage[]));
-
-    if (!data.has_more || !data.next_cursor) return rows;
-    cursor = data.next_cursor;
-  }
-
-  throw new Error(`Exceeded ${MAX_PAGES} pages for ${label}`);
-}
+// fetchSource now lives in app/lib/notion.ts, unchanged, and is imported at the
+// top of this file. It was the twelfth hand-rolled copy of the same request in
+// this repo and the only one that got pagination, timeout and the exceeded-page
+// throw all right, so it became the shared one rather than being rewritten.
 
 /* ── shaping ─────────────────────────────────────────────────────────────── */
 

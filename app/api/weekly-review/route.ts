@@ -428,13 +428,67 @@ async function readFocus(weekKey: string): Promise<string | null> {
  * whose snapshot could not be read is still a tick — the timestamp is the fact
  * that matters and the numbers are the commentary.
  */
-async function captureSnapshot(origin: string, weekKey: string): Promise<Record<string, unknown>> {
+/**
+ * The finance block for a FINANCES tick.
+ *
+ * Everything here is read off the /api/pocketsmith payload rather than worked
+ * out again: that route already owns the control-class split, the runway and
+ * the two week windows they are measured over, and a second implementation of
+ * any of them here would be a second answer to the same question — the exact
+ * mistake readLastTest exists to avoid.
+ *
+ * Null in, null out. A snapshot that could not read the numbers says so; it
+ * does not record zeroes, which would read as a week that spent nothing.
+ */
+function financeBlock(pocketsmith: Record<string, unknown> | null): Record<string, unknown> | null {
+  if (!pocketsmith) return null;
+
+  const lastWeek = (pocketsmith.lastWeek as Record<string, unknown> | undefined) ?? undefined;
+  const rawSpend = lastWeek?.totalSpending;
+  const lastWeekTotalSpend =
+    typeof rawSpend === "number" && Number.isFinite(rawSpend) ? rawSpend : null;
+
+  const control = (pocketsmith.controlSpend as Record<string, unknown> | undefined) ?? undefined;
+
+  return {
+    lastWeekTotalSpend,
+    // Same function the hero figure on the dashboard wears, so the recorded
+    // tier can never disagree with the tier that was on the screen.
+    lastWeekTier: lastWeekTotalSpend === null ? null : spendTier(lastWeekTotalSpend),
+    // Passed through verbatim, both windows, so the snapshot holds the split as
+    // the route computed it rather than a reduction of it.
+    controlSpend: {
+      lastWeek: (control?.lastWeek as Record<string, unknown> | undefined) ?? null,
+      previousWeek: (control?.previousWeek as Record<string, unknown> | undefined) ?? null,
+    },
+    runway: (pocketsmith.runway as Record<string, unknown> | undefined) ?? null,
+  };
+}
+
+async function captureSnapshot(
+  origin: string,
+  weekKey: string,
+  itemKey: ItemKey,
+): Promise<Record<string, unknown>> {
   const [mission, pocketsmith] = await Promise.all([
     readJson(`${origin}/api/mission`),
     readJson(`${origin}/api/pocketsmith`),
   ]);
 
   const weekly = (mission?.weekly as Record<string, unknown> | undefined) ?? null;
+
+  // FINANCES gets the full block: the control-class split and the runway are
+  // what that review is actually about. The other three items keep the exact
+  // two-field shape they have always recorded — this change is scoped to
+  // finances and must not rewrite what a homeschool tick means.
+  if (itemKey === "finances") {
+    return {
+      capturedAt: new Date().toISOString(),
+      weekKey,
+      weekly,
+      finance: financeBlock(pocketsmith),
+    };
+  }
 
   const lastWeek = (pocketsmith?.lastWeek as Record<string, unknown> | undefined) ?? undefined;
   const rawSpend = lastWeek?.totalSpending;
@@ -882,6 +936,13 @@ export async function POST(request: Request) {
       }
     }
 
+    // Past the focus-only early return above, so bodyItemKey is a validated
+    // ItemKey: the 400 at the top rejected anything else whenever an item was
+    // intended, and the only path reaching here without one has already
+    // returned. Asserted rather than re-tested so no new response path appears
+    // — the uses below already rely on exactly this invariant.
+    const itemKey = bodyItemKey as ItemKey;
+
     const supabase = serviceClient();
 
     // Only the columns this request is actually about. PostgREST's upsert
@@ -894,7 +955,7 @@ export async function POST(request: Request) {
       write.ticked_at = new Date().toISOString();
       // Overwritten on every re-tick, by design: the snapshot records the
       // numbers at the moment of the tick that stands, not the first one ever.
-      write.snapshot = await captureSnapshot(new URL(request.url).origin, weekKey);
+      write.snapshot = await captureSnapshot(new URL(request.url).origin, weekKey, itemKey);
     } else if (mode === "untick") {
       // Null the timestamp, keep the row. Unticking something that was never
       // ticked writes a row that is already in the unticked state, which is a

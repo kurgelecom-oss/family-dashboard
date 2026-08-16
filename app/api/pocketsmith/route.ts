@@ -5,6 +5,7 @@ import {
   getSetting,
   loadSettingsSafe,
 } from "../../lib/settings";
+import { fetchSource, type NotionPage } from "../../lib/notion";
 
 // Cached for 30 minutes (legacy caching model — cacheComponents is not enabled
 // in next.config.ts, so `dynamic`/`revalidate` are still honoured in Next 16;
@@ -375,13 +376,307 @@ function summarisePeriod(window: DateWindow, transactions: PsTransaction[]): Per
   };
 }
 
-async function fetchPeriod(window: DateWindow, cacheSeconds: number): Promise<PeriodSummary> {
-  const transactions = await fetchAllPages<PsTransaction>(
+/**
+ * Every transaction in a window.
+ *
+ * Split out of fetchPeriod so the control-class classifier can read the same
+ * raw rows the summary was built from. Both go through this one URL on purpose:
+ * Next dedupes identical fetches inside a single request, so asking twice costs
+ * one round trip, and neither caller can drift onto a different window.
+ */
+async function fetchWindowTransactions(
+  window: DateWindow,
+  cacheSeconds: number,
+): Promise<PsTransaction[]> {
+  return fetchAllPages<PsTransaction>(
     `${BASE_URL}/users/${USER_ID}/transactions` +
       `?start_date=${iso(window.start)}&end_date=${iso(window.end)}&per_page=100`,
     cacheSeconds,
   );
-  return summarisePeriod(window, transactions);
+}
+
+async function fetchPeriod(window: DateWindow, cacheSeconds: number): Promise<PeriodSummary> {
+  return summarisePeriod(window, await fetchWindowTransactions(window, cacheSeconds));
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Control classes — how much of a week's spend could actually have been stopped
+
+   The six SPEND_CATEGORIES above answer "where did it go". This answers the
+   different and harder question "how much of it was a choice", which is the one
+   runway depends on: a week that is 90% rent is not the same week as one that
+   is 90% takeaway, even at an identical total.
+
+   The classification is NOT hardcoded here. It is read from the Spending
+   Control Map in Notion, so re-classifying a category is an edit to a database
+   row rather than a deploy.
+   ──────────────────────────────────────────────────────────────────────── */
+
+const CONTROL_MAP_DS = "dee4b811-58b5-4900-81e5-ff94a28be925";
+
+/** The four control classes. Anything unmatched stays UNCLASSIFIED, never one of these. */
+type ControlClass = "Locked" | "Cancellable" | "Choice" | "Excluded";
+
+const CONTROL_CLASSES: ReadonlySet<string> = new Set([
+  "Locked",
+  "Cancellable",
+  "Choice",
+  "Excluded",
+]);
+
+/** The exact Notion select value that makes a rule cascade to descendants. */
+const APPLIES_SUBTREE = "This category and everything under it";
+
+interface ControlRule {
+  categoryName: string;
+  pocketsmithId: number | null;
+  control: ControlClass;
+  /** true = applies to this category and every descendant; false = this one only. */
+  cascades: boolean;
+}
+
+/** Notion property readers, local and minimal — only the columns this map has. */
+function notionTitle(prop: unknown): string {
+  const p = prop as { title?: { plain_text?: string }[] } | undefined;
+  return (p?.title ?? []).map((t) => t.plain_text ?? "").join("").trim();
+}
+
+function notionSelect(prop: unknown): string {
+  const p = prop as { select?: { name?: string } | null } | undefined;
+  return (p?.select?.name ?? "").trim();
+}
+
+function notionNumber(prop: unknown): number | null {
+  const p = prop as { number?: number | null } | undefined;
+  return typeof p?.number === "number" && Number.isFinite(p.number) ? p.number : null;
+}
+
+/**
+ * The control map, as rules.
+ *
+ * A row with no Category name or an unrecognised Control is dropped rather than
+ * guessed at: a typo in the select must not quietly reclassify a category as
+ * something it is not. Dropped rows surface as UNCLASSIFIED spend downstream,
+ * which is visible, rather than as a silent bucket change, which is not.
+ */
+function buildControlRules(pages: NotionPage[]): ControlRule[] {
+  const rules: ControlRule[] = [];
+
+  for (const page of pages) {
+    const props = page.properties ?? {};
+    const categoryName = notionTitle(props["Category"]);
+    const control = notionSelect(props["Control"]);
+    if (!categoryName || !CONTROL_CLASSES.has(control)) continue;
+
+    rules.push({
+      categoryName,
+      pocketsmithId: notionNumber(props["PocketSmith ID"]),
+      control: control as ControlClass,
+      // Anything that is not the exact subtree phrase is treated as
+      // this-category-only. The narrower reading is the safe one: a mistyped
+      // Applies To under-reaches instead of silently recolouring a whole tree.
+      cascades: notionSelect(props["Applies To"]) === APPLIES_SUBTREE,
+    });
+  }
+
+  return rules;
+}
+
+interface CategoryNode {
+  id: number;
+  title: string;
+  parentId: number | null;
+}
+
+/** Flatten the PocketSmith category tree, keeping each node's parent. */
+function flattenCategories(tree: PsCategory[]): Map<number, CategoryNode> {
+  const nodes = new Map<number, CategoryNode>();
+
+  const walk = (list: PsCategory[], parentId: number | null) => {
+    for (const node of list) {
+      nodes.set(node.id, { id: node.id, title: node.title?.trim() ?? "", parentId });
+      if (node.children?.length) walk(node.children, node.id);
+    }
+  };
+
+  walk(tree, null);
+  return nodes;
+}
+
+interface ControlResolution {
+  /** categoryId -> the class that governs it. Absent = UNCLASSIFIED. */
+  byCategory: Map<number, ControlClass>;
+  /** Rules whose category could not be found in the PocketSmith tree at all. */
+  unmatched: string[];
+}
+
+/**
+ * Resolve every PocketSmith category to a control class.
+ *
+ * Matching is by PocketSmith ID first and exact category name second. The id is
+ * preferred because a category can be renamed in PocketSmith without anyone
+ * touching Notion, and a rename must not silently unclassify a whole subtree.
+ *
+ * Resolution walks from the category UP: a rule on the category itself always
+ * wins, then the nearest ancestor carrying a cascading rule. An ancestor rule
+ * marked this-category-only is stepped over — it governs itself and nothing
+ * below it, which is precisely what makes it a carve-out.
+ *
+ * A category with no rule of its own and no cascading ancestor is left out of
+ * the map entirely. That absence is UNCLASSIFIED and is reported as its own
+ * bucket; it is never folded into one of the four classes.
+ */
+function resolveControlClasses(tree: PsCategory[], rules: ControlRule[]): ControlResolution {
+  const nodes = flattenCategories(tree);
+
+  const byId = new Map<number, ControlRule>();
+  const byName = new Map<string, ControlRule>();
+  for (const rule of rules) {
+    if (rule.pocketsmithId !== null) byId.set(rule.pocketsmithId, rule);
+    byName.set(rule.categoryName, rule);
+  }
+
+  // A rule matching nothing in the tree — a deleted or renamed PocketSmith
+  // category, or a typo in the Notion row. Reported, never guessed at.
+  const titles = new Set([...nodes.values()].map((n) => n.title));
+  const unmatched: string[] = [];
+  for (const rule of rules) {
+    const hitById = rule.pocketsmithId !== null && nodes.has(rule.pocketsmithId);
+    if (!hitById && !titles.has(rule.categoryName)) unmatched.push(rule.categoryName);
+  }
+
+  const ruleFor = (node: CategoryNode): ControlRule | undefined =>
+    byId.get(node.id) ?? byName.get(node.title);
+
+  const byCategory = new Map<number, ControlClass>();
+
+  for (const node of nodes.values()) {
+    // The category's own rule wins outright, cascading or not.
+    const own = ruleFor(node);
+    if (own) {
+      byCategory.set(node.id, own.control);
+      continue;
+    }
+
+    // Otherwise the nearest ancestor with a CASCADING rule. A non-cascading
+    // ancestor rule is skipped rather than stopping the walk.
+    let parentId = node.parentId;
+    const guard = new Set<number>([node.id]);
+    while (parentId !== null && !guard.has(parentId)) {
+      guard.add(parentId);
+      const parent = nodes.get(parentId);
+      if (!parent) break;
+      const inherited = ruleFor(parent);
+      if (inherited?.cascades) {
+        byCategory.set(node.id, inherited.control);
+        break;
+      }
+      parentId = parent.parentId;
+    }
+  }
+
+  return { byCategory, unmatched };
+}
+
+interface ControlSpend {
+  locked: number;
+  cancellable: number;
+  choice: number;
+  excluded: number;
+  unclassified: number;
+  /** locked + cancellable + choice. Excluded and unclassified are NOT in here. */
+  discretionary: number;
+  unmatchedCategories: string[];
+}
+
+/**
+ * One window's spend, split by control class.
+ *
+ * Same conventions as summarisePeriod, deliberately, so the buckets can be
+ * compared against totalSpending without a sign or filter mismatch: transfers
+ * dropped, spending only (a negative amount_in_base_currency), reported as a
+ * positive magnitude.
+ *
+ * A transaction with no category at all cannot be matched by any rule, so it
+ * lands in unclassified alongside categories the map has not reached yet.
+ */
+function summariseControlSpend(
+  transactions: PsTransaction[],
+  resolution: ControlResolution,
+): ControlSpend {
+  let locked = 0;
+  let cancellable = 0;
+  let choice = 0;
+  let excluded = 0;
+  let unclassified = 0;
+
+  for (const t of transactions) {
+    if (isTransfer(t)) continue;
+    if (t.amount_in_base_currency >= 0) continue; // income is not spend
+    const amount = -t.amount_in_base_currency;
+
+    const categoryId = t.category?.id;
+    const control =
+      typeof categoryId === "number" ? resolution.byCategory.get(categoryId) : undefined;
+
+    switch (control) {
+      case "Locked":
+        locked += amount;
+        break;
+      case "Cancellable":
+        cancellable += amount;
+        break;
+      case "Choice":
+        choice += amount;
+        break;
+      case "Excluded":
+        excluded += amount;
+        break;
+      default:
+        unclassified += amount;
+        break;
+    }
+  }
+
+  return {
+    locked: round2(locked),
+    cancellable: round2(cancellable),
+    choice: round2(choice),
+    excluded: round2(excluded),
+    unclassified: round2(unclassified),
+    discretionary: round2(locked + cancellable + choice),
+    unmatchedCategories: resolution.unmatched,
+  };
+}
+
+interface Runway {
+  cashOnHand: number;
+  weeklyBurn: number;
+  /** null when burn is zero or negative — never Infinity, never a divide by zero. */
+  weeks: number | null;
+}
+
+/**
+ * How many weeks the cash lasts at the recent discretionary rate.
+ *
+ * Two weeks is a short mean and it is meant to be: this figure exists to answer
+ * "how am I going right now", and a longer average would smooth away exactly
+ * the change it is being asked about.
+ */
+function buildRunway(
+  cashOnHand: number,
+  lastWeek: ControlSpend,
+  previousWeek: ControlSpend,
+): Runway {
+  const weeklyBurn = round2((lastWeek.discretionary + previousWeek.discretionary) / 2);
+
+  return {
+    cashOnHand: round2(cashOnHand),
+    weeklyBurn,
+    // Guarded rather than clamped. A zero-burn fortnight is not "infinite
+    // runway", it is a fortnight the question has no answer for.
+    weeks: weeklyBurn > 0 ? Math.round((cashOnHand / weeklyBurn) * 10) / 10 : null,
+  };
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -450,6 +745,40 @@ export async function GET() {
       fetchPeriod(lastMonthWindow, cacheSeconds),
       fetchPeriod(previousMonthWindow, cacheSeconds),
     ]);
+
+    /* ---- control classes ------------------------------------------------- */
+    // The same two windows the week panels already use — no second opinion
+    // about which Mon–Sun "last week" means. The transaction fetches here hit
+    // the identical URLs fetchPeriod used, so Next serves them from its
+    // per-request cache rather than going back to PocketSmith.
+    //
+    // The Notion read is CAUGHT, and that is the whole point of it being
+    // separate: this route is the finance panel's only source, and before this
+    // block existed nothing here could be taken down by Notion. A control map
+    // that will not load must cost the two new fields and nothing else — the
+    // balances, the budget and the period summaries are all still true.
+    const [controlMapPages, lastWeekTx, previousWeekTx] = await Promise.all([
+      fetchSource(CONTROL_MAP_DS, "Spending Control Map").catch((e: unknown) => {
+        console.error("Spending Control Map unavailable; controlSpend/runway omitted:", e);
+        return null;
+      }) as Promise<NotionPage[] | null>,
+      fetchWindowTransactions(lastWeekWindow, cacheSeconds),
+      fetchWindowTransactions(previousWeekWindow, cacheSeconds),
+    ]);
+
+    // Null, not an empty rule set. Zero rules would classify every dollar as
+    // UNCLASSIFIED and report a $0 discretionary week — a confident wrong
+    // answer, which is worse than saying nothing.
+    const controlResolution = controlMapPages
+      ? resolveControlClasses(categoryTree, buildControlRules(controlMapPages))
+      : null;
+
+    const lastWeekControl = controlResolution
+      ? summariseControlSpend(lastWeekTx, controlResolution)
+      : null;
+    const previousWeekControl = controlResolution
+      ? summariseControlSpend(previousWeekTx, controlResolution)
+      : null;
 
     /* ---- balances -------------------------------------------------------- */
     // Split by account type rather than by name: "bank" is the two cash
@@ -581,6 +910,23 @@ export async function GET() {
 
       accounts: panelAccounts,
       totalBalance,
+
+      // ── ADDITIVE, and everything above this line is untouched ────────────
+      // Last week's spend and the week before it, split by how stoppable each
+      // dollar was. Same two windows as lastWeek/previousWeek above.
+      // Both null together when the control map could not be read: runway is
+      // derived from the discretionary split, so it cannot outlive it.
+      controlSpend:
+        lastWeekControl && previousWeekControl
+          ? { lastWeek: lastWeekControl, previousWeek: previousWeekControl }
+          : null,
+
+      // cashOnHand is cash.total — the SAME value emitted above, passed through
+      // rather than recomputed, so the two can never disagree.
+      runway:
+        lastWeekControl && previousWeekControl
+          ? buildRunway(cashTotal, lastWeekControl, previousWeekControl)
+          : null,
     });
   } catch (error) {
     console.error("Error fetching PocketSmith data:", error);
