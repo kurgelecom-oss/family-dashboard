@@ -558,6 +558,31 @@ export async function POST(request: Request) {
       // ticked writes a row that is already in the unticked state, which is a
       // success — there is no such thing as a failed untick.
       write.ticked_at = null;
+    } else {
+      /*
+       * TOUCH — decision only, tick state must not move.
+       *
+       * ticked_at is written EXPLICITLY here rather than omitted, and the
+       * difference is not cosmetic. Omitting a column preserves it on the
+       * UPDATE half of an upsert, but on the INSERT half the column takes its
+       * DEFAULT — and weekly_reviews.ticked_at still carries DEFAULT now() from
+       * when it was NOT NULL. So a decision saved on an item with no row yet
+       * silently ticked it, stamped with the moment the decision was typed.
+       *
+       * Reading the current value first and writing it back makes the outcome
+       * identical on both halves of the upsert and independent of whatever
+       * default the column happens to hold.
+       */
+      const { data: current, error: currentError } = await supabase
+        .from(TABLE)
+        .select("ticked_at")
+        .eq("week_key", weekKey)
+        .eq("item_key", bodyItemKey)
+        .maybeSingle();
+
+      if (currentError) throw new Error(currentError.message);
+
+      write.ticked_at = (current as { ticked_at: string | null } | null)?.ticked_at ?? null;
     }
 
     if (decisionProvided) write.decision = decisionValue;
