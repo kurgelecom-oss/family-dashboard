@@ -470,17 +470,24 @@ async function captureSnapshot(
   weekKey: string,
   itemKey: ItemKey,
 ): Promise<Record<string, unknown>> {
-  const [mission, pocketsmith] = await Promise.all([
+  const [mission, pocketsmith, homeschool] = await Promise.all([
     readJson(`${origin}/api/mission`),
     readJson(`${origin}/api/pocketsmith`),
+    // Only the homeschool tick pays for this read. The week is named
+    // explicitly rather than left to the route's default, so a tick landing
+    // either side of the Saturday turnover still records the week it belongs
+    // to instead of whichever one the server happens to think is current.
+    itemKey === "homeschool"
+      ? readJson(`${origin}/api/homeschool?week_key=${encodeURIComponent(weekKey)}`)
+      : Promise.resolve(null),
   ]);
 
   const weekly = (mission?.weekly as Record<string, unknown> | undefined) ?? null;
 
   // FINANCES gets the full block: the control-class split and the runway are
-  // what that review is actually about. The other three items keep the exact
-  // two-field shape they have always recorded — this change is scoped to
-  // finances and must not rewrite what a homeschool tick means.
+  // what that review is actually about. Ecom and origins keep the exact
+  // two-field shape they have always recorded — every branch here is scoped to
+  // one item and must not rewrite what the others mean.
   if (itemKey === "finances") {
     return {
       capturedAt: new Date().toISOString(),
@@ -495,16 +502,39 @@ async function captureSnapshot(
   const lastWeekTotalSpend =
     typeof rawSpend === "number" && Number.isFinite(rawSpend) ? rawSpend : null;
 
+  // The two-field finance record every non-finances item has always carried.
+  // Ecom and origins get exactly this and nothing else; homeschool gets it plus
+  // its own block, so nothing that was being recorded stops being recorded.
+  const legacyFinance = {
+    lastWeekTotalSpend,
+    // Same function the hero figure on the dashboard wears, so the recorded
+    // tier can never disagree with the tier that was on the screen.
+    lastWeekTier: lastWeekTotalSpend === null ? null : spendTier(lastWeekTotalSpend),
+  };
+
+  if (itemKey === "homeschool") {
+    return {
+      capturedAt: new Date().toISOString(),
+      weekKey,
+      weekly,
+      finance: legacyFinance,
+      // Passed through verbatim, or null. /api/homeschool already owns the
+      // window arithmetic and every count in here; re-deriving any of it would
+      // put a second answer to the same question in the codebase.
+      //
+      // Null on any failure — a 4s timeout, a Notion outage, a 400, a 500. The
+      // tick is what the person is standing there waiting for and it completes
+      // regardless; a snapshot missing its numbers is a snapshot, while a tick
+      // that would not save because a Notion database was slow is a broken app.
+      homeschool,
+    };
+  }
+
   return {
     capturedAt: new Date().toISOString(),
     weekKey,
     weekly,
-    finance: {
-      lastWeekTotalSpend,
-      // Same function the hero figure on the dashboard wears, so the recorded
-      // tier can never disagree with the tier that was on the screen.
-      lastWeekTier: lastWeekTotalSpend === null ? null : spendTier(lastWeekTotalSpend),
-    },
+    finance: legacyFinance,
   };
 }
 
