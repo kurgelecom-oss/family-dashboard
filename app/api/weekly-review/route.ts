@@ -135,6 +135,31 @@ export interface LastTest {
   since: string;
 }
 
+/**
+ * What the Notion mirror did on THIS request.
+ *
+ * It exists because the mirror is deliberately unable to fail a tick, and an
+ * unfailable thing that only logs is a thing that dies quietly — the way this
+ * one did, mirroring nothing for days behind a stale page id while every write
+ * returned 200. The tick still succeeds; the response now says whether the copy
+ * of it reached Notion, so a dead mirror is visible on the very next write
+ * instead of being discovered weeks later by noticing the log is empty.
+ */
+export interface MirrorStatus {
+  /** false = the mirror did not complete. The tick still succeeded. */
+  ok: boolean;
+  /** Short, stable reason when `ok` is false; null when it worked. */
+  reason: string | null;
+  /** The page written, when there was one. */
+  pageId?: string;
+  /**
+   * Extra pages found for this week+item beyond the one updated. Reported even
+   * on success — the mirror completing does not make duplicate pages fine, and
+   * nothing else in the system would ever mention them.
+   */
+  duplicates?: string[];
+}
+
 export interface WeeklyReviewPayload {
   weekKey: string;
   items: ReviewItem[];
@@ -144,6 +169,8 @@ export interface WeeklyReviewPayload {
   focus: string | null;
   /** Null when /api/actions could not be read — never a fabricated zero. */
   lastTest: LastTest | null;
+  /** Mirror result for this request; null when no mirror ran (every GET). */
+  mirror: MirrorStatus | null;
   /** Present only when `weeks` > 1. Past weeks, newest first. */
   history?: HistoryWeek[];
 }
@@ -483,20 +510,117 @@ function notionProperties(row: Row) {
     },
   };
 }
+/**
+ * How long the WHOLE mirror gets, across however many Notion calls it makes.
+ *
+ * A per-request timeout is no longer enough: deduping can cost a failed PATCH,
+ * then a query, then a second PATCH. Three 3s requests would be a nine-second
+ * tail on a write Supabase finished long ago. This is one budget for the lot —
+ * each call gets whatever is left, and when it runs out the mirror stops.
+ */
+const NOTION_BUDGET_MS = 4000;
+
+/** Milliseconds left in the budget, floored so a call is never given ~0ms. */
+function remaining(deadline: number): number {
+  return Math.max(400, deadline - Date.now());
+}
+
+/**
+ * Pages already in the log for this row's week AND item, oldest first.
+ *
+ * This is the dedupe. The log itself is asked what exists rather than trusting
+ * notion_page_id to have survived, which is the whole bug: that column is a
+ * cache on a row that gets deleted, cleared and recreated, and every time it
+ * came back empty the mirror created a second page beside the live one.
+ *
+ * Returns [] on any failure — the caller treats "cannot tell" as "do not
+ * create", so a query outage can never manufacture a duplicate.
+ */
+async function findNotionPages(
+  row: Row,
+  headers: Record<string, string>,
+  deadline: number,
+): Promise<Array<{ id: string; created_time: string }> | null> {
+  const response = await fetch(
+    `https://api.notion.com/v1/data_sources/${WEEKLY_REVIEW_LOG_DS}/query`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        filter: {
+          and: [
+            { property: "Week", date: { equals: row.week_key } },
+            { property: "Item", select: { equals: ITEM_LABELS[row.item_key as ItemKey] } },
+          ],
+        },
+        // Oldest first, so "the one we keep" is stable across runs rather than
+        // whichever page the API happened to list first.
+        sorts: [{ timestamp: "created_time", direction: "ascending" }],
+        page_size: 20,
+      }),
+      signal: AbortSignal.timeout(remaining(deadline)),
+    },
+  );
+
+  if (!response.ok) {
+    console.error("[weekly-review] Notion dedupe query failed:", response.status, await response.text());
+    return null;
+  }
+
+  const data = (await response.json()) as { results?: Array<{ id: string; created_time: string }> };
+  return (data.results ?? []).map((r) => ({ id: r.id, created_time: r.created_time }));
+}
+
+/** PATCH one page's properties. True on success. */
+async function patchNotionPage(
+  pageId: string,
+  properties: unknown,
+  headers: Record<string, string>,
+  deadline: number,
+): Promise<boolean> {
+  const response = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({ properties }),
+    signal: AbortSignal.timeout(remaining(deadline)),
+  });
+  if (!response.ok) {
+    console.error("[weekly-review] Notion update failed:", response.status, await response.text());
+    return false;
+  }
+  return true;
+}
+
+/** Cache a page id on the row so the next write takes the fast path. */
+async function cacheNotionPageId(row: Row, pageId: string): Promise<void> {
+  const { error } = await serviceClient()
+    .from(TABLE)
+    .update({ notion_page_id: pageId })
+    .eq("week_key", row.week_key)
+    .eq("item_key", row.item_key);
+  if (error) console.error("[weekly-review] notion_page_id write-back failed:", error.message);
+}
 
 /**
  * Mirror one row into the Weekly Review Log. Never throws.
  *
- * Supabase is the source of truth and this runs AFTER it has committed, so
- * every failure path here is a log line and a return. Leaving notion_page_id
- * null on a failed create is the retry: the next write for the same
- * week_key+item_key sees no id and creates the page again, which is why a
- * Notion outage costs the mirror a beat rather than the row forever.
+ * Three steps, in order of cost:
+ *   1. notion_page_id, if set — one PATCH and done. A stale id no longer ends
+ *      the attempt: a page deleted in Notion used to fail here and stop, which
+ *      silently killed the mirror for that row forever.
+ *   2. Otherwise ASK THE LOG what exists for this week+item. One match is
+ *      updated and its id cached. More than one is reported and the OLDEST is
+ *      updated — the extras are left exactly as they are, because deleting
+ *      someone's Notion pages is not this function's call to make.
+ *   3. Create only when the log genuinely holds nothing for this week+item.
+ *
+ * Supabase is the source of truth and this runs AFTER it commits, so every
+ * failure path is a log line and a return. The tick has already succeeded.
  */
-async function mirrorToNotion(row: Row): Promise<void> {
+async function mirrorToNotion(row: Row): Promise<MirrorStatus> {
   if (!NOTION_TOKEN) {
     console.error("[weekly-review] Notion mirror skipped: missing NOTION_TOKEN");
-    return;
+    return { ok: false, reason: "missing_token" };
   }
 
   const headers = {
@@ -504,27 +628,50 @@ async function mirrorToNotion(row: Row): Promise<void> {
     "Notion-Version": NOTION_VERSION,
     "Content-Type": "application/json",
   };
+  const deadline = Date.now() + NOTION_BUDGET_MS;
 
   try {
     const properties = notionProperties(row);
 
+    // 1 — fast path on the cached id.
     if (row.notion_page_id) {
-      const response = await fetch(`https://api.notion.com/v1/pages/${row.notion_page_id}`, {
-        method: "PATCH",
-        headers,
-        body: JSON.stringify({ properties }),
-        signal: AbortSignal.timeout(NOTION_TIMEOUT_MS),
-      });
-      if (!response.ok) {
-        console.error(
-          "[weekly-review] Notion update failed:",
-          response.status,
-          await response.text(),
-        );
+      if (await patchNotionPage(row.notion_page_id, properties, headers, deadline)) {
+        return { ok: true, reason: null, pageId: row.notion_page_id };
       }
-      return;
+      // The cached id is stale (page deleted or archived). Fall through and
+      // find out what is actually in the log rather than giving up.
+      console.error("[weekly-review] cached notion_page_id is stale, re-resolving:", row.notion_page_id);
     }
 
+    // 2 — resolve by week + item.
+    const found = await findNotionPages(row, headers, deadline);
+
+    // null means the query itself failed. "Cannot tell" must never become
+    // "create another one" — that is precisely how duplicates were born.
+    if (found === null) return { ok: false, reason: "lookup_failed" };
+
+    if (found.length > 0) {
+      const oldest = found[0];
+      const extras = found.slice(1).map((p) => p.id);
+
+      if (extras.length > 0) {
+        console.error(
+          `[weekly-review] ${found.length} Notion pages match ${row.week_key}/${row.item_key}; ` +
+            `updating oldest ${oldest.id}, leaving untouched: ${extras.join(", ")}`,
+        );
+      }
+
+      if (!(await patchNotionPage(oldest.id, properties, headers, deadline))) {
+        return { ok: false, reason: "update_failed", duplicates: extras };
+      }
+
+      await cacheNotionPageId(row, oldest.id);
+      // Duplicates are reported even on success: the mirror DID complete, and
+      // the extra pages are a fact about the log that someone has to see.
+      return { ok: true, reason: null, pageId: oldest.id, duplicates: extras };
+    }
+
+    // 3 — nothing exists for this week+item, so create it.
     const response = await fetch("https://api.notion.com/v1/pages", {
       method: "POST",
       headers,
@@ -532,29 +679,26 @@ async function mirrorToNotion(row: Row): Promise<void> {
         parent: { type: "data_source_id", data_source_id: WEEKLY_REVIEW_LOG_DS },
         properties,
       }),
-      signal: AbortSignal.timeout(NOTION_TIMEOUT_MS),
+      signal: AbortSignal.timeout(remaining(deadline)),
     });
 
     if (!response.ok) {
       console.error("[weekly-review] Notion create failed:", response.status, await response.text());
-      return;
+      return { ok: false, reason: `create_failed_${response.status}` };
     }
 
     const created = (await response.json()) as { id?: string };
-    if (!created.id) return;
+    if (!created.id) return { ok: false, reason: "create_returned_no_id" };
 
-    // Store the id so the next write updates this page instead of creating a
-    // second one. This is what keeps four writes in a week to one Notion row.
-    const supabase = serviceClient();
-    const { error } = await supabase
-      .from(TABLE)
-      .update({ notion_page_id: created.id })
-      .eq("week_key", row.week_key)
-      .eq("item_key", row.item_key);
-
-    if (error) console.error("[weekly-review] notion_page_id write-back failed:", error.message);
+    await cacheNotionPageId(row, created.id);
+    return { ok: true, reason: null, pageId: created.id };
   } catch (e) {
-    console.error("[weekly-review] Notion mirror error:", e instanceof Error ? e.message : String(e));
+    const message = e instanceof Error ? e.message : String(e);
+    console.error("[weekly-review] Notion mirror error:", message);
+    // TimeoutError is the budget expiring, which is the single most likely way
+    // this fails in the wild and the one most worth naming distinctly.
+    const timedOut = e instanceof Error && e.name === "TimeoutError";
+    return { ok: false, reason: timedOut ? "timeout" : `error: ${message}` };
   }
 }
 
@@ -591,7 +735,9 @@ async function buildPayload(weekKey: string, origin: string): Promise<WeeklyRevi
 
   // `core` is spread first and untouched: items and ticked come through exactly
   // as the table gave them, with the two new keys added alongside weekKey.
-  return { ...core, focus, lastTest };
+  // mirror defaults to null: no mirror runs on a read. POST overrides it with
+  // the real result after it has written.
+  return { ...core, focus, lastTest, mirror: null };
 }
 
 /* ── handlers ────────────────────────────────────────────────────────────── */
@@ -809,15 +955,22 @@ export async function POST(request: Request) {
     // Awaited, but bounded and swallowing: a serverless function that returns
     // before its background work is done gets frozen mid-flight, so fire-and-
     // forget would lose the mirror outright. mirrorToNotion never throws and
-    // caps itself at NOTION_TIMEOUT_MS, so the worst case is a late response,
+    // caps itself at NOTION_BUDGET_MS, so the worst case is a late response,
     // never a failed tick.
-    if (saved) await mirrorToNotion(saved as Row);
+    //
+    // Its verdict is KEPT rather than discarded. The tick's success and the
+    // mirror's success are two different facts, and collapsing them into one
+    // 200 is what let the mirror die unnoticed.
+    const mirror: MirrorStatus | null = saved ? await mirrorToNotion(saved as Row) : null;
 
     // The whole updated set, read back from the table rather than assembled from
     // what we just sent. The response is then the database's account of the
     // week, not this handler's optimistic guess at it — and it is built by the
     // same function GET uses, so the two can never answer in different shapes.
-    return json(await buildPayload(weekKey, new URL(request.url).origin), 200);
+    // `mirror` is layered on top: still a 200, still a successful tick, with the
+    // mirror's own outcome stated beside it.
+    const payload = await buildPayload(weekKey, new URL(request.url).origin);
+    return json({ ...payload, mirror }, 200);
   } catch (e) {
     return fail(e);
   }
