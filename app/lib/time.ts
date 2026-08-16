@@ -77,6 +77,24 @@ export function mondayOfWeek(c: CivilDate): CivilDate {
 }
 
 /**
+ * Saturday that OPENS the review week containing `c`.
+ *
+ * The family meeting runs Saturday morning and the review week runs Saturday →
+ * Friday, so the week resets as the meeting starts rather than in the middle of
+ * the night before it. Deliberately a sibling of mondayOfWeek() rather than a
+ * replacement: the ISO Monday week still governs /api/mission's counters and
+ * every other weekly window in this repo, and only the weekly review moved.
+ *
+ * Same UTC anchor as the rest of this module, so the only zone-aware step
+ * remains zoneToday(). Pass it a Sydney civil date and the Saturday is Sydney's.
+ */
+export function saturdayOfWeek(c: CivilDate): CivilDate {
+  const dow = toAnchor(c).getUTCDay(); // 0=Sun … 6=Sat
+  const daysSinceSaturday = (dow + 1) % 7; // Sat=0, Sun=1 … Fri=6
+  return addDays(c, -daysSinceSaturday);
+}
+
+/**
  * Whole days from `from` to `to`, both civil dates. Negative if `to` precedes
  * `from`. Uses the same UTC anchor, so DST never adds or drops an hour that
  * could round a day boundary the wrong way.

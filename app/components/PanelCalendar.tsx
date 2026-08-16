@@ -45,6 +45,78 @@ type ToastItem = {
   personColor: string;
 };
 
+/* ── weekly review misses ────────────────────────────────────────────────────
+   How long each of the four weekly review items has gone unreviewed, read from
+   /api/weekly-review. Rendered ONLY for items that have actually been missed —
+   a week where all four were ticked draws nothing at all, no heading and no
+   empty container, so a household that is on top of it sees no red on the wall.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+const REVIEW_LABELS: Record<string, string> = {
+  finances:          "Finances",
+  homeschool:        "Homeschool",
+  ecom_product_logs: "Ecom Product Logs",
+  origins_sessions:  "Origins Sessions",
+};
+
+type ReviewApiItem = { key: string; ticked: boolean };
+
+type ReviewResponse = {
+  weekKey: string;
+  items: ReviewApiItem[];
+  history?: Array<{ weekKey: string; items: ReviewApiItem[] }>;
+};
+
+/** `weeksSince` null means "not ticked anywhere in the window we asked for". */
+type ReviewMiss = { key: string; weeksSince: number | null };
+
+/**
+ * Whole weeks between two review-week Saturdays, both `YYYY-MM-DD`.
+ *
+ * Plain UTC arithmetic on two dates the SERVER already resolved in Sydney. The
+ * zone question was settled when the week keys were minted; re-applying a zone
+ * here would be a second, competing answer to a question already answered.
+ */
+function weeksBetween(fromKey: string, toKey: string): number | null {
+  const from = Date.parse(`${fromKey}T00:00:00Z`);
+  const to   = Date.parse(`${toKey}T00:00:00Z`);
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return null;
+  return Math.round((to - from) / (7 * 86_400_000));
+}
+
+/**
+ * The missed items, worst first.
+ *
+ * An item ticked in the CURRENT week is not missed and is omitted — that is
+ * what makes a fully-reviewed set render nothing. Anything else is reported
+ * with the number of weeks since the last week it was ticked in, or null when
+ * the window holds no tick for it at all.
+ */
+function reviewMisses(data: ReviewResponse): ReviewMiss[] {
+  const current = new Map(data.items.map(i => [i.key, i.ticked]));
+
+  return Object.keys(REVIEW_LABELS)
+    .filter(key => !current.get(key))
+    .map(key => {
+      const lastTicked = (data.history ?? []).find(week =>
+        week.items.some(i => i.key === key && i.ticked)
+      );
+      return {
+        key,
+        weeksSince: lastTicked ? weeksBetween(lastTicked.weekKey, data.weekKey) : null,
+      };
+    })
+    // Never-reviewed sorts worst; otherwise the longest gap leads.
+    .sort((a, b) => (b.weeksSince ?? Infinity) - (a.weeksSince ?? Infinity));
+}
+
+function missText(miss: ReviewMiss): string {
+  const label = (REVIEW_LABELS[miss.key] ?? miss.key).toUpperCase();
+  if (miss.weeksSince === null) return `${label} — never reviewed`;
+  const n = miss.weeksSince;
+  return `${label} — ${n} ${n === 1 ? "week" : "weeks"} since reviewed`;
+}
+
 function parseEventTime(iso: string): number {
   // Microsoft Graph returns calendarView times in UTC with NO offset in the
   // string (e.g. "2026-07-05T22:00:00.0000000", timeZone: "UTC"). A bare string
@@ -140,6 +212,7 @@ export default function PanelCalendar() {
   const [missing,    setMissing]    = useState<string[]>([]);
   const [calLoading, setCalLoading] = useState(true);
   const [toasts,     setToasts]     = useState<ToastItem[]>([]);
+  const [misses,     setMisses]     = useState<ReviewMiss[]>([]);
 
   const toastedIds = useRef<Set<string>>(new Set());
 
@@ -154,6 +227,19 @@ export default function PanelCalendar() {
       // silent — show empty state
     } finally {
       setCalLoading(false);
+    }
+  }, []);
+
+  // 26 weeks is the route's own ceiling, so this asks for the whole window it
+  // will ever serve. A failure leaves `misses` empty, which renders nothing —
+  // the same as a clean week, and the right way to fail for a wall display.
+  const loadReview = useCallback(async () => {
+    try {
+      const res = await fetch("/api/weekly-review?weeks=26");
+      if (!res.ok) throw new Error(`${res.status}`);
+      setMisses(reviewMisses(await res.json() as ReviewResponse));
+    } catch {
+      setMisses([]);
     }
   }, []);
 
@@ -194,6 +280,14 @@ export default function PanelCalendar() {
     const fetchId = setInterval(loadCalendar, 60 * 60 * 1000);
     return () => { clearInterval(fetchId); };
   }, [loadCalendar]);
+
+  useEffect(() => {
+    loadReview();
+    // Hourly like the calendar: the answer only changes when someone ticks a box
+    // on the mission board, and being an hour behind on that costs nothing.
+    const reviewId = setInterval(loadReview, 60 * 60 * 1000);
+    return () => { clearInterval(reviewId); };
+  }, [loadReview]);
 
   useEffect(() => {
     checkUpcomingEvents();
@@ -310,6 +404,38 @@ export default function PanelCalendar() {
             </div>
           )}
         </div>
+
+        {/* Weekly review misses. Sibling of the events list, not a child: the
+            list above is `flex: 1` with `overflow: hidden`, so a `flexShrink: 0`
+            block here takes its space out of the LIST rather than out of the
+            card. The card's height is set by the column's flex share either way,
+            and nothing here can push it past the viewport.
+
+            Renders nothing at all when nothing is missed — no wrapper, no
+            margin, no heading. `var(--red)` and `fontSize: 10` are both already
+            in use in this panel (COLOR_MAP above, and the "Not connected"
+            warning), so this introduces no token, no colour and no font size. */}
+        {misses.length > 0 && (
+          <div style={{ flexShrink: 0, marginTop: 8 }}>
+            {misses.map(miss => (
+              <div
+                key={miss.key}
+                style={{
+                  fontSize:      10,
+                  fontWeight:    700,
+                  letterSpacing: "0.06em",
+                  lineHeight:    1.35,
+                  color:         "var(--red)",
+                  whiteSpace:    "nowrap",
+                  overflow:      "hidden",
+                  textOverflow:  "ellipsis",
+                }}
+              >
+                {missText(miss)}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </>
   );
