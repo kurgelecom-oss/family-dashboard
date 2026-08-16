@@ -116,11 +116,34 @@ export interface HistoryWeek {
   }>;
 }
 
+/**
+ * How long since a product test was actually FINISHED, and how many have been.
+ *
+ * `testsRun` counts completed tests and nothing else. It is deliberately not
+ * backfilled from validations or product logs — those are different activities
+ * and a week can be full of them while no test ran at all. Zero is a real
+ * answer here and the honest one.
+ */
+export interface LastTest {
+  /** Days since the last completed test, or since go-live when none ever was. */
+  daysSince: number;
+  /** Completed tests to date. Zero is a valid, meaningful answer. */
+  testsRun: number;
+  /** false → `daysSince` counts from Launchpad go-live, not from a test. */
+  everCompleted: boolean;
+  /** The `YYYY-MM-DD` the count runs from — a test date, or go-live. */
+  since: string;
+}
+
 export interface WeeklyReviewPayload {
   weekKey: string;
   items: ReviewItem[];
   /** The ticked keys alone, for a caller that only needs the set. */
   ticked: ItemKey[];
+  /** The week's one sentence, or null when unset. */
+  focus: string | null;
+  /** Null when /api/actions could not be read — never a fabricated zero. */
+  lastTest: LastTest | null;
   /** Present only when `weeks` > 1. Past weeks, newest first. */
   history?: HistoryWeek[];
 }
@@ -155,7 +178,14 @@ function json(body: unknown, status: number) {
  * no longer one of the four is ignored on read instead of surfacing as an item
  * the UI has no name for.
  */
-async function readWeek(weekKey: string): Promise<WeeklyReviewPayload> {
+/**
+ * The part of the payload that comes from weekly_reviews alone. Split out so
+ * readWeek is not forced to know about the focus table or /api/actions — the
+ * two additions are assembled around it in buildPayload, not inside it.
+ */
+type WeekCore = Pick<WeeklyReviewPayload, "weekKey" | "items" | "ticked">;
+
+async function readWeek(weekKey: string): Promise<WeekCore> {
   const supabase = serviceClient();
   const { data, error } = await supabase.from(TABLE).select(ROW_COLUMNS).eq("week_key", weekKey);
 
@@ -266,6 +296,86 @@ async function readJson(url: string): Promise<Record<string, unknown> | null> {
     if (!response.ok) return null;
     return (await response.json()) as Record<string, unknown>;
   } catch {
+    return null;
+  }
+}
+
+/* ── days since the last real test ───────────────────────────────────────── */
+
+/**
+ * The "N days since …" figure, READ from /api/actions rather than recomputed.
+ *
+ * That route already owns this calculation — app/api/actions/route.ts builds
+ * clock.tests from LAUNCHPAD_GO_LIVE_DATE and the completed-test dates, and
+ * PanelTodos renders it on the dashboard as "N days since last completed test"
+ * / "… since Launchpad go-live". Recomputing it here would put a second answer
+ * to the same question in the codebase, and the two would drift the first time
+ * the go-live setting or the completed-status list changed. Reading the route
+ * means the wall display and this endpoint cannot disagree, by construction.
+ *
+ * Null on any failure. A missing figure is honest; a zero would be a lie that
+ * reads as "a test finished today".
+ */
+async function readLastTest(origin: string): Promise<LastTest | null> {
+  const actions = await readJson(`${origin}/api/actions`);
+  const clock = actions?.clock as Record<string, unknown> | undefined;
+  const tests = clock?.tests as Record<string, unknown> | undefined;
+  if (!tests) return null;
+
+  const daysSince = tests.daysSinceLastCompleted;
+  const testsRun = tests.completed;
+  if (typeof daysSince !== "number" || typeof testsRun !== "number") return null;
+
+  return {
+    daysSince,
+    testsRun,
+    everCompleted: tests.everCompleted === true,
+    since: typeof tests.gapFromDate === "string" ? tests.gapFromDate : "",
+  };
+}
+
+/* ── the one thing ───────────────────────────────────────────────────────── */
+
+const FOCUS_TABLE = "week_focus";
+
+/** Cap on a sentence that has to stay readable on a wall from across a room. */
+const FOCUS_MAX = 280;
+
+/**
+ * True when the failure is "that table does not exist yet".
+ *
+ * public.week_focus is created by hand in the SQL editor, so between this code
+ * deploying and that statement being run the table is genuinely absent. Naming
+ * that case lets the route say so instead of returning an opaque 500 that looks
+ * like a bug in the handler.
+ */
+function isMissingFocusTable(message: string): boolean {
+  return /relation .*week_focus.* does not exist/i.test(message) || message.includes("42P01");
+}
+
+/**
+ * The week's sentence, or null.
+ *
+ * Degrades to null rather than throwing: the focus is one field on a payload
+ * whose main job is the four items, and a missing table must not take the whole
+ * GET — and with it the mission site's tick bar — down with it.
+ */
+async function readFocus(weekKey: string): Promise<string | null> {
+  try {
+    const supabase = serviceClient();
+    const { data, error } = await supabase
+      .from(FOCUS_TABLE)
+      .select("focus")
+      .eq("week_key", weekKey)
+      .maybeSingle();
+
+    if (error) {
+      console.error("[weekly-review] focus read failed:", error.message);
+      return null;
+    }
+    return (data as { focus: string | null } | null)?.focus ?? null;
+  } catch (e) {
+    console.error("[weekly-review] focus read error:", e instanceof Error ? e.message : String(e));
     return null;
   }
 }
@@ -454,20 +564,38 @@ function fail(e: unknown) {
   return json({ error: message }, missingEnv ? 503 : 500);
 }
 
+/**
+ * The whole payload for one week. The single place the response is assembled,
+ * so GET and POST cannot drift into returning different shapes.
+ *
+ * The three reads are concurrent and two of the three degrade to null on their
+ * own, which is what keeps a missing focus table or a slow /api/actions from
+ * delaying — or failing — the part callers actually depend on: the four items.
+ */
+async function buildPayload(weekKey: string, origin: string): Promise<WeeklyReviewPayload> {
+  const [core, focus, lastTest] = await Promise.all([
+    readWeek(weekKey),
+    readFocus(weekKey),
+    readLastTest(origin),
+  ]);
+
+  // `core` is spread first and untouched: items and ticked come through exactly
+  // as the table gave them, with the two new keys added alongside weekKey.
+  return { ...core, focus, lastTest };
+}
+
 /* ── handlers ────────────────────────────────────────────────────────────── */
 
 export async function GET(request: Request) {
   try {
     const weeks = parseWeeks(new URL(request.url).searchParams.get("weeks"));
     const weekKey = currentWeekKey();
-    const payload = await readWeek(weekKey);
+    const body = await buildPayload(weekKey, new URL(request.url).origin);
 
-    // weeks=1 returns EXACTLY the original shape — no `history` key at all, not
-    // an empty one. The mission board reads this response and an added key is a
-    // change it did not ask for.
-    if (weeks <= 1) return json(payload, 200);
+    // weeks=1 still carries no `history` key at all, not an empty one.
+    if (weeks <= 1) return json(body, 200);
 
-    return json({ ...payload, history: await readHistory(weekKey, weeks - 1) }, 200);
+    return json({ ...body, history: await readHistory(weekKey, weeks - 1) }, 200);
   } catch (e) {
     return fail(e);
   }
@@ -488,9 +616,25 @@ export async function POST(request: Request) {
     item_key: bodyItemKey,
     ticked: bodyTicked,
     decision: bodyDecision,
+    focus: bodyFocus,
   } = (body ?? {}) as Record<string, unknown>;
 
-  if (!isItemKey(bodyItemKey)) {
+  const focusProvided = bodyFocus !== undefined;
+
+  if (focusProvided && typeof bodyFocus !== "string") {
+    return json({ error: "focus must be a string when present", weekKey }, 400);
+  }
+
+  /*
+   * A focus-only write carries no item_key, so the item_key check has to be
+   * skipped for it — but ONLY for it. A body with neither an item_key nor a
+   * focus is still the old "unknown item_key" 400, and a body that names an
+   * item_key still has it validated even when a focus rides along. Setting the
+   * week's sentence must never require naming an item it has nothing to do with.
+   */
+  const itemIntended = bodyItemKey !== undefined || !focusProvided;
+
+  if (itemIntended && !isItemKey(bodyItemKey)) {
     return json(
       { error: `Unknown item_key. Expected one of: ${ITEM_KEYS.join(", ")}`, weekKey },
       400,
@@ -540,6 +684,48 @@ export async function POST(request: Request) {
     bodyTicked !== undefined ? (bodyTicked ? "tick" : "untick") : decisionProvided ? "touch" : "tick";
 
   try {
+    /*
+     * FOCUS — written first, and entirely on its own.
+     *
+     * It touches week_focus and never weekly_reviews, so no item row is read,
+     * written or upserted on this path: setting the week's sentence cannot tick
+     * anything, cannot untick anything, and cannot disturb a decision. When a
+     * focus arrives with no item_key the handler stops after this block.
+     */
+    if (focusProvided) {
+      const raw = bodyFocus as string;
+      // Empty string CLEARS. Stored as null so GET's "unset" and "cleared" are
+      // the same answer rather than two states the caller has to tell apart.
+      const focusValue = raw.trim() === "" ? null : raw.slice(0, FOCUS_MAX);
+
+      const { error: focusError } = await serviceClient()
+        .from(FOCUS_TABLE)
+        .upsert(
+          { week_key: weekKey, focus: focusValue, updated_at: new Date().toISOString() },
+          { onConflict: "week_key" },
+        );
+
+      if (focusError) {
+        if (isMissingFocusTable(focusError.message)) {
+          return json(
+            {
+              error:
+                "public.week_focus does not exist yet — run the CREATE TABLE in the Supabase SQL editor",
+              weekKey,
+            },
+            503,
+          );
+        }
+        throw new Error(focusError.message);
+      }
+
+      // Focus-only request: nothing about an item was asked for, so nothing
+      // about an item is touched.
+      if (!isItemKey(bodyItemKey)) {
+        return json(await buildPayload(weekKey, new URL(request.url).origin), 200);
+      }
+    }
+
     const supabase = serviceClient();
 
     // Only the columns this request is actually about. PostgREST's upsert
@@ -619,8 +805,9 @@ export async function POST(request: Request) {
 
     // The whole updated set, read back from the table rather than assembled from
     // what we just sent. The response is then the database's account of the
-    // week, not this handler's optimistic guess at it.
-    return json(await readWeek(weekKey), 200);
+    // week, not this handler's optimistic guess at it — and it is built by the
+    // same function GET uses, so the two can never answer in different shapes.
+    return json(await buildPayload(weekKey, new URL(request.url).origin), 200);
   } catch (e) {
     return fail(e);
   }
