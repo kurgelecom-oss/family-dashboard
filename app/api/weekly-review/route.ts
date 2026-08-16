@@ -470,7 +470,7 @@ async function captureSnapshot(
   weekKey: string,
   itemKey: ItemKey,
 ): Promise<Record<string, unknown>> {
-  const [mission, pocketsmith, homeschool, ecom] = await Promise.all([
+  const [mission, pocketsmith, homeschool, ecom, origins] = await Promise.all([
     readJson(`${origin}/api/mission`),
     readJson(`${origin}/api/pocketsmith`),
     // Only the homeschool tick pays for this read. The week is named
@@ -486,6 +486,12 @@ async function captureSnapshot(
     // nothing here reconciles them, because they are not meant to agree.
     itemKey === "ecom_product_logs"
       ? readJson(`${origin}/api/ecom-products?week_key=${encodeURIComponent(weekKey)}`)
+      : Promise.resolve(null),
+    // Same Sunday–Saturday window as ecom. Note this reads /api/origins-review,
+    // NOT /api/origins — the latter serves OriginsStrip off an ISO Monday week
+    // with no week_key and cannot answer for a named review week.
+    itemKey === "origins_sessions"
+      ? readJson(`${origin}/api/origins-review?week_key=${encodeURIComponent(weekKey)}`)
       : Promise.resolve(null),
   ]);
 
@@ -554,6 +560,23 @@ async function captureSnapshot(
       // the route's own disposition assertion tripping. The tick is what the
       // person is standing there waiting for and it completes regardless.
       ecom,
+    };
+  }
+
+  if (itemKey === "origins_sessions") {
+    return {
+      capturedAt: new Date().toISOString(),
+      weekKey,
+      weekly,
+      finance: legacyFinance,
+      // Passed through verbatim, or null. /api/origins-review owns the window,
+      // the Status-over-Done rule and the action-item proof test; re-deriving
+      // any of it here would put a second answer to the same question in the
+      // codebase — and this one has two columns disagreeing already.
+      //
+      // Null on any failure — a 4s timeout, a Notion outage, a 400, a 500, or
+      // the route's own assertions tripping. The tick completes regardless.
+      origins,
     };
   }
 
