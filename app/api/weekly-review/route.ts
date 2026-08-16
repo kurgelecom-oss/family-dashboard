@@ -350,7 +350,17 @@ const FOCUS_MAX = 280;
  * like a bug in the handler.
  */
 function isMissingFocusTable(message: string): boolean {
-  return /relation .*week_focus.* does not exist/i.test(message) || message.includes("42P01");
+  // Two different components report this, in two different wordings. Postgres
+  // itself raises 42P01 "relation ... does not exist"; PostgREST, which is what
+  // supabase-js actually talks to, answers PGRST205 "Could not find the table
+  // ... in the schema cache" before the query ever reaches Postgres. Matching
+  // only the Postgres form let the real-world case through as an opaque 500.
+  return (
+    /relation .*week_focus.* does not exist/i.test(message) ||
+    /could not find the table .*week_focus/i.test(message) ||
+    message.includes("42P01") ||
+    message.includes("PGRST205")
+  );
 }
 
 /**
