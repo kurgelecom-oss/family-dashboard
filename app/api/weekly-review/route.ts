@@ -470,7 +470,7 @@ async function captureSnapshot(
   weekKey: string,
   itemKey: ItemKey,
 ): Promise<Record<string, unknown>> {
-  const [mission, pocketsmith, homeschool] = await Promise.all([
+  const [mission, pocketsmith, homeschool, ecom] = await Promise.all([
     readJson(`${origin}/api/mission`),
     readJson(`${origin}/api/pocketsmith`),
     // Only the homeschool tick pays for this read. The week is named
@@ -479,6 +479,13 @@ async function captureSnapshot(
     // to instead of whichever one the server happens to think is current.
     itemKey === "homeschool"
       ? readJson(`${origin}/api/homeschool?week_key=${encodeURIComponent(weekKey)}`)
+      : Promise.resolve(null),
+    // Likewise scoped to its own item. Note this route reads a DIFFERENT window
+    // out of the same week_key — Sunday to Saturday inclusive, where homeschool
+    // reads the Mon–Fri before it. Each route owns its own definition and
+    // nothing here reconciles them, because they are not meant to agree.
+    itemKey === "ecom_product_logs"
+      ? readJson(`${origin}/api/ecom-products?week_key=${encodeURIComponent(weekKey)}`)
       : Promise.resolve(null),
   ]);
 
@@ -527,6 +534,26 @@ async function captureSnapshot(
       // regardless; a snapshot missing its numbers is a snapshot, while a tick
       // that would not save because a Notion database was slow is a broken app.
       homeschool,
+    };
+  }
+
+  if (itemKey === "ecom_product_logs") {
+    return {
+      capturedAt: new Date().toISOString(),
+      weekKey,
+      weekly,
+      finance: legacyFinance,
+      // Passed through verbatim, or null — so the five-bucket disposition, the
+      // stale-date count and the week window arrive exactly as the route
+      // computed them, and this block needs no edit when that shape changes.
+      // /api/ecom-products owns the mapping and the assertion that the buckets
+      // account for every row; re-deriving any of it here would put a second
+      // answer to the same question in the codebase.
+      //
+      // Null on any failure — a 4s timeout, a Notion outage, a 400, a 500, or
+      // the route's own disposition assertion tripping. The tick is what the
+      // person is standing there waiting for and it completes regardless.
+      ecom,
     };
   }
 
