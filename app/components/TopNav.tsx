@@ -14,7 +14,6 @@ const LINKS: { label: string; href: string; external?: boolean }[] = [
   { label: "Mission",               href: "https://jade-bombolone-82d172.netlify.app/#board" },
   { label: "ECOM Launchpad",        href: "https://ecom-launchpad-mentor.netlify.app/" },
   { label: "Calculator",            href: "https://kurgel-dashboard.netlify.app/profit.html" },
-  { label: "Ansar · ANSAR FC",      href: "https://ansar-habits-tracker.netlify.app/" },
   { label: "Time Allocation Board", href: "https://kurgel-dashboard.netlify.app/board" },
   { label: "ORIGINS",               href: "https://kurgel-dashboard.netlify.app/origins" },
   { label: "Link Board",            href: "https://luxury-kringle-cf4171.netlify.app/" },
