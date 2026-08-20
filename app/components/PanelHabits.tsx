@@ -225,19 +225,6 @@ export default function PanelHabits() {
     <div className="card">
       <div className="card-header">
         <div className="card-title">Ansar · Habits</div>
-        <a
-          href="https://ansar-habits-tracker.netlify.app/"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            fontSize: 10, color: "var(--amber)", textDecoration: "none",
-            fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase",
-            background: "rgba(245,166,35,0.1)", padding: "2px 7px", borderRadius: 4,
-            border: "1px solid rgba(245,166,35,0.2)", display: "inline-flex",
-          }}
-        >
-          Full page →
-        </a>
       </div>
 
       {/* Hero stats */}
