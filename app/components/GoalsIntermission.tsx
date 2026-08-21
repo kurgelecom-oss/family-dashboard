@@ -322,8 +322,19 @@ function AgeChip({ ageDays }: { ageDays: number | null }) {
 
 /* ── Slide bodies ────────────────────────────────────────────────────────── */
 
-function DailySlide({ owner, points }: { owner: string; points: MissionDailyPoint[] }) {
-  const tone = worstTone(points);
+function DailySlide({
+  owner,
+  points,
+  soften,
+}: {
+  owner: string;
+  points: MissionDailyPoint[];
+  /* During an active cycle week, N's slide keeps its facts (age chips stay
+     truthful) but drops the shouting: the big letter and card accent hold
+     calm cyan instead of escalating to red. */
+  soften?: boolean;
+}) {
+  const tone = soften ? "var(--cyan)" : worstTone(points);
   return (
     <>
       <Kicker text="Today · keep the pressure on" />
@@ -567,6 +578,7 @@ export default function GoalsIntermission() {
   const [rewardIndex, setRewardIndex] = useState(0);
   const [stamp, setStamp] = useState<string | null>(null);
   const [mission, setMission] = useState<MissionPayload | null>(null);
+  const [cycleActive, setCycleActive] = useState(false);
 
   /* Resolved ONCE, then never again — `timing` is the cycle effect's only
      dependency, so anything that re-set it would restart the countdown. */
@@ -619,6 +631,16 @@ export default function GoalsIntermission() {
         if (!cancelled) setMission(payload);
       } catch {
         // Unreachable mission board must not break the overlay.
+      }
+      try {
+        // Same refresh beat as the mission read: while a cycle tracker is
+        // active, N's daily slide is softened (see DailySlide.soften).
+        const res = await fetch("/api/cycle");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setCycleActive(typeof data.activeDay === "number");
+      } catch {
+        // No cycle read → no softening; the deck still runs.
       }
     };
 
@@ -693,11 +715,16 @@ export default function GoalsIntermission() {
 
   const row = rows[rewardIndex % rows.length];
 
+  const softenDaily = (s: Slide) =>
+    s.kind === "daily" && s.owner === "N" && cycleActive;
+
   const accent =
     slide.kind === "reward"
       ? accentOf(row)
       : slide.kind === "daily"
-        ? worstTone(slide.points)
+        ? softenDaily(slide)
+          ? "var(--cyan)"
+          : worstTone(slide.points)
         : slide.kind === "deadline"
           ? deadlineTone(slide.daysLeft)
           : "var(--red)";
@@ -754,7 +781,9 @@ export default function GoalsIntermission() {
           transition,
         }}
       >
-        {slide.kind === "daily" && <DailySlide owner={slide.owner} points={slide.points} />}
+        {slide.kind === "daily" && (
+          <DailySlide owner={slide.owner} points={slide.points} soften={softenDaily(slide)} />
+        )}
         {slide.kind === "deadline" && (
           <DeadlineSlide goal={slide.goal} daysLeft={slide.daysLeft} tests={slide.tests} />
         )}

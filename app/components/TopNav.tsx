@@ -68,6 +68,7 @@ function IncidentCounter() {
    read fails the button still renders — only the pill needs data. */
 function CycleTracker() {
   const [activeDay, setActiveDay] = useState<number | null>(null);
+  const [headsUp, setHeadsUp] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -77,6 +78,9 @@ function CycleTracker() {
         if (!res.ok) return;
         const data = await res.json();
         setActiveDay(typeof data.activeDay === "number" ? data.activeDay : null);
+        // Server only sets expectedInDays inside the ±3-day window and never
+        // while a tracker is active, so presence alone is the signal.
+        setHeadsUp(typeof data.expectedInDays === "number");
       } catch {
         // Unreachable state must not take the nav down; the button stays.
       }
@@ -104,6 +108,7 @@ function CycleTracker() {
 
   return (
     <div className="cycle-wrap">
+      {headsUp && activeDay === null && <span className="cycle-heads-up" />}
       {activeDay !== null && (
         <span className="cycle-pill">day {activeDay} of 7</span>
       )}

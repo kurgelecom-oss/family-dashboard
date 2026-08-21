@@ -1035,8 +1035,24 @@ html, body {
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.35; }
 }
+/* Quiet amber heads-up: the predicted next start is within a few days. Sits
+   left of the button, never together with the pill (server suppresses the
+   prediction while a tracker runs). Unlabeled, like everything else here. */
+.cycle-heads-up {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: 0 0 5px var(--amber);
+  animation: cycle-heads-up-breathe 3s ease-in-out infinite;
+}
+@keyframes cycle-heads-up-breathe {
+  0%, 100% { opacity: 0.9; }
+  50%      { opacity: 0.35; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .cycle-btn, .cycle-pill { animation: none; }
+  .cycle-btn, .cycle-pill, .cycle-heads-up { animation: none; }
 }
 
 /* ── WEEKLY SPEND THRESHOLD GLOW ──────────────────────────────────────────────
