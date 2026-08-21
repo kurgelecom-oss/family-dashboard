@@ -1,15 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import {
-  allocate,
-  readGoals,
-  readGoalsServer,
-  subscribeGoals,
-  sydneyStamp,
-  useBusinessProfit,
-  type GoalRow,
-} from "./PanelTodos";
+import { sydneyStamp } from "./PanelTodos";
 import { SETTING_DEFAULTS, type SettingsMap, getSetting } from "../lib/settings";
 import { HOUSEHOLD_TZ, zoneToday, daysBetween, type CivilDate } from "../lib/time";
 
@@ -18,21 +10,19 @@ import { HOUSEHOLD_TZ, zoneToday, daysBetween, type CivilDate } from "../lib/tim
    every few minutes, shows ONE thing big enough to read across the room, and
    gets out of the way.
 
-   Content is now a PRESSURE DECK, not just rewards. Each appearance shows the
-   next slide in rotation:
+   Content is a PRESSURE DECK — driver messages and directives only. The reward
+   slide was removed 2026-08-21 by request. Each appearance shows the next
+   slide in rotation:
 
      1. TODAY — T        open daily points for T, with age chips
      2. TODAY — N        open daily points for N, with age chips
      3. THE DEADLINE     countdown to the dated monthly goal + weekly counts
      4. PINNED           the pinned board note, verbatim (only when one exists)
-     5. FAMILY REWARD    the original reward card (the carrot stays in the mix)
 
-   Slides 1–4 render the SAME payload the mission board renders — /api/mission,
-   fetched from this origin, never a second derivation. The reward slide still
-   uses allocate() + useBusinessProfit() from PanelTodos over the same store,
-   for the same reason: a surface that contradicts the tracker beside it is
-   worse than no surface at all. If /api/mission is unreachable the deck
-   degrades to reward-only, which is exactly the old behaviour.
+   Every slide renders the SAME payload the mission board renders —
+   /api/mission, fetched from this origin, never a second derivation. If
+   /api/mission is unreachable the deck is empty and the overlay simply never
+   appears — the dashboard underneath is the fallback.
 
    ZERO CURRENCY, same as column C: never a dollar figure on this surface.
    ══════════════════════════════════════════════════════════════════════════ */
@@ -102,11 +92,6 @@ function resolveTiming(settings: SettingsMap | null): Timing {
 
 /** Above TopNav (900), the origins strip (890) and the calendar popover (9999). */
 const OVERLAY_Z = 10000;
-
-const RING_SIZE = 240;
-const RING_STROKE = 14;
-const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
-const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
 /* ── Mission payload (subset) ─────────────────────────────────────────────────
    Local minimal types for what this surface reads out of /api/mission. The
@@ -206,13 +191,11 @@ const STAKES: string[] = [
 type Slide =
   | { kind: "daily"; owner: "T" | "N"; points: MissionDailyPoint[] }
   | { kind: "deadline"; goal: string; daysLeft: number | null; tests: number | null }
-  | { kind: "note"; note: string }
-  | { kind: "reward" };
+  | { kind: "note"; note: string };
 
 /**
  * Build the rotation from the latest mission read. Mission missing or empty →
- * reward-only, the old behaviour. The reward slide is always last, so pressure
- * outnumbers carrot roughly 4:1 when the board is populated.
+ * an empty deck, and the overlay never appears.
  */
 function buildDeck(mission: MissionPayload | null, today: CivilDate): Slide[] {
   const deck: Slide[] = [];
@@ -236,25 +219,8 @@ function buildDeck(mission: MissionPayload | null, today: CivilDate): Slide[] {
     const pinned = mission.notes?.find((x) => x.pinned && x.note.trim() !== "");
     if (pinned) deck.push({ kind: "note", note: pinned.note });
   }
-  deck.push({ kind: "reward" });
   return deck;
 }
-
-/* ── Reward helpers (unchanged) ──────────────────────────────────────────── */
-
-function subtitleOf(row: GoalRow): string {
-  if (row.note) return row.note;
-  if (row.target === null) return "Funded by profit · no target set yet";
-  return "Funded by profit";
-}
-
-function accentOf(row: GoalRow): string {
-  if (row.state === "earned" || row.state === "funded") return "var(--green)";
-  if (row.state === "locked" || row.state === "unset") return "var(--text-muted)";
-  return "var(--cyan)";
-}
-
-const hasPct = (row: GoalRow): boolean => row.note !== undefined || row.target !== null;
 
 /* ── Motion preference as an external store (unchanged) ──────────────────── */
 
@@ -480,102 +446,11 @@ function NoteSlide({ note }: { note: string }) {
   );
 }
 
-function RewardSlide({
-  row,
-  reducedMotion,
-}: {
-  row: GoalRow;
-  reducedMotion: boolean;
-}) {
-  const accent = accentOf(row);
-  const pct = hasPct(row) ? Math.max(0, Math.min(100, row.pct)) : 0;
-  return (
-    <>
-      <Kicker text="Family reward" />
-      {/* Progress ring. Rotated so 0% starts at twelve o'clock. */}
-      <div style={{ position: "relative", width: RING_SIZE, height: RING_SIZE }}>
-        <svg width={RING_SIZE} height={RING_SIZE} style={{ transform: "rotate(-90deg)" }}>
-          <circle
-            cx={RING_SIZE / 2}
-            cy={RING_SIZE / 2}
-            r={RING_RADIUS}
-            fill="none"
-            stroke="var(--progress-track)"
-            strokeWidth={RING_STROKE}
-          />
-          <circle
-            cx={RING_SIZE / 2}
-            cy={RING_SIZE / 2}
-            r={RING_RADIUS}
-            fill="none"
-            stroke={accent}
-            strokeWidth={RING_STROKE}
-            strokeLinecap="round"
-            strokeDasharray={RING_CIRCUMFERENCE}
-            strokeDashoffset={RING_CIRCUMFERENCE * (1 - pct / 100)}
-            style={{
-              transition: reducedMotion ? "none" : `stroke-dashoffset ${FADE_MS}ms ease`,
-            }}
-          />
-        </svg>
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 58,
-            fontWeight: 800,
-            letterSpacing: "-0.03em",
-            fontVariantNumeric: "tabular-nums",
-            color: accent,
-          }}
-        >
-          {hasPct(row) ? `${Math.round(row.pct)}%` : "—"}
-        </div>
-      </div>
-
-      <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: 10 }}>
-        <div
-          style={{
-            fontSize: 46,
-            fontWeight: 800,
-            lineHeight: 1.1,
-            letterSpacing: "-0.02em",
-            color: "var(--text-primary)",
-          }}
-        >
-          {row.label}
-        </div>
-        <div style={{ fontSize: 17, fontWeight: 600, color: accent }}>{subtitleOf(row)}</div>
-      </div>
-
-      {/* The same bar the panel row draws, at wall-display scale. */}
-      <div style={{ width: "min(560px, 72vw)" }}>
-        <div className="progress-track thick">
-          <div
-            className="progress-fill"
-            style={{
-              width: `${pct}%`,
-              background: accent,
-              transition: reducedMotion ? "none" : `width ${FADE_MS}ms ease`,
-            }}
-          />
-        </div>
-      </div>
-    </>
-  );
-}
-
 export default function GoalsIntermission() {
-  const goals = useSyncExternalStore(subscribeGoals, readGoals, readGoalsServer);
-  const profit = useBusinessProfit();
   const reducedMotion = useSyncExternalStore(subscribeMotion, readMotion, readMotionServer);
 
   const [visible, setVisible] = useState(false);
   const [index, setIndex] = useState(0);
-  const [rewardIndex, setRewardIndex] = useState(0);
   const [stamp, setStamp] = useState<string | null>(null);
   const [mission, setMission] = useState<MissionPayload | null>(null);
   const [cycleActive, setCycleActive] = useState(false);
@@ -687,60 +562,37 @@ export default function GoalsIntermission() {
     };
   }, [timing]);
 
-  /* Reward rows — same derivation as the panel, always. */
-  const pot =
-    profit.cumulative === null
-      ? null
-      : (Math.max(0, profit.cumulative) * goals.rewardSplitPct) / 100;
-  const { rows } = allocate(goals, pot, profit.genuineTest);
-
   /* Deck for THIS render. Mission state is only ever set from effects, so the
-     server (and first client render) always sees mission === null → a deck of
-     exactly [reward] → no hydration mismatch and no clock read on the server. */
+     server (and first client render) always sees mission === null → an empty
+     deck → nothing rendered, no hydration mismatch, no clock read on the
+     server. */
   const deck = buildDeck(
     mission,
     mission === null ? { y: 2026, m: 1, d: 1 } : zoneToday(new Date(), HOUSEHOLD_TZ),
   );
+
+  // Nothing to say → never on screen. All hooks are above this line.
+  if (deck.length === 0) return null;
+
   const slide = deck[index % deck.length];
-
-  /* When the reward slide leaves, advance which reward shows next time. */
-  const isReward = slide.kind === "reward";
-  const wasRewardRef = useRef(false);
-  useEffect(() => {
-    if (wasRewardRef.current && !visible) {
-      setRewardIndex((i) => i + 1);
-    }
-    wasRewardRef.current = isReward && visible;
-  }, [visible, isReward]);
-
-  const row = rows[rewardIndex % rows.length];
 
   const softenDaily = (s: Slide) =>
     s.kind === "daily" && s.owner === "N" && cycleActive;
 
   const accent =
-    slide.kind === "reward"
-      ? accentOf(row)
-      : slide.kind === "daily"
-        ? softenDaily(slide)
-          ? "var(--cyan)"
-          : worstTone(slide.points)
-        : slide.kind === "deadline"
-          ? deadlineTone(slide.daysLeft)
-          : "var(--red)";
+    slide.kind === "daily"
+      ? softenDaily(slide)
+        ? "var(--cyan)"
+        : worstTone(slide.points)
+      : slide.kind === "deadline"
+        ? deadlineTone(slide.daysLeft)
+        : "var(--red)";
 
   const transition = reducedMotion
     ? "none"
     : `opacity ${FADE_MS}ms ease, transform ${FADE_MS}ms ease`;
 
-  const footer =
-    slide.kind === "reward"
-      ? profit.error
-        ? "Profit read failed — percentage unknown"
-        : `Goal ${(rewardIndex % rows.length) + 1} of ${rows.length}${
-            stamp ? ` · ${stamp} Sydney` : ""
-          }`
-      : `${STAKES[index % STAKES.length]}${stamp ? ` · ${stamp} Sydney` : ""}`;
+  const footer = `${STAKES[index % STAKES.length]}${stamp ? ` · ${stamp} Sydney` : ""}`;
 
   return (
     <div
@@ -788,7 +640,6 @@ export default function GoalsIntermission() {
           <DeadlineSlide goal={slide.goal} daysLeft={slide.daysLeft} tests={slide.tests} />
         )}
         {slide.kind === "note" && <NoteSlide note={slide.note} />}
-        {slide.kind === "reward" && <RewardSlide row={row} reducedMotion={reducedMotion} />}
 
         <div
           style={{
