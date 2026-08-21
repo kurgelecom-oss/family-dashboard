@@ -60,6 +60,63 @@ function IncidentCounter() {
   );
 }
 
+/* Deliberately unlabeled — a small pulsing red button beside the incident
+   counter. One press starts a 7-day countdown pill ("day X of 7") that flashes
+   red beside it, then everything but the button disappears again. While a
+   tracker is running the button is inert (the API also 409s), so a stray tap
+   cannot restart the count. State lives in Supabase via /api/cycle; if that
+   read fails the button still renders — only the pill needs data. */
+function CycleTracker() {
+  const [activeDay, setActiveDay] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch("/api/cycle");
+        if (!res.ok) return;
+        const data = await res.json();
+        setActiveDay(typeof data.activeDay === "number" ? data.activeDay : null);
+      } catch {
+        // Unreachable state must not take the nav down; the button stays.
+      }
+    };
+    load();
+    const interval = setInterval(load, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const press = async () => {
+    if (activeDay !== null || busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/cycle", { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        setActiveDay(typeof data.activeDay === "number" ? data.activeDay : null);
+      }
+    } catch {
+      // Failed press stays silent on screen; the next tap retries.
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="cycle-wrap">
+      {activeDay !== null && (
+        <span className="cycle-pill">day {activeDay} of 7</span>
+      )}
+      <button
+        type="button"
+        className={activeDay === null ? "cycle-btn" : "cycle-btn cycle-btn-quiet"}
+        onClick={press}
+        aria-label="tracker"
+      />
+    </div>
+  );
+}
+
 export default function TopNav() {
   const [active, setActive] = useState<string | null>(null);
 
@@ -86,6 +143,7 @@ export default function TopNav() {
         </a>
       ))}
       <IncidentCounter />
+      <CycleTracker />
     </nav>
   );
 }
