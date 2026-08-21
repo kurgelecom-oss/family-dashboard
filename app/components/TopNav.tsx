@@ -61,7 +61,7 @@ function IncidentCounter() {
 }
 
 /* Deliberately unlabeled — a small pulsing red button beside the incident
-   counter. One press starts a 7-day countdown pill ("day X of 7") that flashes
+   counter. One press starts a 9-day countdown pill ("day X of 9") that flashes
    red beside it, then everything but the button disappears again. While a
    tracker is running the button is inert (the API also 409s), so a stray tap
    cannot restart the count. State lives in Supabase via /api/cycle; if that
@@ -110,7 +110,7 @@ function CycleTracker() {
     <div className="cycle-wrap">
       {headsUp && activeDay === null && <span className="cycle-heads-up" />}
       {activeDay !== null && (
-        <span className="cycle-pill">day {activeDay} of 7</span>
+        <span className="cycle-pill">day {activeDay} of 9</span>
       )}
       <button
         type="button"

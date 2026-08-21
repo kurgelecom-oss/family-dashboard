@@ -11,10 +11,10 @@ import {
 } from "../../lib/time";
 
 /* ────────────────────────────────────────────────────────────────────────────
-   /api/cycle — the discreet 7-day tracker behind the small red nav button.
+   /api/cycle — the discreet 9-day tracker behind the small red nav button.
 
    Backed by public.cycle_starts (append-only; one row per button press).
-   GET  → current state: activeDay 1–7 while a tracker is running, else null,
+   GET  → current state: activeDay 1–9 while a tracker is running, else null,
           plus expectedInDays when the NEXT start is predicted within ±3 days
           (needs at least two recorded starts to have a gap to average).
    POST → record today (Sydney) as a new start. Refused with 409 while a
@@ -38,8 +38,8 @@ export const revalidate = 0;
 
 const TABLE = "cycle_starts";
 
-/** Days the tracker stays visible, day 1 through day 7 inclusive. */
-const ACTIVE_DAYS = 7;
+/** Days the tracker stays visible, day 1 through day 9 inclusive. */
+const ACTIVE_DAYS = 9;
 
 /** How many recent starts feed the prediction. */
 const HISTORY_LIMIT = 12;
