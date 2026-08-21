@@ -277,7 +277,7 @@ const readMotionServer = (): boolean => false;
 
 function cardBackground(kind: Slide["kind"], accent: string): string {
   const wash = `radial-gradient(120% 120% at 50% 0%, color-mix(in srgb, ${accent} 14%, transparent) 0%, transparent 55%)`;
-  const shade = `linear-gradient(180deg, color-mix(in srgb, var(--bg-card) 88%, transparent) 0%, color-mix(in srgb, var(--bg-card) 97%, transparent) 70%, var(--bg-card) 100%)`;
+  const shade = `linear-gradient(180deg, color-mix(in srgb, var(--bg-card) 62%, transparent) 0%, color-mix(in srgb, var(--bg-card) 82%, transparent) 70%, color-mix(in srgb, var(--bg-card) 94%, transparent) 100%)`;
   const image = `url(/intermission/${kind}.jpg) center / cover no-repeat`;
   return `${wash}, ${shade}, ${image}, var(--bg-card)`;
 }
