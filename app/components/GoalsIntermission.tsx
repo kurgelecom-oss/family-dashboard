@@ -126,11 +126,39 @@ const MAX_DAILY_ROWS = 4;
    the same as one raised this morning.
    ──────────────────────────────────────────────────────────────────────────── */
 
-function ageTone(ageDays: number | null): string {
-  if (ageDays === null) return "var(--text-muted)";
-  if (ageDays >= 7) return "var(--red)";
-  if (ageDays >= 3) return "var(--amber)";
-  return "var(--cyan)";
+/* ── Tones, old-engine-safe ───────────────────────────────────────────────────
+   The wall display is a Samsung Flip Pro whose browser predates color-mix();
+   an unsupported function invalidates the WHOLE declaration it appears in,
+   which is exactly how the backdrop images vanished on the TV. So: solid
+   colours keep reading the theme vars (custom properties are ancient and
+   safe), and every translucent layer uses a numeric rgba() baked from the
+   night palette below. Never reintroduce color-mix() on this surface.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+type ToneKey = "cyan" | "amber" | "red" | "muted";
+
+const TONE_VAR: Record<ToneKey, string> = {
+  cyan: "var(--cyan)",
+  amber: "var(--amber)",
+  red: "var(--red)",
+  muted: "var(--text-muted)",
+};
+
+/** Night-palette channels for the alpha layers: #00d4ff, #f5a623, #e74c3c, #5a6080. */
+const TONE_RGB: Record<ToneKey, string> = {
+  cyan: "0,212,255",
+  amber: "245,166,35",
+  red: "231,76,60",
+  muted: "90,96,128",
+};
+
+const toneRgba = (k: ToneKey, a: number) => `rgba(${TONE_RGB[k]},${a})`;
+
+function ageTone(ageDays: number | null): ToneKey {
+  if (ageDays === null) return "muted";
+  if (ageDays >= 7) return "red";
+  if (ageDays >= 3) return "amber";
+  return "cyan";
 }
 
 function ageLabel(ageDays: number | null): string {
@@ -141,7 +169,7 @@ function ageLabel(ageDays: number | null): string {
 }
 
 /** The slide's accent is its worst item — pressure reads at a glance. */
-function worstTone(points: MissionDailyPoint[]): string {
+function worstTone(points: MissionDailyPoint[]): ToneKey {
   const worst = points.reduce<number>(
     (max, p) => (p.ageDays !== null && p.ageDays > max ? p.ageDays : max),
     0,
@@ -168,11 +196,11 @@ function parseGoalDate(text: string): CivilDate | null {
   return { y: Number(m[3]), m: month, d: Number(m[1]) };
 }
 
-function deadlineTone(daysLeft: number | null): string {
-  if (daysLeft === null) return "var(--cyan)";
-  if (daysLeft <= 7) return "var(--red)";
-  if (daysLeft <= 30) return "var(--amber)";
-  return "var(--cyan)";
+function deadlineTone(daysLeft: number | null): ToneKey {
+  if (daysLeft === null) return "cyan";
+  if (daysLeft <= 7) return "red";
+  if (daysLeft <= 30) return "amber";
+  return "cyan";
 }
 
 /* ── Stakes lines ─────────────────────────────────────────────────────────────
@@ -237,15 +265,47 @@ const readMotionServer = (): boolean => false;
 
 /* ── Shared slide chrome ─────────────────────────────────────────────────────
    One card, one backdrop system. Each slide kind may carry a full-bleed image
-   at /intermission/<kind>.jpg behind a heavy navy gradient; a missing file
-   simply leaves the gradient, so images are droppable assets, not code.
+   at /intermission/<kind>.jpg; a missing file simply leaves the solid card,
+   so images are droppable assets, not code.
+
+   The backdrop is a zIndex:-1 layer INSIDE the card rather than a background
+   shorthand: the card's transform creates a stacking context, so the layer
+   sits above the card's solid background and below every slide element, and
+   the image is dimmed by plain `opacity` — no color-mix, nothing the TV's
+   engine can reject. The accent wash rides the same layer as a radial
+   gradient built from numeric rgba stops.
    ──────────────────────────────────────────────────────────────────────────── */
 
-function cardBackground(kind: Slide["kind"], accent: string): string {
-  const wash = `radial-gradient(120% 120% at 50% 0%, color-mix(in srgb, ${accent} 14%, transparent) 0%, transparent 55%)`;
-  const shade = `linear-gradient(180deg, color-mix(in srgb, var(--bg-card) 62%, transparent) 0%, color-mix(in srgb, var(--bg-card) 82%, transparent) 70%, color-mix(in srgb, var(--bg-card) 94%, transparent) 100%)`;
-  const image = `url(/intermission/${kind}.jpg) center / cover no-repeat`;
-  return `${wash}, ${shade}, ${image}, var(--bg-card)`;
+function CardBackdrop({ kind, tone }: { kind: Slide["kind"]; tone: ToneKey }) {
+  return (
+    <>
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: -1,
+          backgroundImage: `url(/intermission/${kind}.jpg)`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          opacity: 0.32,
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: -1,
+          background: `radial-gradient(120% 120% at 50% 0%, ${toneRgba(tone, 0.16)} 0%, rgba(0,0,0,0) 55%)`,
+        }}
+      />
+    </>
+  );
 }
 
 function Kicker({ text, tone }: { text: string; tone?: string }) {
@@ -274,9 +334,9 @@ function AgeChip({ ageDays }: { ageDays: number | null }) {
         fontWeight: 800,
         letterSpacing: "0.08em",
         fontVariantNumeric: "tabular-nums",
-        color: tone,
-        background: `color-mix(in srgb, ${tone} 14%, transparent)`,
-        border: `1px solid color-mix(in srgb, ${tone} 45%, transparent)`,
+        color: TONE_VAR[tone],
+        background: toneRgba(tone, 0.14),
+        border: `1px solid ${toneRgba(tone, 0.45)}`,
         borderRadius: 999,
         padding: "4px 12px",
       }}
@@ -300,7 +360,7 @@ function DailySlide({
      calm cyan instead of escalating to red. */
   soften?: boolean;
 }) {
-  const tone = soften ? "var(--cyan)" : worstTone(points);
+  const tone = TONE_VAR[soften ? "cyan" : worstTone(points)];
   return (
     <>
       <Kicker text="Today · keep the pressure on" />
@@ -325,7 +385,7 @@ function DailySlide({
               gap: 16,
               padding: "14px 18px",
               borderRadius: 12,
-              background: "color-mix(in srgb, var(--bg-inner) 70%, transparent)",
+              background: "var(--bg-inner)",
               border: "1px solid var(--border)",
             }}
           >
@@ -373,7 +433,7 @@ function DeadlineSlide({
   daysLeft: number | null;
   tests: number | null;
 }) {
-  const tone = deadlineTone(daysLeft);
+  const tone = TONE_VAR[deadlineTone(daysLeft)];
   return (
     <>
       <Kicker text="The deadline" />
@@ -579,14 +639,15 @@ export default function GoalsIntermission() {
   const softenDaily = (s: Slide) =>
     s.kind === "daily" && s.owner === "N" && cycleActive;
 
-  const accent =
+  const accentKey: ToneKey =
     slide.kind === "daily"
       ? softenDaily(slide)
-        ? "var(--cyan)"
+        ? "cyan"
         : worstTone(slide.points)
       : slide.kind === "deadline"
         ? deadlineTone(slide.daysLeft)
-        : "var(--red)";
+        : "red";
+  const accent = TONE_VAR[accentKey];
 
   const transition = reducedMotion
     ? "none"
@@ -608,23 +669,37 @@ export default function GoalsIntermission() {
         // Click-through in every state. This is a wall display, not a modal —
         // it must never swallow a click meant for a panel underneath.
         pointerEvents: "none",
-        background: "color-mix(in srgb, var(--bg-base) 92%, transparent)",
         opacity: visible ? 1 : 0,
         visibility: visible ? "visible" : "hidden",
         transition: reducedMotion ? "none" : `opacity ${FADE_MS}ms ease`,
       }}
     >
+      {/* Dimming scrim as its own layer: solid theme colour + opacity, because
+          the alpha-mixed background it replaces needed color-mix, which the
+          TV's engine rejects (taking the whole declaration with it). */}
       <div
         style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "var(--bg-base)",
+          opacity: 0.92,
+        }}
+      />
+      <div
+        style={{
+          position: "relative",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           gap: 26,
           padding: "48px 64px",
           borderRadius: 20,
-          background: cardBackground(slide.kind, accent),
+          background: "var(--bg-card)",
           border: `1px solid ${accent}`,
-          boxShadow: `0 0 60px color-mix(in srgb, ${accent} 22%, transparent)`,
+          boxShadow: `0 0 60px ${toneRgba(accentKey, 0.25)}`,
           width: slide.kind === "daily" ? "min(900px, 90vw)" : undefined,
           maxWidth: "min(900px, 90vw)",
           maxHeight: "86vh",
@@ -633,6 +708,7 @@ export default function GoalsIntermission() {
           transition,
         }}
       >
+        <CardBackdrop kind={slide.kind} tone={accentKey} />
         {slide.kind === "daily" && (
           <DailySlide owner={slide.owner} points={slide.points} soften={softenDaily(slide)} />
         )}
