@@ -1188,3 +1188,233 @@ html, body {
   .drill-tile { padding: 10px 13px; gap: 6px; border-radius: 6px; }
   .drill-tile::after { min-height: 26px; }
 }
+
+/* ── THE FACE — three rotating frames. RESTRUCTURE-SPEC §3. ──────────────────
+   Appended AFTER every existing rule, including the .drill-tile tiers above:
+   media tiers add no specificity, so face rules must not sit above them. Every
+   colour is a theme token, so the NIGHT/day switch (data-theme on <html>)
+   dims all three frames with no face-specific code. No inline padding on any
+   tile — heroes and lanes are .drill-tile, so the height tiers apply. */
+
+.face-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+}
+
+/* 2px progress line, directly under the Header. The n/3 counter lives in
+   the Header's right cluster (date · time · counter) via its render slot. */
+.face-subheader { flex: none; display: flex; flex-direction: column; gap: 4px; }
+.face-counter {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+}
+.face-counter-cur { color: var(--cyan); font-size: 15px; }
+.face-progressline {
+  height: 2px;
+  background: var(--progress-track);
+  border-radius: 1px;
+  overflow: hidden;
+}
+.face-progressline-fill { height: 100%; width: 0; background: var(--cyan); }
+.face-progressline-fill.animate {
+  animation-name: face-progress;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@keyframes face-progress { from { width: 0; } to { width: 100%; } }
+
+/* a frame — hard cut, fills the space under the subheader */
+.face-frame {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow: hidden;
+  padding: 8px 4px 0;
+}
+.face-spacer { flex: 1; min-height: 0; }
+
+.face-headline {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text-primary);
+  max-width: 1400px;
+}
+.face-headline-muted {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+.face-nextaction {
+  border-left: 3px solid var(--cyan);
+  padding: 6px 0 6px 16px;
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--text-primary);
+  max-width: 1200px;
+}
+
+.face-traction { display: flex; align-items: center; gap: 14px; max-width: 720px; }
+.face-traction-track { flex: 1; }
+.face-traction-label {
+  flex: none;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* shared bits */
+.face-label {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-label);
+}
+.face-context {
+  font-size: 13px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* frame 1 — four chips in a single row */
+.face-chiprow {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.face-chip {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--text-primary);
+  min-width: 0;
+}
+.face-chip-value {
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.face-chip .face-context { flex: 1; text-align: right; }
+
+/* frame 2 — four hero tiles + tomorrow strip */
+.face-herorow {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.face-hero { text-decoration: none; color: var(--text-primary); }
+.face-hero-value {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.face-tomorrow {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  min-height: 48px;
+  padding: 10px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.face-event {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  border-left: 3px solid var(--cyan);
+  padding-left: 10px;
+  min-width: 0;
+}
+.face-event-person { font-size: 12px; font-weight: 800; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+.face-event-time { font-size: 13px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.face-event-subject { font-size: 13px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px; }
+.face-tomorrow-traction {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* frame 3 — three lanes */
+.face-lanerow {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  align-content: start;
+}
+.face-lane { text-decoration: none; color: var(--text-primary); }
+.face-hairline { height: 1px; background: var(--border); flex: none; }
+.face-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
+}
+.face-row-label { font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
+.face-row-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 390px collapse (secondary surface): rows stack, headline shrinks */
+@media (max-width: 768px) {
+  .face-chiprow, .face-herorow, .face-lanerow { grid-template-columns: 1fr 1fr; }
+  .face-headline { font-size: 22px; }
+  .face-nextaction { font-size: 16px; }
+}
+@media (max-width: 480px) {
+  .face-chiprow, .face-herorow, .face-lanerow { grid-template-columns: 1fr; }
+  .face-frame { overflow-y: auto; }
+}
+
+/* short-viewport recovery, mirroring the .drill-tile tiers */
+@media (max-height: 1000px) {
+  .face-frame { gap: 14px; }
+  .face-headline { font-size: 28px; } /* spec size holds at every height */
+}
+@media (max-height: 950px) {
+  .face-frame { gap: 12px; padding-top: 4px; }
+  .face-main { gap: 8px; }
+}

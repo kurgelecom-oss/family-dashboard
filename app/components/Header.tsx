@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 
 // Local hour in Sydney. The hardcoded `getUTCHours() + 10` this replaces was
 // wrong for roughly half the year: Sydney runs UTC+11 during AEDT (early Oct to
@@ -22,7 +22,11 @@ function getAutoTheme(): "day" | "night" {
   return getAestHour() >= 17 ? "night" : "day";
 }
 
-export default function Header() {
+/* `frameCounter` is a render slot for the face's `n/3` frame counter
+   (RESTRUCTURE-SPEC §3: header right = date · time · counter). Routes that
+   don't rotate pass nothing and render exactly as before. Theme/NIGHT/AUTO/
+   LIVE behaviour is untouched. */
+export default function Header({ frameCounter }: { frameCounter?: ReactNode }) {
   const [time, setTime] = useState("");
   const [date, setDate] = useState("");
   const [theme, setTheme] = useState<"day" | "night">("night");
@@ -81,6 +85,7 @@ export default function Header() {
       <div className="header-right">
         <div className="header-date">{date}</div>
         <div className="header-time">{time}</div>
+        {frameCounter}
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <button
             onClick={toggleTheme}

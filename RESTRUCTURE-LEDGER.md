@@ -213,3 +213,39 @@ Files: `app/globals.css` (append only), `app/money/page.tsx`, `app/business/page
 Measured locally (`npm run build` + `next start`, headless Chromium, per tile: lastRow.bottom vs tile content-box bottom): minimum surplus **33px at 1920x936 and 1905x923, 37px at 1920x1080** on every tile of all three routes; pageScroll=0 at all heights; 0px horizontal excess at 390px (document and inner scroller). /money's populated tiles proven with a synthetic in-browser `/api/pocketsmith` intercept (local upstream reads fail in this environment; production reads untouched); its live-data render re-proves on the production verify. Surpluses now differ across heights (33 vs 37) — the tiles demonstrably sit on the tier system. `npx tsc --noEmit` and `npm run build` pass.
 
 Not proven: production state (re-verify after deploy); /business entry-log internal scroll untouched by design.
+
+## 2026-08-25 — Prompt 3 — the face
+
+`/` now renders the three rotating frames (spec §3). Old 4-column grid removed from `app/page.tsx`; the panel components themselves are untouched and still render on their routes. GoalsIntermission, TopNav untouched. Header gained one optional render-slot prop (caller decision, below); its NIGHT/AUTO/LIVE and theme logic are byte-identical.
+
+### Files touched
+
+- `app/components/face/useFaceData.ts` — NEW: the ONE data load. Per-source intervals keep the existing cadences (pocketsmith 10 m, ecom 5 m, actions 5 m, table 5 m, calendar 60 m, habits/Supabase 60 s = AnsarStrip's); frames never fetch. Also `buildFaceModel` (headline rules 1–4 first-match-wins, next gate mirroring /business, test word Stale/Running/None, tomorrow-by-person, traction fill go-live→traction-end) and `fmtMoney` ($0.00 → null, value hidden). Habits streak/today% import the canonical libs (streak.ts; today% = PanelHabits.tsx:220 roster rule) — scoring/streak/gating not touched.
+- `app/components/face/FaceRotator.tsx` — NEW: `DWELL_MS = [10_000, 15_000, 25_000]` (the only dwell constant), hard-cut conditional render, `?view=1|2|3` freeze via location.search (no useSearchParams → no Suspense), visibilitychange pause/resume-at-1, touch-on-anchor navigates / any-other-touch 60 s pause then frame 1. Renders `<Header frameCounter={n/3}>` itself (Header sits outside the pointerdown surface, exactly as when page.tsx rendered it) with only the 2 px progress line beneath.
+- `app/components/face/FaceFrameSentence.tsx`, `FaceFrameNumbers.tsx`, `FaceFrameLanes.tsx` — NEW: frames 1–3 per §3; heroes/lanes are `.drill-tile` anchors (no inline padding; height tiers apply); links Week→/money, Test→/business, Table→/table, Ansar→ansar-habits-tracker.netlify.app, Family lane→/board; chips ≥48px.
+- `app/components/Header.tsx` — optional `frameCounter?: ReactNode` render-slot in the right cluster, after date · time (spec §3: header right = date · time · counter). Purely additive: theme/NIGHT/AUTO/LIVE and clock logic untouched; DrillChrome and every non-rotating route pass nothing and render exactly as before.
+- `app/page.tsx` — face rewritten to GoalsIntermission + FaceRotator (Header renders inside FaceRotator so its right cluster carries the counter); same route.
+- `app/globals.css` — `.face-*` rules APPENDED after the `.drill-tile` tiers (no existing rule or token touched); all colours are theme tokens so NIGHT dims frames by construction; 768/480 px collapse; height-tier trims at 1000/950.
+
+### Decisions taken (report if wrong)
+
+- Counter placement (caller-corrected): the `n/3` counter rides IN the Header's right cluster next to date · time via the `frameCounter` render slot; only the 2 px progress line sits under the header. The earlier strip-under-header counter is removed. Header stays mounted across all three frames (theme/clock state persists); counter appears only on the face.
+- Stale = no running test with entries, OR a Live/Iterating test unfed past TEST_STALE_RED_DAYS; headline rule 1 then uses the matching N. Never-any-entry falls through to rules 3/4 (rule 1's sentence needs an N).
+- Rule-2 headline with a $0-spend running test says "is yet to spend into the $X window" — no $0 on the face.
+- Traction bar fill = elapsed LAUNCHPAD_GO_LIVE_DATE → tractionEndDate (clock exposes no period start).
+- Ansar purple = `#a78bfa` (AnsarStrip's constant), not a new token.
+
+### Measured (local prod build, headless Chromium, synthetic API intercepts + one real-data run)
+
+- 1920x936 / 1905x923 / 1920x1080 × view=1|2|3: page scroll 0/0; min `.drill-tile` surplus 33 px @936/923, 37 px @1080; no `$0` anywhere; counter freezes 1/3·2/3·3/3; headline rule 2 correct on synthetic data, rule 1 correct on real data ("No test is running. Last entry was 48 days ago.").
+- Rotation: counter 1→2→3 at the 10 s/15 s dwells, progress line advances, API counts stayed at ONE fetch per route across the whole loop (no refetch between frames).
+- Touch pause: pointerdown on non-anchor stops the animation and holds the frame past its dwell.
+- 390 px: 0 horizontal excess at all three views (frames scroll internally below 480 px).
+- Counter-in-header re-measure (1920x936, view=1|2|3): `.face-counter` is inside `.header-right`, DOM order date → time → counter, within the header's bounds; frame digit computed `rgb(0, 212, 255)` (= `#00d4ff`); subheader holds ONLY the 2 px progress line; page scroll 0/0; min `.drill-tile` surplus 33 px (frame 1 has no `.drill-tile`); no `$0`; counter advances 1/3 → 2/3 past the 10 s dwell; `/money` `/business` `/table` `/week` `/board` HTML contains no `.face-counter`.
+
+### Not proven
+
+- Production state — deploy + prod verify pending (this prompt did not deploy).
+- 60 s touch-pause RESUME and visibilitychange pause/resume: code-reviewed only (not browser-timed).
+- Night-mode dim: by token construction only; not visually asserted this session.
+- PocketSmith values on the face: local upstream fails in this environment (rows rendered "—"); populated render proven with synthetic intercept only.
