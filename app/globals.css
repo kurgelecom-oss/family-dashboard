@@ -1661,3 +1661,53 @@ html, body {
   .face-lane .face-row-label { font-size: 21px; }
   .face-lane .face-row-value { font-size: 30px; }
 }
+
+/* ── Prompt 5 · Fix 1 — F2 heroes fill + F1 chip clearance + interior insets ─
+   Prod verify (attempt 1, headless Chromium) measured what the local pass did
+   not: per-element boxes. F2's hero cards ended 322–444px (Week/Test) and
+   176–237px (Table/Ansar) above the tomorrow strip and were unequal — the
+   fill relied on TWO fragile mechanisms: a grid auto-row stretching inside a
+   flex-basis-0 item, and the herorow's flex 999 out-growing the sibling
+   .face-spacer's flex 1. Both are engine/timing-sensitive; the verifier's
+   renderer resolved them without the stretch. Replaced with explicit
+   primitives that cannot be resolved any other way:
+   · the spacer is display:none at ≥1280px (frames 1/2 keep it in the DOM for
+     the <1280px base layout), so nothing competes for the frame's free space;
+   · .face-sentence-card and .face-herorow take flex: 1 1 0 outright;
+   · the herorow's single row track is minmax(0, 1fr) — the track IS the
+     container height, items stretch to it, all four cards equal by
+     construction, and the tomorrow strip sits flush below at the frame's
+     20px gap.
+   Interior distribution (taller viewport = breathing room INSIDE cards):
+   label at top; the giant value + its context centred by the value's
+   margin-top:auto against the hairline's existing margin-top:auto, which
+   still pins the info rows to the card bottom; --fill cards keep their
+   centred hero block. Last rows get an 8px inset from the content-box bottom
+   (they sat ~1px off the padding edge) in sentence card, chips, heroes and
+   lanes alike — margins, so no pinned geometry changes by more than 8px.
+   F1 chip clearance lifts from the frame's bottom reserve: 32 → 48px at
+   ≥1280px only (the Fix-3 base 32px holds below), paid for by the sentence
+   card's flexible share — chip band height and 48px touch targets untouched.
+   APPENDED last: every equal-specificity tie resolves to this block. */
+@media (min-width: 1280px) {
+  .face-frame { padding-bottom: 48px; }
+  .face-frame .face-spacer { display: none; }
+
+  /* frame 1 */
+  .face-sentence-card { flex: 1 1 0; }
+  .face-sentence-card > .face-traction { margin-bottom: 8px; }
+  .face-chip { padding-bottom: 26px; }
+  .face-chip > :last-child { margin-bottom: 8px; }
+
+  /* frame 2 */
+  .face-herorow {
+    flex: 1 1 0;
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+  }
+  .face-hero .face-hero-value { margin-top: auto; }
+  .face-hero > .face-row:last-child { margin-bottom: 8px; }
+
+  /* frame 3 */
+  .face-lane > .face-row:last-child { margin-bottom: 8px; }
+}
