@@ -249,3 +249,7 @@ Not proven: production state (re-verify after deploy); /business entry-log inter
 - 60 s touch-pause RESUME and visibilitychange pause/resume: code-reviewed only (not browser-timed).
 - Night-mode dim: by token construction only; not visually asserted this session.
 - PocketSmith values on the face: local upstream fails in this environment (rows rendered "—"); populated render proven with synthetic intercept only.
+
+### Fix 1 — 2026-08-25 — frame 2 clearance floor
+
+Prod verify found frame 2's last leaf (inside `.face-tomorrow`, bottom-pinned by `.face-spacer`) clearing the viewport by only 20.3px at 923/936 — under the 25px floor. Fix: one appended rule at the very end of `globals.css` — `.face-tomorrow { margin-bottom: 12px; }` — the flex spacer absorbs the lift, so no overflow and frames 1/3 are byte-untouched (`.face-tomorrow` renders only in frame 2); no touch target or content changed. Measured locally (prod build, headless Chromium, the verifier's leaf set `.face-context`/`.face-tomorrow-traction`/`.face-row-value`, at 1920x936 · 1905x923 · 1920x1080): view=2 clearance 18.3px before → **30.3px after** at all three heights; view=3 326.6px and page scroll 0/0 at every size/view, both unchanged. `npx tsc --noEmit` and `npm run build` pass. Not proven: production re-verify pending; view=1's local clearance reads 23.8px both before AND after (pre-existing, unchanged by this fix — local data renders chips unpopulated; the prod check passed frame 1 with live data).

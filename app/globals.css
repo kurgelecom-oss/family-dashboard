@@ -1418,3 +1418,10 @@ html, body {
   .face-frame { gap: 12px; padding-top: 4px; }
   .face-main { gap: 8px; }
 }
+
+/* Fix 1 — frame 2 clearance. The tomorrow strip is bottom-pinned by
+   .face-spacer (flex: 1), so its last leaf cleared the viewport by only
+   ~20px at 936/923 — under the 25px floor. Lifting the strip with a
+   bottom margin lets the spacer absorb the difference: no overflow, no
+   change to frames 1/3, touch targets untouched. Frame-2-only. */
+.face-tomorrow { margin-bottom: 12px; }
