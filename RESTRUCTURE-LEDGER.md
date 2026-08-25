@@ -277,3 +277,37 @@ Where the Clock renders now: the ClockPanel COMPONENT is mounted nowhere — no 
 Verified (local prod build, headless Chromium 1920x936): `npx tsc --noEmit` + `npm run build` pass; `/?view=1|2|3`, `/table`, `/money` all render, no `$0.00`, no console error from this change (only the known local PocketSmith 401 → `/api/pocketsmith`//`/api/incident` 500s, pre-existing — diff is one client component). `/money` Rewards tile store proven live: Edit targets → Docklands input write produced `{"targets":{"docklands":4321,…},"people":4,"rewardSplitPct":100}` in `familyGoals.v1`; savedPot sibling key also written; both throwaway values removed after.
 
 Not proven: production state (not deployed this prompt); `/money` populated PocketSmith render (local upstream 401, per prior entries).
+
+## 2026-08-26 — Prompt 5 — face full-bleed redesign
+
+Owner verdict on the shipped frames: far too much blank space (thin headline + dead middles). Two sample directions built by restyling the real local prod build with REAL production API payloads (six `/api/*` bodies fetched from kurgel-dashboard.netlify.app and route-intercepted) and screenshotted at a true 1920x936 viewport — `~/Downloads/face-redesign-{A,B}-frame{1,2,3}.png` (kept). Direction A was implemented first; **the owner then picked Direction B's frame-3 style mid-task** ("i like this … apply to all the 3 but make them unique to their own and not identical layout or structure") — accent bar across the card top, giant hero, muted context, hairline, ~3 label/value rows — so the A block was replaced with the final B-language block before anything was committed. Implemented silhouettes:
+
+- **Frame 1 · sentence-led**: ONE wide cyan-topped card filling the frame — 76px headline (whole-line clamp 2 at ≥1280px), 30px next-action inset on `--bg-base`, traction bar (14px track) pinned to the card bottom — over a full-width band of four accent-topped mini-cards (label · 60px value · context; cyan/amber/text-primary/#a78bfa).
+- **Frame 2 · four accent-topped hero columns** (same order/accents): 80px hero + context; Week and Test also carry hairline + three info rows (Month/Balance/Saved · Campaigns/Next gate/Tests), Table and Ansar centre their hero block (`face-hero--fill`); tomorrow band full-width below, events as `--bg-base` pills, traction days at right.
+- **Frame 3 · the approved sample**: three accent-topped lanes (Money cyan · Business amber · Family #a78bfa), 120px hero, context, hairline, three 56px rows.
+
+### Files touched
+
+- `app/globals.css` — APPEND-ONLY: the working-tree Direction A block replaced by one final `@media (min-width: 1280px)` block after every committed rule (equal-specificity ties resolve to it; base rules keep the 390px collapse; every colour a theme token except the established Ansar purple `#a78bfa`, so NIGHT dims by construction). Key structural rules: `.face-sentence-card` and `.face-herorow` take `flex: 999 1 0` so the base `.face-spacer { flex: 1 }` collapses to ~0 — without this the spacer split the free space 50/50 and clipped 17–61px of hero rows; frame-1 headline clamp tightens 3 → 2 lines at ≥1280px only (whole-line ellipsis; base clamp 3 holds below).
+- `app/components/face/FaceFrameSentence.tsx` — headline/next-action/traction wrapped in `.face-sentence-card` (unstyled below 1280px). DOM otherwise unchanged.
+- `app/components/face/FaceFrameNumbers.tsx` — `Hero` gains optional `rows` (hairline + `face-row`s, Week/Test only) and `face-hero--fill` when rows are absent; local `Row` helper added. Model, links, per-person event caps unchanged.
+- `FaceFrameLanes.tsx`, `FaceRotator.tsx`, `useFaceData.ts`, `Header.tsx` — untouched; mechanics (dwell array, `?view` freeze, visibilitychange, touch-pause, counter, one shared load, Fix-3 32px floor) untouched.
+
+### Discovery worth keeping
+
+- Playwright `browser.newPage({ viewportSize })` is silently ignored — the option is `viewport`. Prior scratchpad scripts (`measure-fix3.mjs` etc.) used `viewportSize`, so their "3 sizes" all actually measured 1280x720. This session's numbers use `viewport` (verified `window.innerWidth === 1920`).
+- `.face-spacer { flex: 1 }` competes with any other `flex: 1` sibling for the frame's free space — a full-height band beside it must out-grow it (`flex: 999 1 0`) or the band gets half the slack and its content clips.
+
+### Measured (local prod build, headless Chromium, {real prod payloads, stressA long-headline + 15 events, stressB long next-action} × 1920x936 · 1905x923 · 1920x1080 × view 1|2|3)
+
+- Lowest text-leaf clearance (936/923 · 1080): frame 1 **59 · 65px** (identical real and both stresses); frame 2 real **71 · 77px**, stressed **67.5 · 73.5px**; frame 3 **74.5 · 80.5px**. All ≥25.
+- Fill: lowest content edge (card boxes) clears the viewport by **38px** at 936/923 and 44px at 1080 in every cell — inside the bottom 15% band, no dead lower half.
+- Interior clipping probe (`scrollHeight/Width` on sentence-card, chips, heroes, lanes, frame): clean in all 9 mode×view cells at 1905x923.
+- Page scroll 0/0 everywhere; no `$0.00`; chips one row, min chip height 193px (≥48); tomorrow strip unclipped; 390x844 horizontal excess 0. `npx tsc --noEmit` and `npm run build` pass.
+- Both themes rendered and eyeballed (screenshots): NIGHT via `themeOverride` — `~/Downloads/face-final-frame{1,2,3}.png` (1920x936, real prod payloads replayed against the local build); DAY copies in the session scratchpad. Accents, hero colours and `--bg-base` insets read correctly in both.
+
+### Not proven
+
+- Production state — not committed/staged/deployed this prompt (per instruction); the final PNGs are the local build fed with today's real production API payloads, not a live-URL capture.
+- Rotation/no-refetch/touch-pause timing not re-timed this session — FaceRotator/useFaceData byte-untouched since Prompt 3's measured pass.
+- Stress "tomorrow" events now compute Sydney tomorrow at run time (scratchpad `stress-payloads.mjs` fix) — the hardcoded date had gone stale overnight and would have emptied the strip in stress runs.

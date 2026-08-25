@@ -45,20 +45,26 @@ export default function FaceFrameSentence({ model }: { model: FaceModel }) {
   const m = model;
   return (
     <div className="face-frame">
-      <div className="face-headline">{m.headline}</div>
+      {/* Owner-approved accent-card language: the sentence, next action and
+          traction bar ride in ONE wide cyan-topped card — frame 1's own
+          silhouette (≥1280px; below that the wrapper is unstyled and the
+          base rules render as before). */}
+      <div className="face-sentence-card">
+        <div className="face-headline">{m.headline}</div>
 
-      {m.nextAction !== null && <div className="face-nextaction">{m.nextAction}</div>}
+        {m.nextAction !== null && <div className="face-nextaction">{m.nextAction}</div>}
 
-      <div className="face-traction">
-        <span className="progress-track thick face-traction-track">
-          <span
-            className="progress-fill"
-            style={{ width: `${m.tractionPct}%`, background: "var(--cyan)" }}
-          />
-        </span>
-        <span className="face-traction-label">
-          {m.tractionDays !== null ? `${m.tractionDays} days left` : "—"}
-        </span>
+        <div className="face-traction">
+          <span className="progress-track thick face-traction-track">
+            <span
+              className="progress-fill"
+              style={{ width: `${m.tractionPct}%`, background: "var(--cyan)" }}
+            />
+          </span>
+          <span className="face-traction-label">
+            {m.tractionDays !== null ? `${m.tractionDays} days left` : "—"}
+          </span>
+        </div>
       </div>
 
       <div className="face-spacer" />

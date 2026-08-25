@@ -18,6 +18,19 @@ import { FACE_PURPLE, type FaceModel } from "./useFaceData";
 
 const MAX_EVENTS_PER_PERSON = 2;
 
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="face-row">
+      <span className="face-row-label">{label}</span>
+      <span className="face-row-value">{value}</span>
+    </span>
+  );
+}
+
+/* Owner-approved accent-card language: each hero is an accent-topped card with
+   the giant value + context; Week and Test additionally carry a hairline and
+   three info rows (the data supports them), while Table and Ansar centre the
+   hero block (`face-hero--fill`) — frame 2's own silhouette. */
 function Hero({
   href,
   external,
@@ -25,6 +38,7 @@ function Hero({
   value,
   context,
   valueColor,
+  rows,
 }: {
   href: string;
   external?: boolean;
@@ -32,10 +46,11 @@ function Hero({
   value: string;
   context: string;
   valueColor?: string;
+  rows?: React.ReactNode;
 }) {
   return (
     <a
-      className="drill-tile face-hero"
+      className={`drill-tile face-hero${rows ? "" : " face-hero--fill"}`}
       href={href}
       {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
     >
@@ -44,6 +59,12 @@ function Hero({
         {value}
       </span>
       <span className="face-context">{context}</span>
+      {rows && (
+        <>
+          <span className="face-hairline" />
+          {rows}
+        </>
+      )}
     </a>
   );
 }
@@ -76,6 +97,13 @@ export default function FaceFrameNumbers({ model }: { model: FaceModel }) {
           value={m.weekSpend ?? "—"}
           context={m.weekEnded !== null ? `week ended ${m.weekEnded}` : "last week"}
           valueColor="var(--cyan)"
+          rows={
+            <>
+              <Row label="Month" value={m.monthSpend ?? "—"} />
+              <Row label="Balance" value={m.balance ?? "—"} />
+              <Row label="Saved" value={m.savedPct ?? "—"} />
+            </>
+          }
         />
         <Hero
           href="/business"
@@ -83,6 +111,13 @@ export default function FaceFrameNumbers({ model }: { model: FaceModel }) {
           value={m.testWord}
           context={m.testContext}
           valueColor={m.testStale ? "var(--red)" : undefined}
+          rows={
+            <>
+              <Row label="Campaigns" value={m.campaigns} />
+              <Row label="Next gate" value={m.nextGate ?? "—"} />
+              <Row label="Tests" value={m.testsLine} />
+            </>
+          }
         />
         <Hero
           href="/table"
