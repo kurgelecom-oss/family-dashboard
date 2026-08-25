@@ -9,7 +9,14 @@ import { FACE_PURPLE, type FaceModel } from "./useFaceData";
    strip (events by person) with traction days at right.
    Heroes are `.drill-tile` anchors — the tail-room and height tiers come from
    globals.css, never inline padding. Every hero links to its route (§3).
+
+   The tomorrow strip is CAPPED at MAX_EVENTS_PER_PERSON per person, with a
+   "+n more" marker per person past the cap — so the strip's height is bounded
+   at any data volume and the frame's 32px bottom reserve holds structurally
+   (Fix 3). Whole events are dropped, never half-clipped.
    ══════════════════════════════════════════════════════════════════════════ */
+
+const MAX_EVENTS_PER_PERSON = 2;
 
 function Hero({
   href,
@@ -43,6 +50,21 @@ function Hero({
 
 export default function FaceFrameNumbers({ model }: { model: FaceModel }) {
   const m = model;
+
+  /* Cap events per person; count what the cap drops, in event order. */
+  const shown: typeof m.tomorrow = [];
+  const dropped = new Map<string, number>();
+  const perPerson = new Map<string, number>();
+  for (const e of m.tomorrow) {
+    const n = perPerson.get(e.person) ?? 0;
+    if (n < MAX_EVENTS_PER_PERSON) {
+      shown.push(e);
+      perPerson.set(e.person, n + 1);
+    } else {
+      dropped.set(e.person, (dropped.get(e.person) ?? 0) + 1);
+    }
+  }
+
   return (
     <div className="face-frame">
       <div className="face-headline-muted">{m.headline}</div>
@@ -82,16 +104,23 @@ export default function FaceFrameNumbers({ model }: { model: FaceModel }) {
 
       <div className="face-tomorrow">
         <span className="face-label">Tomorrow · {m.tomorrowLabel}</span>
-        {m.tomorrow.length === 0 ? (
+        {shown.length === 0 ? (
           <span className="face-context">nothing scheduled</span>
         ) : (
-          m.tomorrow.map((e) => (
-            <span key={e.id} className="face-event" style={{ borderLeftColor: e.colorVar }}>
-              <span className="face-event-person">{e.person}</span>
-              <span className="face-event-time">{e.time}</span>
-              <span className="face-event-subject">{e.subject}</span>
-            </span>
-          ))
+          <>
+            {shown.map((e) => (
+              <span key={e.id} className="face-event" style={{ borderLeftColor: e.colorVar }}>
+                <span className="face-event-person">{e.person}</span>
+                <span className="face-event-time">{e.time}</span>
+                <span className="face-event-subject">{e.subject}</span>
+              </span>
+            ))}
+            {[...dropped.entries()].map(([person, n]) => (
+              <span key={`more-${person}`} className="face-event-more">
+                {person} +{n} more
+              </span>
+            ))}
+          </>
         )}
         <span className="face-tomorrow-traction">
           {m.tractionDays !== null ? `${m.tractionDays} days · traction` : ""}

@@ -423,6 +423,9 @@ export function buildFaceModel(d: FaceData): FaceModel {
   /* ---- tomorrow strip ----------------------------------------------------- */
   const tomorrowIso = isoDate(addDays(zoneToday(new Date()), 1));
   const tomorrow: FaceTomorrowEvent[] = (d.calendar ?? [])
+    /* An unparseable startISO must drop the event, not throw inside format()
+       and blank the whole face (Fix 3 stress run surfaced the crash path). */
+    .filter((e) => !Number.isNaN(new Date(e.startISO).getTime()))
     .filter((e) => SYD_DAY.format(new Date(e.startISO)) === tomorrowIso)
     .map((e) => ({
       id: e.id,

@@ -1433,3 +1433,65 @@ html, body {
    absorbs it: no overflow, chips stay one row at ≥48px, frames 2/3
    byte-untouched (.face-chiprow renders only in frame 1). */
 .face-chiprow { margin-bottom: 16px; }
+
+/* ── Fix 3 — STRUCTURAL clearance floor (supersedes Fix 1 + Fix 2) ──────────
+   Margin lifts failed in production because live data reflows the column:
+   when the headline / next-action wrapped further or the tomorrow strip grew,
+   the flex spacer collapsed to 0 and the bottom-pinned row slid toward the
+   viewport edge — a margin on the last element does not bound its bottom.
+
+   The structural guarantee instead:
+   1. .face-frame is already a fixed-height box (flex:1 inside .face-main
+      inside .dashboard's height: calc(100vh − nav − strip), every link
+      min-height:0 + overflow:hidden, border-box everywhere). A 32px
+      padding-bottom reserves the floor: the spacer pins the last element to
+      the CONTENT-box bottom, i.e. ≥ 32px + .dashboard's padding-bottom above
+      the viewport bottom — by construction, at any data volume.
+   2. Every variable-height region is bounded so the column's content can
+      never exceed the box (which would let it paint into the reserve):
+      · headline / muted headline / next-action clamp at whole lines
+        (ellipsis, never a half-clipped line);
+      · the tomorrow strip is capped in FaceFrameNumbers.tsx at 2 events per
+        person + a "+n more" marker per person — with .face-event-subject's
+        320px cap that bounds the strip at ≤3 wrapped rows at ≥1905px wide;
+      · chips, heroes, lanes and lane rows were already fixed-height
+        (nowrap + ellipsis values).
+   Worst-case bounded column ≈ 330px against a ≥690px frame at 1905x923, so
+   the spacer can never collapse below zero. Fix 1/Fix 2 margins are zeroed —
+   the reserve replaces them. No touch target changes: chips stay ≥48px. */
+.face-frame { padding-bottom: 32px; }
+.face-tomorrow { margin-bottom: 0; }
+.face-chiprow { margin-bottom: 0; }
+
+.face-headline {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+.face-headline-muted {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+/* line-clamp clips at the padding edge, so vertical padding would expose a
+   sliver of the clipped line — move the 6px into margins (flex margins don't
+   collapse, so spacing is unchanged: gap + 6px each side). */
+.face-nextaction {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin: 6px 0;
+}
+
+/* "+n more" marker when the per-person cap drops events — data, not a link */
+.face-event-more {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
