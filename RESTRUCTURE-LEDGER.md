@@ -203,3 +203,13 @@ Built `/money`, `/business`, `/table` (new) and extended `/board`. All four copy
 - Layout at 1905x923 / 1920x936 / 1920x1080 and 390px not browser-measured — production verification step. No `getBoundingClientRect` claims made.
 - PocketSmith deep-link URL shapes (`/transactions/search?search[...]`, `/transactions/uncategorised`, `/account_summary`) taken from PocketSmith's own deep-link generator this session; not clicked through to a logged-in session.
 - `/api/table` GET not exercised against production Notion this session (reads only; token read against 4431302a… verified in Prompt 1).
+
+### Fix 1 — 2026-08-25 — tiles onto the height-tier system
+
+The verifier's layout check failed: tile surpluses on /money, /business, /table were ~1px and identical at 936/923/1080 — the inline `tileStyle` object opted every tile out of height responsiveness (the CLAUDE.md inline-padding failure, on new class). Fix: NEW `.drill-tile` class + `::after` tail-room + two new `@media (max-height)` tiers appended to the END of `globals.css` (after every existing rule; no existing `.card` rule, token, or tier touched). All three pages now use `className="drill-tile"`; the inline `tileStyle` objects are deleted, and no tile carries inline padding/gap.
+
+Files: `app/globals.css` (append only), `app/money/page.tsx`, `app/business/page.tsx`, `app/table/page.tsx`.
+
+Measured locally (`npm run build` + `next start`, headless Chromium, per tile: lastRow.bottom vs tile content-box bottom): minimum surplus **33px at 1920x936 and 1905x923, 37px at 1920x1080** on every tile of all three routes; pageScroll=0 at all heights; 0px horizontal excess at 390px (document and inner scroller). /money's populated tiles proven with a synthetic in-browser `/api/pocketsmith` intercept (local upstream reads fail in this environment; production reads untouched); its live-data render re-proves on the production verify. Surpluses now differ across heights (33 vs 37) — the tiles demonstrably sit on the tier system. `npx tsc --noEmit` and `npm run build` pass.
+
+Not proven: production state (re-verify after deploy); /business entry-log internal scroll untouched by design.

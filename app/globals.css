@@ -1149,3 +1149,42 @@ html, body {
     text-shadow: none;
   }
 }
+
+/* ── DRILL-DOWN TILES (/money, /business, /table) ──────────────────
+   The drill-down routes' tiles. Sizing lives HERE, never inline: inline
+   padding/gap beats any stylesheet rule regardless of specificity and would
+   silently opt the tile out of the height tiers below (the exact failure
+   CLAUDE.md records for `.card`).
+
+   The ::after pseudo-element is a real flex child at the tail of every tile,
+   so the last content row always finishes a full tail-room above the tile's
+   content-box bottom — the +25px clearance floor is structural, not
+   measured-and-hoped. It is not an element child, so scripts reading
+   lastElementChild still see the true last row.
+
+   Tiers must sit after the base rule: a media query adds no specificity, so
+   source order decides. */
+.drill-tile {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.drill-tile::after {
+  content: "";
+  display: block;
+  flex: 0 0 auto;
+  min-height: 28px;
+}
+@media (max-height: 1000px) {
+  .drill-tile { padding: 12px 14px; gap: 7px; }
+  .drill-tile::after { min-height: 26px; }
+}
+@media (max-height: 950px) {
+  .drill-tile { padding: 10px 13px; gap: 6px; border-radius: 6px; }
+  .drill-tile::after { min-height: 26px; }
+}

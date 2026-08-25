@@ -117,18 +117,10 @@ function breakevenRoas(revenue: number, cogs: number): number | null {
   return 1 / marginRatio;
 }
 
-/* ── Tiles ────────────────────────────────────────────────────────────────── */
-
-const tileStyle: CSSProperties = {
-  background: "var(--bg-card)",
-  border: "1px solid var(--border)",
-  borderRadius: 8,
-  padding: "14px 16px",
-  display: "flex",
-  flexDirection: "column",
-  gap: 8,
-  minWidth: 0,
-};
+/* ── Tiles ────────────────────────────────────────────────────────────────────
+   Tiles are `.drill-tile` (globals.css) — sizing lives in the stylesheet so the
+   drill-tile height tiers apply. Never reintroduce inline padding/gap here:
+   inline styles beat the @media tiers (CLAUDE.md). */
 
 function Row({
   label,
@@ -492,7 +484,7 @@ export default function BusinessPage() {
         }}
       >
         {/* ── Active test tile ─────────────────────────────────────────────── */}
-        <div style={tileStyle}>
+        <div className="drill-tile">
           <div
             style={{
               display: "flex",
@@ -713,7 +705,7 @@ export default function BusinessPage() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
           {/* ── P&L tile ───────────────────────────────────────────────────── */}
-          <div style={tileStyle}>
+          <div className="drill-tile">
             <div
               style={{
                 display: "flex",
@@ -771,7 +763,7 @@ export default function BusinessPage() {
           </div>
 
           {/* ── Product tests tile ─────────────────────────────────────────── */}
-          <div style={tileStyle}>
+          <div className="drill-tile">
             <div className="card-title">Product tests</div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
               <span

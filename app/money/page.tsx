@@ -170,18 +170,10 @@ function subscribePotOverride(onChange: () => void): () => void {
   };
 }
 
-/* ── Small pieces ─────────────────────────────────────────────────────────── */
-
-const tileStyle: CSSProperties = {
-  background: "var(--bg-card)",
-  border: "1px solid var(--border)",
-  borderRadius: 8,
-  padding: "14px 16px",
-  display: "flex",
-  flexDirection: "column",
-  gap: 8,
-  minWidth: 0,
-};
+/* ── Small pieces ─────────────────────────────────────────────────────────────
+   Tiles are `.drill-tile` (globals.css) — sizing lives in the stylesheet so the
+   drill-tile height tiers apply. Never reintroduce inline padding/gap here:
+   inline styles beat the @media tiers (CLAUDE.md). */
 
 function TileTitle({ children, badge }: { children: string; badge?: string }) {
   return (
@@ -204,7 +196,7 @@ function StatTile({
   sub?: string;
 }) {
   return (
-    <div style={tileStyle}>
+    <div className="drill-tile">
       <div className="card-title">{label}</div>
       <div
         style={{
@@ -286,7 +278,7 @@ function RewardsTile() {
   const { rows, totalTarget, overallPct } = allocate(state, pot, profit.genuineTest);
 
   return (
-    <div style={tileStyle}>
+    <div className="drill-tile">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <div className="card-title">Rewards</div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -664,7 +656,7 @@ export default function MoneyPage() {
       ) : null}
 
       {!data && !error ? (
-        <div style={{ ...tileStyle, color: "var(--text-secondary)", fontSize: 15 }}>
+        <div className="drill-tile" style={{ color: "var(--text-secondary)", fontSize: 15 }}>
           Loading money…
         </div>
       ) : null}
@@ -686,7 +678,7 @@ export default function MoneyPage() {
               tone="var(--green)"
               sub={rangeLabel(current.now.startDate, current.now.endDate)}
             />
-            <div style={tileStyle}>
+            <div className="drill-tile">
               <div className="card-title">Spent</div>
               <div
                 style={{
@@ -726,7 +718,7 @@ export default function MoneyPage() {
               flexShrink: 0,
             }}
           >
-            <div style={tileStyle}>
+            <div className="drill-tile">
               <TileTitle badge={rangeLabel(current.now.startDate, current.now.endDate)}>
                 Categories
               </TileTitle>
@@ -831,7 +823,7 @@ export default function MoneyPage() {
               ) : null}
             </div>
 
-            <div style={tileStyle}>
+            <div className="drill-tile">
               <TileTitle>Accounts</TileTitle>
               {data.accounts.map((a, i) => (
                 <a

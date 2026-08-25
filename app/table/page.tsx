@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState } from "react";
 import DrillChrome from "../components/DrillChrome";
 import { isActionsPayload } from "../lib/payload-guards";
 import type { TablePayload, TableDecision } from "../api/table/route";
@@ -85,16 +85,9 @@ function startHereQuestion(data: TablePayload): string {
   return "Nothing on the table. Run the check-in short?";
 }
 
-const tileStyle: CSSProperties = {
-  background: "var(--bg-card)",
-  border: "1px solid var(--border)",
-  borderRadius: 8,
-  padding: "14px 16px",
-  display: "flex",
-  flexDirection: "column",
-  gap: 8,
-  minWidth: 0,
-};
+/* Tiles are `.drill-tile` (globals.css) — sizing lives in the stylesheet so the
+   drill-tile height tiers apply. Never reintroduce inline padding/gap on a
+   tile: inline styles beat the @media tiers (CLAUDE.md). */
 
 function DecisionRow({
   decision,
@@ -429,7 +422,7 @@ export default function TablePage() {
 
       {/* Start here — one question, cyan left border. */}
       {data ? (
-        <div style={{ ...tileStyle, borderLeft: "4px solid var(--cyan)", flexShrink: 0 }}>
+        <div className="drill-tile" style={{ borderLeft: "4px solid var(--cyan)", flexShrink: 0 }}>
           <div className="card-title">Start here</div>
           <div
             style={{
@@ -443,7 +436,7 @@ export default function TablePage() {
           </div>
         </div>
       ) : !dataError ? (
-        <div style={{ ...tileStyle, color: "var(--text-secondary)", fontSize: 15 }}>
+        <div className="drill-tile" style={{ color: "var(--text-secondary)", fontSize: 15 }}>
           Loading the table…
         </div>
       ) : null}
@@ -458,7 +451,7 @@ export default function TablePage() {
         }}
       >
         {/* On the table — every open decision, oldest first. */}
-        <div style={{ ...tileStyle, gap: 8 }}>
+        <div className="drill-tile">
           <div
             style={{
               display: "flex",
@@ -493,7 +486,7 @@ export default function TablePage() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
           {/* Closed since yesterday. */}
-          <div style={tileStyle}>
+          <div className="drill-tile">
             <div
               style={{
                 display: "flex",
@@ -551,7 +544,7 @@ export default function TablePage() {
           </div>
 
           {/* The clock. */}
-          <div style={tileStyle}>
+          <div className="drill-tile">
             <div
               style={{
                 display: "flex",
