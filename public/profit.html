@@ -1095,6 +1095,24 @@
   applyAuto();
   paintAll();
   render();
+
+  // Deep link from /business: /profit.html?test=<uuid> starts the page in Auto
+  // mode with the test UUID prefilled, then loads the product exactly as if the
+  // Load button had been pressed. Loading real figures flips the Auto pills off
+  // — that is the page's own behaviour, untouched. A missing or malformed UUID
+  // leaves the page exactly as it inits today.
+  (function(){
+    var qs = new URLSearchParams(window.location.search);
+    var t = (qs.get("test") || "").trim();
+    if(!t || !UUID_RE.test(t)) return;
+    $("productId").value = t;
+    setAuto("cogs", true);
+    setAuto("ads", true);
+    applyAuto();
+    paintAll();
+    render();
+    loadProduct();
+  })();
 })();
 </script>
 </body>

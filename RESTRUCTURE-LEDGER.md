@@ -167,3 +167,39 @@ Currency formatting: **no shared helper.** `fmtExact()` exists only in orphaned 
 - Notion **write** to `4431302a…` not attempted (spec's only write lands in a later prompt; test with a throwaway row then).
 - `/api/net-position`, `/api/shopify`, `/api/budget/*`, `/api/todos`, `/api/homeschool` sources listed but internals not read line-by-line this session.
 - The face is a client shell with per-panel fetching — "one data load on the face" (spec §2) does not exist yet; it must be built.
+
+## 2026-08-25 — Prompt 2 — drill-down routes
+
+Built `/money`, `/business`, `/table` (new) and extended `/board`. All four copy the /board route pattern (client page, own load fn + interval, full-viewport scroll container under nav + strip), carry a back link to `/` and a Sydney date/time via Intl, and use 48px-minimum touch targets. `npx tsc --noEmit` and `npm run build` pass; all four routes present in the build manifest.
+
+### Files touched
+
+- `app/components/DrillChrome.tsx` — NEW: shared back link + Sydney clock + drill-down header row.
+- `app/money/page.tsx` — NEW: period toggle Week · Month · 3 months (default Week); Earned/Spent(+tx count, change vs prior)/Saved tiles; Categories tile (bars, Uncategorised amber, tap → PocketSmith transaction search URL for category+period); Accounts tile (negatives red, hairline, cyan total, tap → PocketSmith account summary); Rewards tile (five goals with $ and %, Edit targets, editable saved pot). Rewards reuses PanelTodos's exported store/allocate/useBusinessProfit — the goals logic was not rewritten.
+- `app/api/pocketsmith/route.ts` — ADDITIVE: `lastQuarter`/`previousQuarter` PeriodSummary (last 3 complete calendar months + prior 3). Nothing above the new fields changed; HEAD comparison build confirms the route's ƒ rendering mode is unchanged.
+- `app/components/PanelTodos.tsx` — one-word change: `export` on `writeGoals` so /money edits targets through the same `familyGoals.v1` store. No other line touched.
+- `app/business/page.tsx` — NEW: campaign pill (amber when none live); active test tile (name/day/last entry/days silent/Stale·Running, Open in Launchpad, Open in calculator `/profit.html?test=<uuid>`, spend-vs-window bar with floor marker, ROAS red under breakeven, Breakeven, Next gate, entry log newest-first scrolling); selector only when >1 running test; P&L tile (Revenue, COGS + unverified flag, Ad spend settled, hairline, Contribution); product tests tile (`N of 3`, days since go-live, queue = Launchpad Setup-status tests that never spent — excludes the backtest fixture, which has `first_spend_at`).
+- `public/profit.html` — ADDITIVE: `?test=<uuid>` deep link prefills the UUID, switches Auto pills on, triggers the existing load. No existing function changed.
+- `app/api/table/route.ts` — NEW GET: open decisions (oldest first), closed-since-yesterday, Monthly milestone from Mission Goals, Launchpad test summary. force-dynamic/no-store.
+- `app/api/table/close/route.ts` — NEW POST: the restructure's only write. PATCHes the Notion row: `Outcome` rich_text = `"<text> — closed YYYY-MM-DD"` (Sydney) and `Status` → `Closed`. Built and typechecked only; NOT exercised against any row.
+- `app/table/page.tsx` — NEW: owner filter All·T·N, Raise item (link to the Notion database — raising stays a Notion edit; Close is the only API write), Start-here panel (headline rules 1–4 as questions, first match wins), decision rows (question form, owner, purple day count, purple left border at 7+ days, expanded Closed-when + outcome input + Close), closed-since-yesterday tile (exact fallback text `Nothing was closed yesterday.`), clock tile (week days, traction days, year %, tests N of 3) fed by `/api/actions`.
+- `app/api/calendar/route.ts` — ADDITIVE: `webLink` in `$select` and payload, so calendar-band blocks can open the event.
+- `app/components/CalendarBand.tsx` — NEW: person × (Today · Tomorrow) grid, Sydney days via Intl, coloured left borders, `—` empty cells, tap → event webLink.
+- `app/components/AnsarStrip.tsx` — NEW: purple day streak, points today, week / 55 (WEEKLY_MAX imported from scoring.ts), progress bar, `Open his dashboard` link. Scoring/streak imported from the canonical libs, never copied or edited.
+- `app/board/page.tsx` — bands region inserted ABOVE the existing header: back link + Sydney clock row, CalendarBand, AnsarStrip. Everything from the existing header down is untouched; BOARD-SPEC content unchanged.
+
+### Decisions taken (report if wrong)
+
+- **Closed date lives inside Outcome.** The live Daily Discussion Points schema (read back this session) has NO closed-date property and NO "Closed when" property — only Point/Owner/Pillar/Type/Raised/Status/Outcome. Close therefore stamps `— closed YYYY-MM-DD` into Outcome and flips Status to Closed; /api/table parses the stamp back (falls back to last_edited_time in Sydney). "Closed when:" renders `— not set in Notion` until the property exists.
+- **Saved-pot override is a sibling localStorage key** `familyGoals.savedPot.v1`, not a field inside `familyGoals.v1`: the face's normalise-on-write emits only targets/people/rewardSplitPct and would silently drop an extra field. Computed pot (profit × split) stays the default; override is explicit and clearable.
+- **"Validated-not-run" queue** = Launchpad tests with status `Setup` and `first_spend_at` null (the permanent backtest fixture has `first_spend_at`, so it self-excludes). `validated` is null on every live record, so status is the only signal.
+- **Open in Launchpad** links to the site root — no per-test deep-link format is known for the Launchpad frontend.
+- **3 months** = last three complete calendar months (ends where Last Month ends), prior three as comparison.
+
+### Not proven
+
+- The Close write has NOT been exercised against any Notion row (per spec: throwaway-row test happens in the separate verification step). Property names `Outcome`/`Status` are confirmed against the live schema; the write path itself is typechecked only.
+- `?test=` prefill in profit.html not exercised in a browser this session.
+- Layout at 1905x923 / 1920x936 / 1920x1080 and 390px not browser-measured — production verification step. No `getBoundingClientRect` claims made.
+- PocketSmith deep-link URL shapes (`/transactions/search?search[...]`, `/transactions/uncategorised`, `/account_summary`) taken from PocketSmith's own deep-link generator this session; not clicked through to a logged-in session.
+- `/api/table` GET not exercised against production Notion this session (reads only; token read against 4431302a… verified in Prompt 1).

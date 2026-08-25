@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import WeekProgressStrip from "../components/WeekProgressStrip";
+import CalendarBand from "../components/CalendarBand";
+import AnsarStrip from "../components/AnsarStrip";
+import { BackLink, SydneyClock } from "../components/DrillChrome";
 import type { Block, BoardPayload } from "../api/board/route";
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -525,6 +528,27 @@ export default function BoardPage() {
         gap: 12,
       }}
     >
+      {/* ── RESTRUCTURE bands (spec §4) — everything BELOW this block is the
+          board exactly as BOARD-SPEC.md defines it, untouched. The bands sit
+          above it: back link + Sydney date/time, the calendar band, then the
+          Ansar strip. All flexShrink 0, same as the banners, so the fixed-height
+          scroll container cannot squash them. ─────────────────────────────── */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+          flexShrink: 0,
+        }}
+      >
+        <BackLink />
+        <div style={{ flex: 1, minWidth: 0 }} />
+        <SydneyClock />
+      </div>
+      <CalendarBand />
+      <AnsarStrip />
+
       <div className="header">
         <div className="header-brand">
           <div className="header-name">

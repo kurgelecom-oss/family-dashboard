@@ -758,7 +758,7 @@ export function readGoals(): GoalsState {
 /** The server has no storage, so it always renders the unset state. */
 export const readGoalsServer = (): GoalsState => EMPTY_GOALS;
 
-function writeGoals(next: GoalsState): void {
+export function writeGoals(next: GoalsState): void {
   goalsCache = next;
   try {
     window.localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(next));

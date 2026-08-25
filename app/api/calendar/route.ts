@@ -22,6 +22,8 @@ type CalEvent = {
   end:   { dateTime: string; timeZone: string };
   isAllDay?: boolean;
   isOrganizer?: boolean;
+  /** Outlook web URL for the event — what "tap → the event" opens. */
+  webLink?: string;
 };
 
 // Graph returns calendarView times in UTC but with NO offset in the string
@@ -66,7 +68,7 @@ async function fetchEvents(accessToken: string, startISO: string, endISO: string
   const url = new URL("https://graph.microsoft.com/v1.0/me/calendarView");
   url.searchParams.set("startDateTime", startISO);
   url.searchParams.set("endDateTime", endISO);
-  url.searchParams.set("$select", "id,subject,start,end,isAllDay,isOrganizer");
+  url.searchParams.set("$select", "id,subject,start,end,isAllDay,isOrganizer,webLink");
   url.searchParams.set("$orderby", "start/dateTime");
   url.searchParams.set("$top", "20");
 
@@ -104,6 +106,7 @@ export async function GET() {
     account: string;
     email: string;
     color: string;
+    webLink?: string;
   }> = [];
 
   const errors: string[] = [];
@@ -130,6 +133,7 @@ export async function GET() {
           account:  account.key,
           email:    account.email,
           color:    account.color,
+          webLink:  e.webLink,
         });
       });
     } catch (err) {

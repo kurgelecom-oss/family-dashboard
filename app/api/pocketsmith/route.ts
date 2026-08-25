@@ -714,6 +714,18 @@ export async function GET() {
     const lastMonthWindow = calendarMonth(today, 1);
     const previousMonthWindow = calendarMonth(today, 2);
 
+    // The /money drill-down's "3 months" period: the last three COMPLETE
+    // calendar months, ending where LAST MONTH ends, with the three months
+    // before that as its comparison window. Additive — nothing above reads it.
+    const lastQuarterWindow: DateWindow = {
+      start: calendarMonth(today, 3).start,
+      end: calendarMonth(today, 1).end,
+    };
+    const previousQuarterWindow: DateWindow = {
+      start: calendarMonth(today, 6).start,
+      end: calendarMonth(today, 4).end,
+    };
+
     const [
       accountsRaw,
       categoryTree,
@@ -724,6 +736,8 @@ export async function GET() {
       previousWeek,
       lastMonth,
       previousMonth,
+      lastQuarter,
+      previousQuarter,
     ] = await Promise.all([
       fetchAllPages<PsAccount>(`${BASE_URL}/users/${USER_ID}/accounts`, cacheSeconds),
       fetchAllPages<PsCategory>(`${BASE_URL}/users/${USER_ID}/categories`, cacheSeconds),
@@ -744,6 +758,8 @@ export async function GET() {
       fetchPeriod(previousWeekWindow, cacheSeconds),
       fetchPeriod(lastMonthWindow, cacheSeconds),
       fetchPeriod(previousMonthWindow, cacheSeconds),
+      fetchPeriod(lastQuarterWindow, cacheSeconds),
+      fetchPeriod(previousQuarterWindow, cacheSeconds),
     ]);
 
     /* ---- control classes ------------------------------------------------- */
@@ -907,6 +923,9 @@ export async function GET() {
       previousWeek,
       lastMonth,
       previousMonth,
+      // ADDITIVE — the /money drill-down's 3-month period and its prior.
+      lastQuarter,
+      previousQuarter,
 
       accounts: panelAccounts,
       totalBalance,
