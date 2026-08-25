@@ -40,9 +40,9 @@ Sequence rule: nothing moves between frames without a reason. Header identical i
 
 | Frame | Dwell | Contents |
 |---|---|---|
-| 1 · Sentence | 10 s | Headline sentence (28px). Next-action line with cyan left border. Traction bar with days left. Four chips in a single row, fixed order: Week · Test · Table · Ansar. |
-| 2 · Four numbers | 15 s | Headline as one muted line. Four hero tiles in chip order, each: label, 30px value, one context line. Below: tomorrow strip (events by person) with traction days at right. |
-| 3 · Three lanes | 25 s | Headline as one muted line. Three tiles: Money, Business, Family. Each: label, 30px hero, one context line, hairline, three label/value rows. |
+| 1 · Sentence | 10 s | Headline sentence (76px; owner-directed full-bleed amendment, 2026-08-26). Next-action line with cyan left border. Traction bar with days left. Four chips in a single row, fixed order: Week · Test · Table · Ansar. |
+| 2 · Four numbers | 15 s | Headline as one muted line. Four hero tiles in chip order, each: label, 80px value, one context line. Below: tomorrow strip (events by person) with traction days at right. |
+| 3 · Three lanes | 25 s | Headline as one muted line. Three tiles: Money, Business, Family. Each: label, 80px hero, one context line, hairline, three label/value rows. |
 
 Chip → hero → lane mapping:
 
