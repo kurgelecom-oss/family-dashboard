@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { SETTING_DEFAULTS, type SettingsMap, getSetting } from "../lib/settings";
 import { isActionsPayload } from "../lib/payload-guards";
 import {
@@ -10,19 +10,20 @@ import {
 } from "../lib/launchpad";
 
 /* ════════════════════════════════════════════════════════════════════════════
-   Column C — FAMILY GOALS / THE CLOCK.
+   Column C — THE CLOCK, plus the family-goals STORE.
 
-   Two panels. Family Goals keeps its TARGETS in localStorage but no longer
-   holds a hand-typed savings figure: the money side is funded from realised
-   business profit read live from Launchpad. THE CLOCK still reads
-   GET /api/actions — which is why this file keeps fetching that route even
-   though the Actions panel it used to feed has been removed from this column.
-   The route itself is untouched and still serves its other data.
+   The Family Goals PANEL is gone (RESTRUCTURE-SPEC §5): reward goals render on
+   /money now, and Column C's content on the TV is carried by the Table chip /
+   hero / Family lane. What survives here is:
 
-   Goals and time only: this column renders ZERO currency in its panel bodies by
-   design. Money lives in column B. The one sanctioned exception is the Family
-   Goals Edit toggle, which reveals the amount inputs on demand; if a dollar
-   figure shows up anywhere else here, something is wired to the wrong payload.
+   - The goals STORE — localStorage `familyGoals.v1` via readGoals / writeGoals /
+     subscribeGoals, the allocate() waterfall, and useBusinessProfit (the
+     Launchpad-funded pot). /money imports all of it; the storage key and
+     behaviour are unchanged.
+   - ClockPanel — the Clock sub-panel, exactly as it was. It reads
+     GET /api/actions; the same `data.clock` payload feeds the face's traction
+     bar, the Family lane's Traction row (via useFaceData) and /table's clock
+     tile. The route itself is untouched.
    ══════════════════════════════════════════════════════════════════════════ */
 
 interface ActionItem {
@@ -150,26 +151,19 @@ function ClockStat({ value, label, tone }: { value: string; label: string; tone?
   );
 }
 
-/* ── Panel 1 — FAMILY GOALS ───────────────────────────────────────────────────
+/* ── The family-goals STORE (no panel — /money renders the UI) ────────────────
    Five goals, funded two different ways.
 
-   FOUR are auto-funded from money the business actually made. Nothing here is
-   typed by hand any more: the reward pot is a split of cumulative contribution
-   profit read live from Launchpad (see useBusinessProfit below), poured
-   top-down through the targets. A hand-entered "saved so far" was the previous
-   model and is gone — it let the panel claim progress no bank account backed.
+   FOUR are auto-funded from money the business actually made: the reward pot
+   is a split of cumulative contribution profit read live from Launchpad (see
+   useBusinessProfit below), poured top-down through the targets. ONE — Night
+   out — is behaviour-linked: earned by running product test #1, no dollar
+   target, no share of the pot.
 
-   ONE — Night out — is behaviour-linked, not money-linked. It is earned by
-   running product test #1 and nothing else, so it carries no dollar target and
-   takes no share of the pot.
-
-   Zero currency in the body, per the column rule: every goal row shows a bar, a
-   percentage and a state — never a dollar figure. The amounts live behind the
-   Edit toggle, the only place a "$" is allowed to appear.
-
-   Targets stay browser-local (localStorage) — there is no goals API, so targets
-   do not sync between devices. The funding side does: it is derived from the
-   same Launchpad data every screen reads.
+   Targets stay browser-local (localStorage `familyGoals.v1`) — there is no
+   goals API, so targets do not sync between devices. The funding side does: it
+   is derived from the same Launchpad data every screen reads. /money's Rewards
+   tile is the only consumer of this store.
    ──────────────────────────────────────────────────────────────────────────── */
 
 const GOALS_STORAGE_KEY = "familyGoals.v1";
@@ -265,31 +259,6 @@ function normaliseGoals(v: unknown): GoalsState {
 
 type GoalState = "funded" | "progress" | "next" | "pending" | "unset" | "earned" | "locked";
 
-const STATE_META: Record<GoalState, { label: string; cls: string; tone?: string; bar: string }> = {
-  funded: { label: "Funded", cls: "badge badge-green", bar: "var(--green)" },
-  progress: { label: "In progress", cls: "badge badge-cyan", bar: "var(--cyan)" },
-  next: { label: "Next", cls: "badge badge-amber", bar: "var(--amber)" },
-  pending: {
-    label: "Not started",
-    cls: "badge",
-    tone: "var(--text-muted)",
-    bar: "var(--text-muted)",
-  },
-  unset: {
-    label: "Set target",
-    cls: "badge",
-    tone: "var(--text-muted)",
-    bar: "var(--text-muted)",
-  },
-  earned: { label: "Earned", cls: "badge badge-green", bar: "var(--green)" },
-  locked: {
-    label: "Locked",
-    cls: "badge",
-    tone: "var(--text-muted)",
-    bar: "var(--text-muted)",
-  },
-};
-
 export interface GoalRow {
   key: GoalKey;
   label: string;
@@ -298,114 +267,6 @@ export interface GoalRow {
   state: GoalState;
   /** Set on behaviour-linked rows only — the sentence under the bar. */
   note?: string;
-}
-
-/* ── Quest-log presentation ───────────────────────────────────────────────────
-   Everything below here is DECORATION. Not one value feeds a calculation: the
-   rows still come from allocate(), the percentages are still its percentages,
-   and the Night out state is still whatever the gate decided. A tier stamp is
-   a sticker on a card, not a fact about the goal.
-
-   The tier hexes are deliberately LOCAL. Gold/silver/bronze are cosmetic
-   labels, so promoting them to globals.css would put three decorative colours
-   next to --cyan and --green, which are semantic and load-bearing. They stay
-   here where their scope is obvious.
-   ──────────────────────────────────────────────────────────────────────────── */
-
-const TIER_GOLD = "#d4af37";
-const TIER_SILVER = "#c0c0c0";
-const TIER_BRONZE = "#cd7f32";
-
-const QUEST_TIER: Record<GoalKey, { label: string; colour: string }> = {
-  docklands: { label: "Gold", colour: TIER_GOLD },
-  trip: { label: "Gold", colour: TIER_GOLD },
-  crown: { label: "Silver", colour: TIER_SILVER },
-  nightOut: { label: "Starter", colour: "var(--cyan)" },
-  spree: { label: "Bronze", colour: TIER_BRONZE },
-};
-
-/**
- * One glyph per quest, drawn inline. No icon package and no emoji: emoji
- * render at the mercy of the platform font and would land differently on the
- * Samsung Flip than on the Mac mini, which is the one thing a wall display
- * cannot afford.
- */
-const QUEST_GLYPH: Record<GoalKey, string> = {
-  docklands: "M3 11 L12 4 L21 11 M5.5 9.5 V20 H18.5 V9.5",
-  trip: "M2 13 L22 4 L14 21 L11.5 14.5 Z",
-  crown: "M3 19 L5 7 L9.5 12 L12 5 L14.5 12 L19 7 L21 19 Z",
-  nightOut: "M20.5 14.5 A8.5 8.5 0 1 1 9.5 3.5 A6.8 6.8 0 0 0 20.5 14.5 Z",
-  spree: "M6 8 H18 L19 20.5 H5 Z M9 8 V6.2 A3 3 0 0 1 15 6.2 V8",
-};
-
-function QuestGlyph({ path, colour }: { path: string; colour: string }) {
-  return (
-    <svg
-      width={14}
-      height={14}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke={colour}
-      strokeWidth={1.9}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      style={{ flexShrink: 0, display: "block" }}
-    >
-      <path d={path} />
-    </svg>
-  );
-}
-
-/** Shown on quests that cannot be worked on yet. */
-function LockGlyph({ colour }: { colour: string }) {
-  return (
-    <svg
-      width={9}
-      height={9}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke={colour}
-      strokeWidth={2.2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      style={{ flexShrink: 0, display: "block" }}
-    >
-      <path d="M7.5 10.5 V7 A4.5 4.5 0 0 1 16.5 7 V10.5" />
-      <rect x="4.5" y="10.5" width="15" height="10" rx="2" />
-    </svg>
-  );
-}
-
-/** The accent a quest card is drawn in. Derived from state, never from tier. */
-function questAccent(state: GoalState): string {
-  if (state === "earned" || state === "funded") return "var(--green)";
-  if (state === "next" || state === "progress") return "var(--cyan)";
-  return "var(--text-muted)";
-}
-
-/** Quests nobody can act on yet recede, so the active one reads first. */
-const isDimmed = (state: GoalState): boolean =>
-  state === "locked" || state === "pending" || state === "unset";
-
-/**
- * The quest objective, phrased as an instruction.
- *
- * Behaviour-linked rows are keyed off `row.state` — the same state the row
- * badge and the overlay read, so the objective cannot say "run test #1" while
- * the badge says EARNED. The gate itself is not consulted here; by the time a
- * row exists the gate has already spoken.
- */
-function objectiveOf(row: GoalRow): string {
-  if (row.key === "nightOut") {
-    if (row.state === "earned") return "Objective complete: test #1 run";
-    // The in-flight row carries its own copy; anything else is the locked case.
-    if (row.note === "Checking Launchpad…") return row.note;
-    return "Objective: run test #1";
-  }
-  if (row.target === null) return "Objective: set a target";
-  return "Objective: fund from profit";
 }
 
 /** Dollar target for a goal — computed for the spree, stored for the rest. */
@@ -783,459 +644,6 @@ export function subscribeGoals(onChange: () => void): () => void {
   };
 }
 
-const numberInput: CSSProperties = {
-  width: 82,
-  background: "var(--bg-inner)",
-  border: "1px solid var(--border)",
-  borderRadius: 4,
-  color: "var(--text-primary)",
-  fontSize: 11,
-  fontFamily: "inherit",
-  fontVariantNumeric: "tabular-nums",
-  padding: "3px 6px",
-  flexShrink: 0,
-};
-
-/** One label + number input row, shown only while editing. */
-function EditRow({
-  label,
-  value,
-  onChange,
-  prefix,
-  whole,
-}: {
-  label: string;
-  value: number | null;
-  onChange: (raw: string) => void;
-  prefix?: string;
-  whole?: boolean;
-}) {
-  return (
-    <label
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        justifyContent: "space-between",
-        minWidth: 0,
-      }}
-    >
-      <span
-        style={{
-          fontSize: 10.5,
-          color: "var(--text-secondary)",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-          flex: 1,
-          minWidth: 0,
-        }}
-      >
-        {label}
-      </span>
-      <span style={{ display: "flex", alignItems: "center", gap: 3, flexShrink: 0 }}>
-        {prefix && <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{prefix}</span>}
-        <input
-          type="number"
-          inputMode="decimal"
-          min={whole ? 1 : 0}
-          step={whole ? 1 : 50}
-          value={value === null ? "" : value}
-          placeholder="—"
-          onChange={(e) => onChange(e.target.value)}
-          style={numberInput}
-        />
-      </span>
-    </label>
-  );
-}
-
-function FamilyGoalsPanel() {
-  const state = useSyncExternalStore(subscribeGoals, readGoals, readGoalsServer);
-  const [editing, setEditing] = useState(false);
-  const profit = useBusinessProfit();
-
-  /** Every edit writes straight through to storage — nothing to flush later. */
-  const update = (fn: (s: GoalsState) => GoalsState) => writeGoals(fn(readGoals()));
-
-  const toNum = (raw: string): number | null => {
-    if (raw.trim() === "") return null;
-    const n = Number.parseFloat(raw);
-    return Number.isFinite(n) ? Math.max(0, n) : null;
-  };
-
-  const setTarget = (key: TargetKey, raw: string) =>
-    update((s) => ({ ...s, targets: { ...s.targets, [key]: toNum(raw) } }));
-
-  const setPeople = (raw: string) =>
-    update((s) => ({ ...s, people: Math.max(0, Math.floor(toNum(raw) ?? 0)) }));
-
-  const setSplit = (raw: string) =>
-    update((s) => ({ ...s, rewardSplitPct: clampPct(toNum(raw) ?? DEFAULT_REWARD_SPLIT_PCT) }));
-
-  /**
-   * The reward pot. A loss is not negative reward money — it is no reward
-   * money — so the pot floors at zero rather than running the waterfall
-   * backwards. Null (loading/failed) stays null and is rendered as "—".
-   */
-  const pot =
-    profit.cumulative === null
-      ? null
-      : (Math.max(0, profit.cumulative) * state.rewardSplitPct) / 100;
-
-  const { rows, overallPct } = allocate(state, pot, profit.genuineTest);
-  const spreeTarget = targetOf(state, "spree");
-  const anyTargetSet = rows.some((r) => r.target !== null);
-
-  return (
-    <div className="card">
-      <div className="card-header" style={{ marginBottom: 5 }}>
-        <div className="card-title">Family Goals</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-          <span className={`badge ${overallPct === null ? "badge-amber" : "badge-cyan"}`}>
-            {/* Two different reasons for "no number", named separately — the
-                badge previously said "No targets" for both. */}
-            {overallPct !== null
-              ? `${Math.round(Math.min(overallPct, 999))}%`
-              : anyTargetSet
-                ? "No data"
-                : "No targets"}
-          </span>
-          <button
-            type="button"
-            onClick={() => setEditing((v) => !v)}
-            aria-pressed={editing}
-            title={editing ? "Hide the amounts" : "Edit targets and saved amount"}
-            style={{
-              appearance: "none",
-              border: "1px solid var(--border)",
-              background: editing ? "rgba(0,212,255,0.12)" : "transparent",
-              color: editing ? "var(--cyan)" : "var(--text-muted)",
-              borderRadius: 4,
-              fontSize: 9,
-              fontWeight: 700,
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-              padding: "3px 7px",
-              cursor: "pointer",
-              fontFamily: "inherit",
-              lineHeight: 1.2,
-            }}
-          >
-            {editing ? "Done" : "Edit"}
-          </button>
-        </div>
-      </div>
-
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 8,
-          flex: 1,
-          minHeight: 0,
-          overflowY: "auto",
-        }}
-      >
-        {/* Hero — the one number that answers "how close are we". Sits in its own
-            recessed block so it reads as a summary, not another goal row. */}
-        <div
-          style={{
-            flexShrink: 0,
-            background: "var(--bg-inner)",
-            borderRadius: 6,
-            padding: "8px 10px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "baseline",
-              gap: 8,
-              marginBottom: 6,
-            }}
-          >
-            <span
-              style={{
-                fontSize: 9,
-                fontWeight: 700,
-                color: "var(--text-muted)",
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-              }}
-            >
-              How close are we
-            </span>
-            <span
-              style={{
-                fontSize: 24,
-                fontWeight: 800,
-                lineHeight: 1,
-                color: overallPct === null ? "var(--text-muted)" : "var(--cyan)",
-                fontVariantNumeric: "tabular-nums",
-                letterSpacing: "-0.02em",
-              }}
-            >
-              {overallPct === null ? "—" : `${Math.round(overallPct)}%`}
-            </span>
-          </div>
-          <div className="progress-track thick">
-            <div
-              className="progress-fill"
-              style={{
-                width: `${Math.min(100, overallPct ?? 0)}%`,
-                background: "var(--cyan)",
-              }}
-            />
-          </div>
-        </div>
-
-        {/* One honest line about the funding source. Percentages and states,
-            never a dollar figure — the amounts stay behind Edit. */}
-        <div
-          style={{
-            fontSize: 10,
-            color: profit.error ? "var(--amber)" : "var(--text-muted)",
-            flexShrink: 0,
-            lineHeight: 1.4,
-          }}
-        >
-          {profit.error
-            ? `Profit read failed — ${profit.error}. Funded % unknown.`
-            : profit.cumulative === null
-              ? "Reading business profit…"
-              : !anyTargetSet
-                ? "Auto-funded from business profit — open Edit to set targets."
-                : `Auto-funded from business profit · ${state.rewardSplitPct}% split${
-                    profit.readAt ? ` · read ${profit.readAt} Sydney` : ""
-                  }`}
-        </div>
-
-        {/* The five quests, in funding order. Bars and percentages only — the
-            amounts stay behind Edit. Hidden while editing so the form always
-            fits the card instead of forcing a scroll.
-
-            The percentage and the status label live on SEPARATE LINES, and that
-            is the fix, not a style preference: they used to share one grid whose
-            badge track was a fixed 72px. "NOT STARTED" needs 93px, so it
-            overflowed 15px left across the 34px percentage cell and the two
-            rendered on top of each other as "0%OT STARTED". Nothing here pins a
-            text width — the name flexes and truncates, the chips size to their
-            own content, and the percentage owns its own row end. */}
-        {!editing &&
-          rows.map((row) => {
-            const meta = STATE_META[row.state];
-            const tier = QUEST_TIER[row.key];
-            const accent = questAccent(row.state);
-            const dimmed = isDimmed(row.state);
-            const active = row.state === "next";
-            // Behaviour-linked rows carry a real 0/100; only a money goal with
-            // no target has no honest percentage to show.
-            const showPct = row.target !== null || row.note !== undefined;
-
-            return (
-              <div
-                key={row.key}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "center",
-                  gap: 4,
-                  // Shrinking The Clock to its content handed this card the
-                  // slack. The quests share it equally so the card is exactly
-                  // filled at any viewport height — no dead gap at the bottom,
-                  // and no scroll. Content is centred, so a taller card reads as
-                  // breathing room rather than a top-aligned one with a hole
-                  // under it. minHeight is the floor on short screens.
-                  flex: "1 1 0",
-                  minHeight: 44,
-                  background: active
-                    ? "color-mix(in srgb, var(--cyan) 8%, var(--bg-inner))"
-                    : "var(--bg-inner)",
-                  // The active quest is the only card that earns a border.
-                  border: `1px solid ${active ? "var(--cyan)" : "transparent"}`,
-                  borderLeft: `2px solid ${active ? "var(--cyan)" : accent}`,
-                  borderRadius: 6,
-                  padding: "5px 8px",
-                  opacity: dimmed ? 0.66 : 1,
-                  minWidth: 0,
-                }}
-              >
-                {/* Line 1 — glyph, quest name, tier stamp. */}
-                <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                  <QuestGlyph path={QUEST_GLYPH[row.key]} colour={accent} />
-                  <span
-                    style={{
-                      fontSize: active ? 12.5 : 11.5,
-                      fontWeight: active ? 700 : 600,
-                      color: "var(--text-primary)",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      // minWidth:0 is what lets the NAME give way instead of
-                      // shoving a neighbour, which is how the old overlap began.
-                      flex: 1,
-                      minWidth: 0,
-                    }}
-                  >
-                    {row.label}
-                  </span>
-                  <span
-                    style={{
-                      flexShrink: 0,
-                      fontSize: 8,
-                      fontWeight: 700,
-                      letterSpacing: "0.09em",
-                      textTransform: "uppercase",
-                      color: tier.colour,
-                      border: `1px solid ${tier.colour}`,
-                      borderRadius: 3,
-                      padding: "1px 4px",
-                      lineHeight: 1.35,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {tier.label}
-                  </span>
-                </div>
-
-                {/* Line 2 — objective on the left, percentage on the right.
-                    Both flex children: the objective truncates, the percentage
-                    never shrinks, so they cannot collide at any width. */}
-                <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                  {dimmed && <LockGlyph colour="var(--text-muted)" />}
-                  <span
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      fontSize: 9.5,
-                      lineHeight: 1.25,
-                      color: row.state === "earned" ? "var(--green)" : "var(--text-muted)",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {objectiveOf(row)}
-                  </span>
-                  <span
-                    style={{
-                      flexShrink: 0,
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: showPct ? accent : "var(--text-muted)",
-                      fontVariantNumeric: "tabular-nums",
-                    }}
-                  >
-                    {showPct ? `${Math.round(row.pct)}%` : "—"}
-                  </span>
-                </div>
-
-                <div className="progress-track">
-                  <div
-                    className="progress-fill"
-                    style={{ width: `${Math.min(100, row.pct)}%`, background: meta.bar }}
-                  />
-                </div>
-
-                {/* Line 3 — the status word, on its own line and nowhere near
-                    the percentage. */}
-                <div style={{ display: "flex", minWidth: 0 }}>
-                  <span
-                    className={meta.cls}
-                    style={{
-                      ...(meta.tone ? { color: meta.tone } : {}),
-                      whiteSpace: "nowrap",
-                      maxWidth: "100%",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {meta.label}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-
-        {/* The only place amounts appear. Collapsed by default so the panel
-            itself stays currency-free. */}
-        {editing && (
-          <div
-            style={{
-              borderTop: "1px solid var(--border)",
-              paddingTop: 5,
-              marginTop: 1,
-              display: "flex",
-              flexDirection: "column",
-              gap: 3,
-              flexShrink: 0,
-            }}
-          >
-            {/* No "saved so far" input: the pot is business profit, not a
-                number anyone types. Targets and the split are the only knobs. */}
-            <EditRow
-              label="1 · Docklands move"
-              value={state.targets.docklands}
-              onChange={(r) => setTarget("docklands", r)}
-              prefix="$"
-            />
-            <EditRow
-              label="2 · Sydney or QLD trip"
-              value={state.targets.trip}
-              onChange={(r) => setTarget("trip", r)}
-              prefix="$"
-            />
-            <EditRow
-              label="3 · Crown weekend"
-              value={state.targets.crown}
-              onChange={(r) => setTarget("crown", r)}
-              prefix="$"
-            />
-            <EditRow
-              label="5 · Shopping spree — people"
-              value={state.people}
-              onChange={setPeople}
-              whole
-            />
-            <EditRow
-              label="Reward split of profit (%)"
-              value={state.rewardSplitPct}
-              onChange={setSplit}
-              whole
-            />
-            {/* Two lines, so opening Edit does not push the form into a scroll. */}
-            <div
-              style={{
-                fontSize: 9,
-                color: "var(--text-muted)",
-                lineHeight: 1.3,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              Spree = ${SPREE_PER_PERSON} × {Math.max(0, Math.floor(state.people))} ={" "}
-              {spreeTarget === null ? "—" : `$${spreeTarget.toLocaleString("en-AU")}`} · pot fills
-              top-down
-              <br />
-              Profit{" "}
-              {profit.cumulative === null
-                ? "—"
-                : // Sign outside the symbol — "$-93.84" reads as a typo.
-                  `${profit.cumulative < 0 ? "−" : ""}$${Math.abs(
-                    profit.cumulative,
-                  ).toLocaleString("en-AU")}`} · pot{" "}
-              {pot === null ? "—" : `$${Math.round(pot).toLocaleString("en-AU")}`} · 4 · Night out is
-              earned by running test #1
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 /* ── Panel 2 — THE CLOCK (untouched) ──────────────────────────────────────── */
 
 function ClockPanel({ data, settings }: { data: ActionsPayload; settings?: SettingsMap }) {
@@ -1250,8 +658,7 @@ function ClockPanel({ data, settings }: { data: ActionsPayload; settings?: Setti
   return (
     // flex "0 0 auto" so the card is only as tall as its content. `.card` is
     // flex:1 by default, which stretched this panel to half the column and left
-    // a large gap under the stats. The slack now goes to Family Goals above,
-    // which has rows to breathe with. Padding is untouched, so the @media height
+    // a large gap under the stats. Padding is untouched, so the @media height
     // tiers still apply.
     <div className="card" style={{ flex: "0 0 auto" }}>
       <div className="card-header" style={{ marginBottom: 5 }}>
@@ -1365,38 +772,22 @@ export default function PanelTodos() {
     };
   }, []);
 
-  // Family Goals has no API dependency, so it renders for real even when
-  // /api/actions is down — only THE CLOCK degrades to a shell. The column keeps
-  // two cards in every state, so it never reflows when data arrives.
+  // The goals panel is gone (spec §5) — this component IS the Clock now. It
+  // degrades to a shell when /api/actions fails, exactly as before.
   if (error) {
     return (
-      <>
-        <FamilyGoalsPanel />
-        <ShellCard
-          title="The Clock"
-          badge="⚠ Error"
-          badgeClass="badge-red"
-          message={`Action data unavailable — ${error}`}
-        />
-      </>
+      <ShellCard
+        title="The Clock"
+        badge="⚠ Error"
+        badgeClass="badge-red"
+        message={`Action data unavailable — ${error}`}
+      />
     );
   }
 
   if (!data) {
-    return (
-      <>
-        <FamilyGoalsPanel />
-        <ShellCard title="The Clock" badge="Loading…" badgeClass="badge-cyan" message="…" />
-      </>
-    );
+    return <ShellCard title="The Clock" badge="Loading…" badgeClass="badge-cyan" message="…" />;
   }
 
-  const settings = data.settings;
-
-  return (
-    <>
-      <FamilyGoalsPanel />
-      <ClockPanel data={data} settings={settings} />
-    </>
-  );
+  return <ClockPanel data={data} settings={data.settings} />;
 }
