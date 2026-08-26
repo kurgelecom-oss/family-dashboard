@@ -19,24 +19,33 @@ function Chip({
   context,
   valueColor,
 }: {
-  href: string;
+  /* No href → the chip is a plain tile, not a link (Ansar: the external
+     dashboard link was removed 2026-08-26 by owner directive; the chip and
+     its streak data stay). */
+  href?: string;
   external?: boolean;
   label: string;
   value: string;
   context: string | null;
   valueColor?: string;
 }) {
+  const body = (
+    <>
+      <span className="face-label">{label}</span>
+      <span className="face-chip-value" style={valueColor ? { color: valueColor } : undefined}>
+        {value}
+      </span>
+      {context !== null && <span className="face-context">{context}</span>}
+    </>
+  );
+  if (href === undefined) return <span className="face-chip">{body}</span>;
   return (
     <a
       className="face-chip"
       href={href}
       {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
     >
-      <span className="face-label">{label}</span>
-      <span className="face-chip-value" style={valueColor ? { color: valueColor } : undefined}>
-        {value}
-      </span>
-      {context !== null && <span className="face-context">{context}</span>}
+      {body}
     </a>
   );
 }
@@ -91,8 +100,6 @@ export default function FaceFrameSentence({ model }: { model: FaceModel }) {
           context={m.oldestDays !== null ? `oldest ${m.oldestDays} days` : "clear"}
         />
         <Chip
-          href="https://ansar-habits-tracker.netlify.app"
-          external
           label="Ansar"
           value={m.streak !== null ? `${m.streak}d` : "—"}
           context="day streak"

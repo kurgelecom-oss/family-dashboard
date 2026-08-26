@@ -6,9 +6,10 @@ import { SETTING_DEFAULTS, type SettingsMap, getSetting } from "../lib/settings"
 import { HOUSEHOLD_TZ, zoneToday, daysBetween, type CivilDate } from "../lib/time";
 
 /* ════════════════════════════════════════════════════════════════════════════
-   GOALS INTERMISSION — a full-viewport card that interrupts the dashboard
-   every few minutes, shows ONE thing big enough to read across the room, and
-   gets out of the way.
+   GOALS INTERMISSION — a compact mac-style corner notification (2026-08-26,
+   owner directive; previously a full-viewport card) that appears bottom-right
+   every few minutes, shows ONE thing, and gets out of the way. No backdrop,
+   no dim — the dashboard stays fully visible and interactive.
 
    Content is a PRESSURE DECK — driver messages and directives only. The reward
    slide was removed 2026-08-21 by request. Each appearance shows the next
@@ -264,59 +265,34 @@ const readMotion = (): boolean => window.matchMedia(REDUCED_MOTION_QUERY).matche
 const readMotionServer = (): boolean => false;
 
 /* ── Shared slide chrome ─────────────────────────────────────────────────────
-   One card, one backdrop system. Each slide kind may carry a full-bleed image
-   at /intermission/<kind>.jpg; a missing file simply leaves the solid card,
-   so images are droppable assets, not code.
-
-   The backdrop is a zIndex:-1 layer INSIDE the card rather than a background
-   shorthand: the card's transform creates a stacking context, so the layer
-   sits above the card's solid background and below every slide element, and
-   the image is dimmed by plain `opacity` — no color-mix, nothing the TV's
-   engine can reject. The accent wash rides the same layer as a radial
-   gradient built from numeric rgba stops.
+   2026-08-26 owner directive: the intermission is no longer a full-viewport
+   interruption. Every slide now renders as a compact mac-style notification
+   anchored to the BOTTOM-RIGHT corner — a wider-than-tall card on --bg-card
+   with a subtle accent border, NO backdrop scrim, NO dim/blur: the dashboard
+   behind it stays fully visible and interactive. The trigger cadence, hold
+   and fade machinery above are untouched; only the presentation shrank. The
+   /intermission/<kind>.jpg backdrop-image system was part of the large-card
+   presentation and retires with it. Same no-color-mix rule as before: solid
+   theme vars + numeric rgba only, for the Flip Pro's old engine.
    ──────────────────────────────────────────────────────────────────────────── */
 
-function CardBackdrop({ kind, tone }: { kind: Slide["kind"]; tone: ToneKey }) {
-  return (
-    <>
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: -1,
-          backgroundImage: `url(/intermission/${kind}.jpg)`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          opacity: 0.32,
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: -1,
-          background: `radial-gradient(120% 120% at 50% 0%, ${toneRgba(tone, 0.16)} 0%, rgba(0,0,0,0) 55%)`,
-        }}
-      />
-    </>
-  );
-}
+/** Corner-card geometry: rectangle, wider than tall (spec 420–520 × 100–160). */
+const CARD_W = 480;
+const CARD_MIN_H = 100;
+const CARD_MAX_H = 160;
 
 function Kicker({ text, tone }: { text: string; tone?: string }) {
   return (
     <div
       style={{
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: 700,
-        letterSpacing: "0.24em",
+        letterSpacing: "0.18em",
         textTransform: "uppercase",
         color: tone ?? "var(--text-muted)",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
       }}
     >
       {text}
@@ -330,7 +306,7 @@ function AgeChip({ ageDays }: { ageDays: number | null }) {
     <span
       style={{
         flex: "none",
-        fontSize: 14,
+        fontSize: 11,
         fontWeight: 800,
         letterSpacing: "0.08em",
         fontVariantNumeric: "tabular-nums",
@@ -338,13 +314,24 @@ function AgeChip({ ageDays }: { ageDays: number | null }) {
         background: toneRgba(tone, 0.14),
         border: `1px solid ${toneRgba(tone, 0.45)}`,
         borderRadius: 999,
-        padding: "4px 12px",
+        padding: "2px 8px",
       }}
     >
       {ageLabel(ageDays)}
     </span>
   );
 }
+
+/** One-or-two-line clamp for free text inside the corner card. */
+const clampStyle = (lines: number): React.CSSProperties => ({
+  display: "-webkit-box",
+  WebkitLineClamp: lines,
+  WebkitBoxOrient: "vertical" as const,
+  overflow: "hidden",
+});
+
+/** How many daily points fit in the corner card. Overflow becomes "+n more". */
+const CORNER_DAILY_ROWS = 2;
 
 /* ── Slide bodies ────────────────────────────────────────────────────────── */
 
@@ -361,41 +348,34 @@ function DailySlide({
   soften?: boolean;
 }) {
   const tone = TONE_VAR[soften ? "cyan" : worstTone(points)];
+  const shown = points.slice(0, CORNER_DAILY_ROWS);
+  const more = points.length - shown.length;
   return (
     <>
-      <Kicker text="Today · keep the pressure on" />
-      <div
-        style={{
-          fontSize: 52,
-          fontWeight: 800,
-          lineHeight: 1,
-          letterSpacing: "-0.02em",
-          color: tone,
-        }}
-      >
-        {owner}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span
+          style={{
+            fontSize: 16,
+            fontWeight: 800,
+            lineHeight: 1,
+            letterSpacing: "-0.01em",
+            color: tone,
+          }}
+        >
+          {owner}
+        </span>
+        <Kicker text="Today · keep the pressure on" />
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 14, width: "100%" }}>
-        {points.map((p) => (
-          <div
-            key={p.point}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 16,
-              padding: "14px 18px",
-              borderRadius: 12,
-              background: "var(--bg-inner)",
-              border: "1px solid var(--border)",
-            }}
-          >
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%" }}>
+        {shown.map((p) => (
+          <div key={p.point} style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span
               style={{
                 flex: 1,
                 minWidth: 0,
-                fontSize: 24,
+                fontSize: 15,
                 fontWeight: 700,
-                lineHeight: 1.2,
+                lineHeight: 1.25,
                 color: "var(--text-primary)",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -404,21 +384,14 @@ function DailySlide({
             >
               {p.point}
             </span>
-            <span
-              style={{
-                flex: "none",
-                fontSize: 12,
-                fontWeight: 700,
-                letterSpacing: "0.12em",
-                textTransform: "uppercase",
-                color: "var(--text-secondary)",
-              }}
-            >
-              {p.pillar}
-            </span>
             <AgeChip ageDays={p.ageDays} />
           </div>
         ))}
+        {more > 0 && (
+          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)" }}>
+            +{more} more
+          </div>
+        )}
       </div>
     </>
   );
@@ -436,51 +409,38 @@ function DeadlineSlide({
   const tone = TONE_VAR[deadlineTone(daysLeft)];
   return (
     <>
-      <Kicker text="The deadline" />
-      {daysLeft !== null && (
-        <div style={{ display: "flex", alignItems: "baseline", gap: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <Kicker text="The deadline" />
+        {daysLeft !== null && (
           <span
             style={{
-              fontSize: 120,
+              fontSize: 15,
               fontWeight: 800,
-              lineHeight: 0.95,
-              letterSpacing: "-0.04em",
               fontVariantNumeric: "tabular-nums",
               color: tone,
+              whiteSpace: "nowrap",
             }}
           >
-            {Math.max(0, daysLeft)}
+            {Math.max(0, daysLeft)} days left
           </span>
-          <span
-            style={{
-              fontSize: 26,
-              fontWeight: 700,
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              color: "var(--text-secondary)",
-            }}
-          >
-            days left
+        )}
+        {tests !== null && (
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+            · {tests} tests this week
           </span>
-        </div>
-      )}
+        )}
+      </div>
       <div
         style={{
-          fontSize: 30,
+          fontSize: 15,
           fontWeight: 700,
-          lineHeight: 1.25,
-          textAlign: "center",
+          lineHeight: 1.3,
           color: "var(--text-primary)",
-          maxWidth: "88%",
+          ...clampStyle(2),
         }}
       >
         {goal}
       </div>
-      {tests !== null && (
-        <div style={{ fontSize: 17, fontWeight: 600, color: tone }}>
-          Tests logged this week: {tests}
-        </div>
-      )}
     </>
   );
 }
@@ -491,13 +451,12 @@ function NoteSlide({ note }: { note: string }) {
       <Kicker text="Pinned" tone="var(--red)" />
       <div
         style={{
-          fontSize: 44,
+          fontSize: 16,
           fontWeight: 800,
-          lineHeight: 1.15,
-          letterSpacing: "-0.02em",
-          textAlign: "center",
+          lineHeight: 1.3,
+          letterSpacing: "-0.01em",
           color: "var(--text-primary)",
-          maxWidth: "90%",
+          ...clampStyle(2),
         }}
       >
         {note}
@@ -653,62 +612,45 @@ export default function GoalsIntermission() {
     ? "none"
     : `opacity ${FADE_MS}ms ease, transform ${FADE_MS}ms ease`;
 
-  const footer = `${STAKES[index % STAKES.length]}${stamp ? ` · ${stamp} Sydney` : ""}`;
-
+  /* Corner card (2026-08-26): bottom-right, no scrim, no dim — the dashboard
+     stays fully visible and interactive (pointerEvents none = click-through,
+     as before). Same appear/hold/fade cycle; only the geometry changed. */
   return (
     <div
       aria-hidden={!visible}
       data-intermission={visible ? "visible" : "hidden"}
       style={{
         position: "fixed",
-        inset: 0,
+        right: 24,
+        bottom: 24,
         zIndex: OVERLAY_Z,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
         // Click-through in every state. This is a wall display, not a modal —
         // it must never swallow a click meant for a panel underneath.
         pointerEvents: "none",
         opacity: visible ? 1 : 0,
         visibility: visible ? "visible" : "hidden",
-        transition: reducedMotion ? "none" : `opacity ${FADE_MS}ms ease`,
+        transform: visible || reducedMotion ? "translateY(0)" : "translateY(12px)",
+        transition,
       }}
     >
-      {/* Dimming scrim as its own layer: solid theme colour + opacity, because
-          the alpha-mixed background it replaces needed color-mix, which the
-          TV's engine rejects (taking the whole declaration with it). */}
       <div
         style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: "var(--bg-base)",
-          opacity: 0.92,
-        }}
-      />
-      <div
-        style={{
-          position: "relative",
           display: "flex",
           flexDirection: "column",
-          alignItems: "center",
-          gap: 26,
-          padding: "48px 64px",
-          borderRadius: 20,
+          justifyContent: "center",
+          gap: 8,
+          padding: "14px 18px",
+          borderRadius: 12,
           background: "var(--bg-card)",
-          border: `1px solid ${accent}`,
-          boxShadow: `0 0 60px ${toneRgba(accentKey, 0.25)}`,
-          width: slide.kind === "daily" ? "min(900px, 90vw)" : undefined,
-          maxWidth: "min(900px, 90vw)",
-          maxHeight: "86vh",
+          border: `1px solid ${toneRgba(accentKey, 0.55)}`,
+          borderLeft: `3px solid ${accent}`,
+          boxShadow: `0 8px 28px rgba(0,0,0,0.35)`,
+          width: `min(${CARD_W}px, calc(100vw - 32px))`,
+          minHeight: CARD_MIN_H,
+          maxHeight: CARD_MAX_H,
           overflow: "hidden",
-          transform: visible || reducedMotion ? "scale(1)" : "scale(0.96)",
-          transition,
         }}
       >
-        <CardBackdrop kind={slide.kind} tone={accentKey} />
         {slide.kind === "daily" && (
           <DailySlide owner={slide.owner} points={slide.points} soften={softenDaily(slide)} />
         )}
@@ -719,13 +661,16 @@ export default function GoalsIntermission() {
 
         <div
           style={{
-            fontSize: 12,
+            fontSize: 11,
             color: "var(--text-muted)",
             letterSpacing: "0.04em",
-            textAlign: "center",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
           }}
         >
-          {footer}
+          {STAKES[index % STAKES.length]}
+          {stamp ? ` · ${stamp} Sydney` : ""}
         </div>
       </div>
     </div>

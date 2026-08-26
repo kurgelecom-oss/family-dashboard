@@ -1711,3 +1711,31 @@ html, body {
   /* frame 3 */
   .face-lane > .face-row:last-child { margin-bottom: 8px; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   Prompt 6 (2026-08-26) — face pause pill. APPENDED, never edit earlier rules.
+   A quiet cyan control beside the header frame counter that toggles rotation
+   pause/resume indefinitely (distinct from the 60 s touch-pause). Visual is
+   small; the button box is a true 48x48 touch target, with negative vertical
+   margins so the header's layout height is unchanged (outer box 48-2*12=24px,
+   matching the theme pill's scale). Paused state: pill lights to full cyan,
+   counter dims (.face-counter--dim).
+   ══════════════════════════════════════════════════════════════════════════ */
+.face-counter-cluster { display: flex; align-items: center; gap: 2px; }
+.face-counter--dim { opacity: 0.4; }
+.face-pause {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin: -12px -8px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  color: var(--cyan);
+  opacity: 0.45;
+  cursor: pointer;
+}
+.face-pause--on { opacity: 1; }

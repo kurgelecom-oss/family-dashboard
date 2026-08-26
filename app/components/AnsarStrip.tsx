@@ -237,28 +237,9 @@ export default function AnsarStrip() {
         </span>
       </span>
 
-      <a
-        href="https://ansar-habits-tracker.netlify.app"
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          minHeight: 48,
-          padding: "0 16px",
-          fontSize: 13,
-          fontWeight: 700,
-          borderRadius: 8,
-          border: "1px solid var(--border)",
-          background: "var(--bg-highlight)",
-          color: "var(--text-primary)",
-          textDecoration: "none",
-          whiteSpace: "nowrap",
-          flexShrink: 0,
-        }}
-      >
-        Open his dashboard ↗
-      </a>
+      {/* "Open his dashboard" link removed 2026-08-26 by owner directive —
+          no navigation path to ansar-habits-tracker may remain on any
+          surface. Streak / points / progress content above is unchanged. */}
     </section>
   );
 }

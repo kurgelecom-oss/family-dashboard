@@ -40,7 +40,10 @@ function Hero({
   valueColor,
   rows,
 }: {
-  href: string;
+  /* No href → the hero is a plain tile, not a link (Ansar: the external
+     dashboard link was removed 2026-08-26 by owner directive; the hero and
+     its streak data stay). */
+  href?: string;
   external?: boolean;
   label: string;
   value: string;
@@ -48,12 +51,9 @@ function Hero({
   valueColor?: string;
   rows?: React.ReactNode;
 }) {
-  return (
-    <a
-      className={`drill-tile face-hero${rows ? "" : " face-hero--fill"}`}
-      href={href}
-      {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-    >
+  const className = `drill-tile face-hero${rows ? "" : " face-hero--fill"}`;
+  const body = (
+    <>
       <span className="face-label">{label}</span>
       <span className="face-hero-value" style={valueColor ? { color: valueColor } : undefined}>
         {value}
@@ -65,6 +65,16 @@ function Hero({
           {rows}
         </>
       )}
+    </>
+  );
+  if (href === undefined) return <span className={className}>{body}</span>;
+  return (
+    <a
+      className={className}
+      href={href}
+      {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+    >
+      {body}
     </a>
   );
 }
@@ -126,8 +136,6 @@ export default function FaceFrameNumbers({ model }: { model: FaceModel }) {
           context={m.oldestDays !== null ? `oldest ${m.oldestDays} days` : "table is clear"}
         />
         <Hero
-          href="https://ansar-habits-tracker.netlify.app"
-          external
           label="Ansar"
           value={m.streak !== null ? `${m.streak}d` : "—"}
           context={m.todayPct !== null ? `${m.todayPct}% today` : "day streak"}

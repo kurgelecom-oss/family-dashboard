@@ -35,7 +35,13 @@ export default function FaceRotator() {
   const [frame, setFrame] = useState(0); // 0-based; rendered as n/3
   const [frozen, setFrozen] = useState<number | null>(null);
   const [suspended, setSuspended] = useState(false);
+  /* Owner pause (2026-08-26): indefinite, toggled by the header pause pill.
+     Distinct from the 60 s touch-pause (`suspended`) — the timer stays fully
+     stopped until the pill is tapped again, and resume restarts at frame 1,
+     the same landing the spec's other resumes use. */
+  const [paused, setPaused] = useState(false);
   const frozenRef = useRef<number | null>(null);
+  const pausedRef = useRef(false);
   const touchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /* ?view=1|2|3 — freeze that frame, stop the timer. Read once on mount from
@@ -50,17 +56,20 @@ export default function FaceRotator() {
     }
   }, []);
 
-  /* Rotation — one timeout per dwell; cleared whenever frozen or suspended. */
+  /* Rotation — one timeout per dwell; cleared whenever frozen, suspended or
+     paused. */
   useEffect(() => {
-    if (frozen !== null || suspended) return;
+    if (frozen !== null || suspended || paused) return;
     const id = setTimeout(() => setFrame((f) => (f + 1) % DWELL_MS.length), DWELL_MS[frame]);
     return () => clearTimeout(id);
-  }, [frame, frozen, suspended]);
+  }, [frame, frozen, suspended, paused]);
 
-  /* Hidden → pause. Visible → resume at frame 1. Frozen stays frozen. */
+  /* Hidden → pause. Visible → resume at frame 1. Frozen stays frozen; an
+     owner pause survives (no auto-resume, current frame stays up). */
   useEffect(() => {
     const onVis = () => {
       if (frozenRef.current !== null) return;
+      if (pausedRef.current) return;
       if (document.hidden) {
         setSuspended(true);
       } else {
@@ -80,9 +89,11 @@ export default function FaceRotator() {
     [],
   );
 
-  /* Touch: anchors navigate; anything else pauses 60 s then resumes at 1. */
+  /* Touch: anchors navigate; anything else pauses 60 s then resumes at 1.
+     While owner-paused, touches never schedule a resume — only the pill does. */
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (frozenRef.current !== null) return;
+    if (pausedRef.current) return;
     const el = e.target as Element | null;
     if (el && el.closest("a")) return;
     if (touchTimerRef.current) clearTimeout(touchTimerRef.current);
@@ -93,7 +104,25 @@ export default function FaceRotator() {
     }, TOUCH_PAUSE_MS);
   };
 
-  const rotating = frozen === null && !suspended;
+  /* Pill toggle. Pause: stop everything where it stands (clear any pending
+     60 s touch-resume so nothing auto-resumes). Resume: back to frame 1,
+     exactly where the spec's other resumes land. */
+  const togglePause = () => {
+    if (frozenRef.current !== null) return;
+    if (touchTimerRef.current) clearTimeout(touchTimerRef.current);
+    if (pausedRef.current) {
+      pausedRef.current = false;
+      setPaused(false);
+      setSuspended(false);
+      setFrame(0);
+    } else {
+      pausedRef.current = true;
+      setPaused(true);
+      setSuspended(false);
+    }
+  };
+
+  const rotating = frozen === null && !suspended && !paused;
 
   return (
     <>
@@ -101,8 +130,30 @@ export default function FaceRotator() {
           page.tsx rendered it — a tap on NIGHT/AUTO never pauses rotation. */}
       <Header
         frameCounter={
-          <div className="face-counter">
-            <span className="face-counter-cur">{frame + 1}</span>/{DWELL_MS.length}
+          <div className="face-counter-cluster">
+            <div className={"face-counter" + (paused ? " face-counter--dim" : "")}>
+              <span className="face-counter-cur">{frame + 1}</span>/{DWELL_MS.length}
+            </div>
+            {frozen === null && (
+              <button
+                type="button"
+                className={"face-pause" + (paused ? " face-pause--on" : "")}
+                aria-pressed={paused}
+                aria-label={paused ? "Resume rotation" : "Pause rotation"}
+                onClick={togglePause}
+              >
+                {paused ? (
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+                    <path d="M3 1.5 12 7 3 12.5z" />
+                  </svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+                    <rect x="2.5" y="1.5" width="3.4" height="11" rx="1" />
+                    <rect x="8.1" y="1.5" width="3.4" height="11" rx="1" />
+                  </svg>
+                )}
+              </button>
+            )}
           </div>
         }
       />
