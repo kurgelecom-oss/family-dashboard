@@ -1847,3 +1847,28 @@ html, body {
    rule matches any more. WeekProgressStrip on /board is a different,
    in-grid component and reads no part of this. */
 :root { --strip-h: 0px; }
+
+/* ── ANSAR STRIP SURPLUS (2026-08-26, Prompt 7 fix) ──────────────────────────
+   The /board Ansar strip band auto-sized to its content, leaving 1px between
+   its lowest leaf and the card's content-box bottom — inside measurement
+   noise of the ≥+25px house rule. Padding cannot fix that (the surplus is
+   measured against content-box bottom, which padding moves with the content),
+   so the band gets real content-box height: min-height buys the room and
+   align-content: flex-start pins the single wrapped flex line to the top so
+   the bought room all lands BELOW the content (76 border-box − 20 padding −
+   ~27 line = ~29px surplus). Padding moved here from the retired inline
+   style — same 10px 12px, but no longer an inline declaration on a .card;
+   this later-in-source rule deliberately opts the fixed band out of the
+   @media padding tiers, exactly as the inline style did. /board's root is
+   its own overflowY:auto scroll container, so the ~29px the band grows by
+   is absorbed by internal scroll, never by clipping. */
+.ansar-strip {
+  /* .card is flex-direction column; the band only ever looked like a row
+     because column-wrap at its tiny auto height packed the items into
+     side-by-side columns. min-height breaks that packing, so the band
+     declares the row it actually is. */
+  flex-direction: row;
+  min-height: 76px;
+  padding: 10px 12px;
+  align-content: flex-start;
+}

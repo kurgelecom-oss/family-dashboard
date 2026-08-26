@@ -133,10 +133,13 @@ export default function AnsarStrip() {
 
   return (
     <section
-      className="card"
+      // `.ansar-strip` (appended in globals.css) owns padding, min-height and
+      // align-content: the band needs ≥25px of true content-box bottom surplus
+      // (house rule), which padding alone cannot buy on an auto-height card,
+      // and inline padding on a .card is banned (it defeats the @media tiers).
+      className="card ansar-strip"
       style={{
         flex: "none",
-        padding: "10px 12px",
         display: "flex",
         alignItems: "center",
         gap: 16,
