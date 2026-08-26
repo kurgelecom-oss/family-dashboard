@@ -59,7 +59,7 @@ Mechanics:
 
 - Loop is 50 s. Hard cut between frames. No crossfade, no slide.
 - Dwell times are one constant array. Nothing else hardcodes them.
-- `?view=1`, `?view=2`, `?view=3` freeze that frame and stop the timer. No param = rotate.
+- `?view=1`, `?view=2`, `?view=3` freeze that frame and stop the timer. No param = start PAUSED on frame 1; rotation begins only when the play pill is pressed (owner amendment 2026-08-26).
 - On `visibilitychange` hidden: pause the timer. On visible: resume at frame 1.
 - Night mode dims all three frames. Do not change how AUTO or LIVE behave; discover what they do first and leave them alone.
 - Frame components live beside the existing face component. The face keeps its route. No new route for the face.
