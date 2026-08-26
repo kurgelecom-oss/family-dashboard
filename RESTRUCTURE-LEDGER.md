@@ -384,3 +384,7 @@ Measured (local prod build port 4123, headless Chromium, `page.clock` faked at S
 Not proven: production state (nothing committed/staged/pushed per instruction); Flip Pro rendering; real wall-clock hour (faked clock); windowed-card path re-proven only by unchanged code (this run sat outside windows).
 
 **Prompt 7 fix (2026-08-26)**: /board Ansar strip band had 1px content-box bottom surplus (breaches ≥+25px rule) — `.ansar-strip` class appended to globals.css (`flex-direction: row; min-height: 76px; padding: 10px 12px; align-content: flex-start`), inline padding dropped from `AnsarStrip.tsx` (was defeating tiers; the band had also only rendered as a row via column-wrap packing, now declared explicitly); measured local prod build: surplus 29.0px at 1920x936 · 1905x923 · 1920x1080, page scroll 0, calendar band + board bottom row unclipped (scrolled-to-end lowest leaf 903.9/890.9/1047.9 ≤ visible 922/909/1066); tsc + build pass; production not deployed/verified (nothing committed per instruction).
+
+### Manager decision — 2026-08-26 — /board internal scroll accepted
+
+Production measurement (post-09ce20d): the board page's inner wrapper scrolls 533–690px at the three heights. Calendar band + Ansar strip + the BOARD-SPEC-defined board cannot fit 936px together, and BOARD-SPEC (protected) wins over §6's no-scroll for this route. Internal touch-scroll on /board is accepted as designed behaviour; bands and strip are fully visible without scrolling, board reachable by scroll. Present since the routes step; document-level scroll remains 0.
