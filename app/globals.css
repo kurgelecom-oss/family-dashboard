@@ -19,11 +19,15 @@
    Reserving 40px first would let a BEHIND lane grow down into the fold. */
 :root { --strip-h: 72px; }
 
-/* Both lanes ON_PACE — the only case that earns the short strip. The strip tags
-   itself `.strip-compact` and :has() lifts that one bit of state up to :root,
-   where every consumer already reads it. Deliberately not JS writing an inline
-   style onto <html>: an inline style out-specifies the mobile tier further down
-   and would silently break the stacked layout. */
+/* RETIRED MECHANISM (2026-08-26): the rule below never matches any more — the
+   strip no longer renders `.strip-compact` (the Flip Pro's engine predates the
+   descendant-sniffing selector it relied on, so compact silently never fired
+   there). OriginsStrip.tsx now lifts the same bit of state onto <html> as
+   `data-strip-compact` (mirroring Header's data-theme), and the live rules sit
+   at the END of this file: `:root[data-strip-compact]`. Rule kept, not edited,
+   per the append-only discipline. Still deliberately not an inline style on
+   <html>: an inline style would out-specify the mobile tier further down and
+   silently break the stacked layout. */
 :root:has(.origins-strip.strip-compact) { --strip-h: 40px; }
 
 /* ── NIGHT THEME (default before JS runs) ─────────────────────── */
@@ -446,10 +450,12 @@ html, body {
    counter are dropped; lesson, tick and colour state survive — those are what
    the strip is for.
 
-   `:root:has(...)` is repeated here because it out-specifies a bare `:root`:
-   the compact rule at the top of this file would otherwise win and squeeze two
-   stacked lanes into 40px. Same specificity, later in source order, so this one
-   takes it. */
+   The second selector below is part of the RETIRED compact mechanism (see the
+   note near the top of this file) and never matches any more. Its job — keep
+   the compact rule from squeezing two stacked lanes into 40px — is done by the
+   `@media (max-width: 768px) :root[data-strip-compact]` rule appended at the
+   END of this file, which out-specifies bare `:root` and, by source order,
+   beats the appended 40px compact rule. */
 @media (max-width: 768px) {
   :root,
   :root:has(.origins-strip.strip-compact) { --strip-h: 72px; }
@@ -1739,3 +1745,122 @@ html, body {
   cursor: pointer;
 }
 .face-pause--on { opacity: 1; }
+
+/* ── CORNER STACK + ORIGINS NUDGES (2026-08-26, Prompt 7) — append-only ──────
+   The face dropped the persistent OriginsStrip; origins pressure arrives as
+   corner nudges in the shared bottom-right CornerStack (one flex column,
+   also carrying the mission/intermission card — cards can never overlap). */
+
+/* Face only: app/page.tsx puts this class on its own .dashboard div (the one
+   element on "/" that reads --strip-h) while OriginsStrip renders null there.
+   An element-local custom property beats EVERY inherited :root value — base,
+   768px tier, and the compact rules alike — by inheritance rules alone, so
+   no selector arms race and nothing the Flip Pro's engine (which already
+   forced color-mix out) cannot parse. */
+.dashboard-nostrip { --strip-h: 0px; }
+
+.corner-stack {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 10000; /* above TopNav (900), the strip (890), the popover (9999) */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  pointer-events: none; /* the stack never swallows a dashboard click */
+}
+
+/* Wrappers stay click-through; an interactive card (the nudges) opts in with
+   pointer-events: auto on its own root. The mission card stays none. */
+.corner-stack-item { pointer-events: none; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .corner-stack-item { animation: corner-card-in 260ms ease; }
+}
+@keyframes corner-card-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* One nudge card — the intermission corner card's language: --bg-card,
+   3px accent left edge (set inline per lane state), same shadow, same
+   480px width cap. Solid theme tokens + numeric rgba only (Flip Pro's old
+   engine; no color-mix on corner surfaces, ever). */
+.onudge {
+  pointer-events: auto;
+  box-sizing: border-box;
+  width: min(480px, calc(100vw - 32px));
+  max-height: 170px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--amber);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.35);
+  overflow: hidden;
+}
+
+.onudge-head { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.onudge-name {
+  font-size: 12px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--text-primary);
+}
+.onudge-state { font-size: 11px; font-weight: 800; letter-spacing: 0.06em; white-space: nowrap; }
+.onudge-ttl { margin-left: auto; font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.onudge-lesson {
+  font-size: 15px; font-weight: 700; line-height: 1.25;
+  color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.onudge-sub {
+  font-size: 12px; color: var(--text-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.onudge-error { font-size: 12px; font-weight: 700; color: var(--red); }
+
+/* Controls — every target ≥48px (Done, proof input, Later). */
+.onudge-actions { display: flex; align-items: stretch; gap: 10px; margin-top: 2px; }
+.onudge-tick {
+  flex: none; min-height: 48px; min-width: 48px; padding: 0 16px;
+  border-radius: 10px; border: 1px solid var(--cyan);
+  background: transparent; color: var(--cyan);
+  font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.onudge-tick:disabled { opacity: 0.5; cursor: default; }
+.onudge-proof {
+  flex: 1; min-width: 0; min-height: 48px; padding: 0 12px;
+  box-sizing: border-box; font-size: 12px;
+  color: var(--text-primary); background: var(--bg-inner);
+  border: 1px solid var(--border); border-radius: 10px; outline: none;
+}
+.onudge-proof::placeholder { color: var(--text-muted); }
+.onudge-later {
+  flex: none; min-height: 48px; min-width: 48px; padding: 0 12px;
+  border: none; background: transparent; color: var(--text-muted);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+}
+
+/* ── STRIP COMPACT STATE, Flip Pro safe (2026-08-26) — append-only ───────────
+   Replaces the retired descendant-sniffing compact mechanism near the top of
+   this file (which the Flip Pro's engine cannot parse — same class of failure
+   as color-mix, commit f956abe). OriginsStrip.tsx sets `data-strip-compact`
+   on <html> from an effect — exactly how Header.tsx sets data-theme — only
+   while the strip is rendered AND both lanes are ON_PACE. Plain attribute
+   selector, (0,2,0): beats the bare `:root { --strip-h: 72px }` base and the
+   768px tier's bare `:root`; the retired rules never match (no element ever
+   carries .strip-compact any more). The face is untouched by any of this —
+   `.dashboard-nostrip`'s element-local 0px wins there regardless. */
+:root[data-strip-compact] { --strip-h: 40px; }
+
+/* Mobile: lanes stack two rows tall, so compact must NOT shrink the strip.
+   Same specificity as the 40px rule above, later in source order, so within
+   this media query it takes the tie — the retired top-of-file exception did
+   this same job with the old mechanism. */
+@media (max-width: 768px) {
+  :root[data-strip-compact] { --strip-h: 72px; }
+}

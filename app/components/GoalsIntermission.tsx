@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import { sydneyStamp } from "./PanelTodos";
+import { useCornerCard } from "./CornerStack";
 import { SETTING_DEFAULTS, type SettingsMap, getSetting } from "../lib/settings";
 import { HOUSEHOLD_TZ, zoneToday, daysBetween, type CivilDate } from "../lib/time";
 
@@ -91,8 +92,9 @@ function resolveTiming(settings: SettingsMap | null): Timing {
   return { firstFireMs, intervalMs, holdMs: Math.min(holdRaw, maxHold) };
 }
 
-/** Above TopNav (900), the origins strip (890) and the calendar popover (9999). */
-const OVERLAY_Z = 10000;
+/* z-index note: positioning moved to the shared CornerStack (2026-08-26) —
+   its container carries the old overlay z-index (10000), above TopNav (900),
+   the origins strip (890) and the calendar popover (9999). */
 
 /* ── Mission payload (subset) ─────────────────────────────────────────────────
    Local minimal types for what this surface reads out of /api/mission. The
@@ -250,19 +252,6 @@ function buildDeck(mission: MissionPayload | null, today: CivilDate): Slide[] {
   }
   return deck;
 }
-
-/* ── Motion preference as an external store (unchanged) ──────────────────── */
-
-const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
-
-function subscribeMotion(onChange: () => void): () => void {
-  const mq = window.matchMedia(REDUCED_MOTION_QUERY);
-  mq.addEventListener("change", onChange);
-  return () => mq.removeEventListener("change", onChange);
-}
-
-const readMotion = (): boolean => window.matchMedia(REDUCED_MOTION_QUERY).matches;
-const readMotionServer = (): boolean => false;
 
 /* ── Shared slide chrome ─────────────────────────────────────────────────────
    2026-08-26 owner directive: the intermission is no longer a full-viewport
@@ -466,8 +455,6 @@ function NoteSlide({ note }: { note: string }) {
 }
 
 export default function GoalsIntermission() {
-  const reducedMotion = useSyncExternalStore(subscribeMotion, readMotion, readMotionServer);
-
   const [visible, setVisible] = useState(false);
   const [index, setIndex] = useState(0);
   const [stamp, setStamp] = useState<string | null>(null);
@@ -590,51 +577,37 @@ export default function GoalsIntermission() {
     mission === null ? { y: 2026, m: 1, d: 1 } : zoneToday(new Date(), HOUSEHOLD_TZ),
   );
 
-  // Nothing to say → never on screen. All hooks are above this line.
-  if (deck.length === 0) return null;
-
-  const slide = deck[index % deck.length];
+  const slide = deck.length > 0 ? deck[index % deck.length] : null;
 
   const softenDaily = (s: Slide) =>
     s.kind === "daily" && s.owner === "N" && cycleActive;
 
   const accentKey: ToneKey =
-    slide.kind === "daily"
-      ? softenDaily(slide)
-        ? "cyan"
-        : worstTone(slide.points)
-      : slide.kind === "deadline"
-        ? deadlineTone(slide.daysLeft)
-        : "red";
+    slide === null
+      ? "muted"
+      : slide.kind === "daily"
+        ? softenDaily(slide)
+          ? "cyan"
+          : worstTone(slide.points)
+        : slide.kind === "deadline"
+          ? deadlineTone(slide.daysLeft)
+          : "red";
   const accent = TONE_VAR[accentKey];
 
-  const transition = reducedMotion
-    ? "none"
-    : `opacity ${FADE_MS}ms ease, transform ${FADE_MS}ms ease`;
-
-  /* Corner card (2026-08-26): bottom-right, no scrim, no dim — the dashboard
-     stays fully visible and interactive (pointerEvents none = click-through,
-     as before). Same appear/hold/fade cycle; only the geometry changed. */
-  return (
-    <div
-      aria-hidden={!visible}
-      data-intermission={visible ? "visible" : "hidden"}
-      style={{
-        position: "fixed",
-        right: 24,
-        bottom: 24,
-        zIndex: OVERLAY_Z,
-        // Click-through in every state. This is a wall display, not a modal —
-        // it must never swallow a click meant for a panel underneath.
-        pointerEvents: "none",
-        opacity: visible ? 1 : 0,
-        visibility: visible ? "visible" : "hidden",
-        transform: visible || reducedMotion ? "translateY(0)" : "translateY(12px)",
-        transition,
-      }}
-    >
+  /* Corner card (2026-08-26): rendered through the shared CornerStack — one
+     bottom-right column shared with the origins nudges, so two live cards
+     stack instead of overlapping. The appear/hold cycle above is untouched;
+     the card registers while `visible` and leaves the stack when the hold
+     ends (entry animation lives on .corner-stack-item in globals.css). No
+     scrim, no dim; pointerEvents none = click-through, as before. */
+  const node =
+    slide === null || !visible ? null : (
       <div
+        data-intermission="visible"
         style={{
+          // Click-through in every state. This is a wall display, not a
+          // modal — it must never swallow a click meant for a panel below.
+          pointerEvents: "none",
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
@@ -649,6 +622,7 @@ export default function GoalsIntermission() {
           minHeight: CARD_MIN_H,
           maxHeight: CARD_MAX_H,
           overflow: "hidden",
+          boxSizing: "border-box",
         }}
       >
         {slide.kind === "daily" && (
@@ -673,6 +647,9 @@ export default function GoalsIntermission() {
           {stamp ? ` · ${stamp} Sydney` : ""}
         </div>
       </div>
-    </div>
-  );
+    );
+
+  useCornerCard("mission", node);
+
+  return null;
 }

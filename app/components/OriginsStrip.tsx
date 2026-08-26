@@ -21,6 +21,16 @@ const NOTION_URL = "https://app.notion.com/p/8922c4a416e0445f808916a10e52b5f8";
 /** Ansar's surface is his own. A Taylan/Nihal course tracker has no business there. */
 const HIDDEN_ON = ["/ansar"];
 
+/* The FACE dropped the persistent strip (2026-08-26, Concept 2): origins
+   pressure now arrives as corner nudges (OriginsNudges) instead of standing
+   chrome. On "/" the strip renders nothing at all; the face's own root div
+   in app/page.tsx carries `dashboard-nostrip`, whose element-local
+   `--strip-h: 0px` (globals.css) hands the strip's height back to
+   .dashboard. Plain class selector on purpose — the Flip Pro's engine
+   predates modern selectors. This list and that class must agree. Every
+   other route keeps the strip exactly as before. */
+const NUDGES_INSTEAD_ON = ["/"];
+
 const REFRESH_MS = 300_000;
 
 type Lane = "taylan" | "nihal";
@@ -112,20 +122,40 @@ export default function OriginsStrip() {
     [load],
   );
 
-  if (HIDDEN_ON.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null;
-
-  // Reserve the row before the first payload lands, so nothing below it shifts
-  // when the data arrives. No `.strip-compact` here on purpose: the placeholder
-  // reserves the taller 72px, so the switch can only ever hand height back.
-  if (!data) return <div className="origins-strip" aria-hidden />;
+  const hidden =
+    HIDDEN_ON.some((p) => pathname === p || pathname.startsWith(`${p}/`)) ||
+    NUDGES_INSTEAD_ON.includes(pathname);
 
   // The only thing the client derives, and it is not a state — it is a read of
   // two the server already computed. Both lanes ON_PACE is the single case that
-  // earns the short strip; :root:has() in globals.css turns it into --strip-h.
-  const compact = data.taylan.state === "onpace" && data.nihal.state === "onpace";
+  // earns the short strip. Only true while the strip actually renders: hidden
+  // routes and the pre-data placeholder keep the taller 72px reservation.
+  const compact =
+    !hidden && !!data && data.taylan.state === "onpace" && data.nihal.state === "onpace";
+
+  // Lift the one bit of compact state onto <html> the same way Header.tsx sets
+  // data-theme, so globals.css can switch --strip-h with a plain attribute
+  // selector (`:root[data-strip-compact]`). An effect + attribute — not an
+  // inline style — because an inline style would out-specify the 768px tier
+  // and squeeze two stacked lanes into 40px. The Flip Pro's engine (which
+  // already forced color-mix out) needs this attribute mechanism; do not move
+  // this state back into a descendant-sniffing selector.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (compact) root.setAttribute("data-strip-compact", "on");
+    else root.removeAttribute("data-strip-compact");
+    return () => root.removeAttribute("data-strip-compact");
+  }, [compact]);
+
+  if (hidden) return null;
+
+  // Reserve the row before the first payload lands, so nothing below it shifts
+  // when the data arrives. Not compact on purpose: the placeholder reserves the
+  // taller 72px, so the switch can only ever hand height back.
+  if (!data) return <div className="origins-strip" aria-hidden />;
 
   return (
-    <div className={`origins-strip${compact ? " strip-compact" : ""}`}>
+    <div className="origins-strip">
       {LANES.map(({ key, label }) => {
         const lane = data[key];
         const { text, isBuild } = laneText(lane);
