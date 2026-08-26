@@ -13,7 +13,9 @@ import FaceFrameLanes from "./FaceFrameLanes";
    · Loop is 50 s — 10 + 15 + 25. DWELL_MS is the ONE constant array; nothing
      else hardcodes a dwell.
    · Hard cut between frames — conditional render, no transition.
-   · ?view=1|2|3 freezes that frame and stops the timer. No param = rotate.
+   · ?view=1|2|3 freezes that frame and stops the timer. No param = mounts
+     PAUSED on frame 1 (owner directive 2026-08-26); rotation starts only
+     when the header play pill is pressed.
    · visibilitychange hidden → pause; visible → resume at frame 1.
    · Touch on a hero/lane/chip (any anchor) navigates. Any other touch pauses
      rotation for 60 s, then resumes at frame 1.
@@ -38,10 +40,14 @@ export default function FaceRotator() {
   /* Owner pause (2026-08-26): indefinite, toggled by the header pause pill.
      Distinct from the 60 s touch-pause (`suspended`) — the timer stays fully
      stopped until the pill is tapped again, and resume restarts at frame 1,
-     the same landing the spec's other resumes use. */
-  const [paused, setPaused] = useState(false);
+     the same landing the spec's other resumes use.
+     Owner directive (Prompt 8, 2026-08-26): the face MOUNTS paused on frame 1
+     — rotation only ever starts from a pill press. Nothing is persisted;
+     every fresh load starts paused. (Deliberate deviation from RESTRUCTURE-
+     SPEC §7 "`/` rotates" — recorded in RESTRUCTURE-LEDGER.) */
+  const [paused, setPaused] = useState(true);
   const frozenRef = useRef<number | null>(null);
-  const pausedRef = useRef(false);
+  const pausedRef = useRef(true);
   const touchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /* ?view=1|2|3 — freeze that frame, stop the timer. Read once on mount from
@@ -139,7 +145,7 @@ export default function FaceRotator() {
                 type="button"
                 className={"face-pause" + (paused ? " face-pause--on" : "")}
                 aria-pressed={paused}
-                aria-label={paused ? "Resume rotation" : "Pause rotation"}
+                aria-label={paused ? "Start rotation" : "Pause rotation"}
                 onClick={togglePause}
               >
                 {paused ? (
