@@ -13,14 +13,12 @@ import FaceRotator from "./components/face/FaceRotator";
    (spec §3: date · time · counter); theme + clock behave as before. */
 
 export default function Dashboard() {
-  /* dashboard-nostrip: the face has no OriginsStrip (it renders null on
-     "/" — see NUDGES_INSTEAD_ON in OriginsStrip.tsx), so this class sets
-     --strip-h: 0px LOCALLY on the one element that consumes it, handing
-     the strip's height to the frames. Element-local beats every inherited
-     :root value by inheritance rules alone — plain class selector, Flip
-     Pro safe. */
+  /* The OriginsStrip banner is retired on EVERY route (owner, 2026-08-26) —
+     unmounted in app/layout.tsx, --strip-h zeroed globally at the end of
+     globals.css. The face needs no local override any more; origins pressure
+     arrives only through OriginsNudges in the CornerStack below. */
   return (
-    <div className="dashboard dashboard-nostrip">
+    <div className="dashboard">
       {/* Both corner surfaces render through the ONE CornerStack (2026-08-26):
           GoalsIntermission and OriginsNudges register cards; the stack is the
           only fixed bottom-right element, so cards can never overlap. */}

@@ -5,7 +5,14 @@ import { usePathname } from "next/navigation";
 import type { LaneSummary, OriginsPayload } from "../api/origins/route";
 
 /* ────────────────────────────────────────────────────────────────────────────
-   OriginsStrip — one row under the nav, on every route, all day.
+   OriginsStrip — RETIRED 2026-08-26 (owner): rendered on NO route any more.
+   Unmounted from app/layout.tsx; origins pressure now exists only as the
+   corner nudges on "/" (OriginsNudges in the CornerStack). This file stays
+   because OriginsNudges imports `deliverableOf` and the tick contract below
+   documents the /api/origins/complete write the nudges reuse verbatim.
+
+   Original header, for the record:
+   One row under the nav, on every route, all day.
 
    `import type` above is erased at compile time: it carries the payload shape
    from the route so the two cannot drift, and pulls no server code (and no
@@ -126,26 +133,8 @@ export default function OriginsStrip() {
     HIDDEN_ON.some((p) => pathname === p || pathname.startsWith(`${p}/`)) ||
     NUDGES_INSTEAD_ON.includes(pathname);
 
-  // The only thing the client derives, and it is not a state — it is a read of
-  // two the server already computed. Both lanes ON_PACE is the single case that
-  // earns the short strip. Only true while the strip actually renders: hidden
-  // routes and the pre-data placeholder keep the taller 72px reservation.
-  const compact =
-    !hidden && !!data && data.taylan.state === "onpace" && data.nihal.state === "onpace";
-
-  // Lift the one bit of compact state onto <html> the same way Header.tsx sets
-  // data-theme, so globals.css can switch --strip-h with a plain attribute
-  // selector (`:root[data-strip-compact]`). An effect + attribute — not an
-  // inline style — because an inline style would out-specify the 768px tier
-  // and squeeze two stacked lanes into 40px. The Flip Pro's engine (which
-  // already forced color-mix out) needs this attribute mechanism; do not move
-  // this state back into a descendant-sniffing selector.
-  useEffect(() => {
-    const root = document.documentElement;
-    if (compact) root.setAttribute("data-strip-compact", "on");
-    else root.removeAttribute("data-strip-compact");
-    return () => root.removeAttribute("data-strip-compact");
-  }, [compact]);
+  // (The data-strip-compact <html> attribute effect that lived here was
+  //  deleted with the strip's retirement — its globals.css rules are gone.)
 
   if (hidden) return null;
 

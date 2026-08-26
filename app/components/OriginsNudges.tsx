@@ -11,10 +11,13 @@ import { useCornerCard } from "./CornerStack";
    The persistent OriginsStrip is gone from the face; in its place, cards
    appear in the shared bottom-right CornerStack at three Sydney windows —
    07:30, 12:30, 19:30 — one card per person who is behind pace (any lane
-   state other than ON_PACE: behind, build, silent). Windowed cards hide after
-   60 s or on Later; a Later is remembered in localStorage for that window so
-   a reload inside the same window stays quiet. A SILENT lane's card PINS —
-   no auto-dismiss; Later only snoozes it for an hour — until a tick lands.
+   state other than ON_PACE: behind, build, silent). EVERY card — SILENT
+   included — sits idle for the same AUTO_DISMISS_MS and then leaves with the
+   mission card's hard-cut exit (owner directive 2026-08-26: no pinning). A
+   Later on a windowed card is remembered in localStorage for that window so
+   a reload inside the same window stays quiet. A SILENT lane keeps its
+   recurrence instead of a pin: auto-dismiss and Later both bring the card
+   back an hour later, until a tick lands.
 
    A fresh mount inside a window shows the card too: the wall display can be
    power-cycled mid-window and must not miss the nudge.
@@ -40,8 +43,11 @@ const LANES: { key: Lane; label: string }[] = [
 const WINDOWS = ["07:30", "12:30", "19:30"] as const;
 const WINDOW_OPEN_MIN = 60;
 
+/** The ONE idle timeout every nudge card gets — windowed AND silent (owner
+    directive 2026-08-26: nothing pins; same timer family as the corner
+    popups). The hint line derives from this constant so it cannot drift. */
 const AUTO_DISMISS_MS = 60_000;
-/** A snoozed SILENT card returns after this long. */
+/** A snoozed or auto-dismissed SILENT card returns after this long. */
 const SILENT_RETURN_MS = 60 * 60 * 1000;
 /** How long the post-tick confirmation lingers before the card removes itself. */
 const CONFIRM_MS = 2_500;
@@ -276,6 +282,10 @@ export default function OriginsNudges() {
   /* Windowed cards already auto-dismissed (or completed) THIS mount, keyed
      `lane|windowKey`. In memory on purpose: only Later persists. */
   const spent = useRef(new Set<string>());
+  /* A SILENT card's auto-dismiss, per lane: hidden until this epoch-ms, then
+     it returns (the hourly recurrence). In memory like `spent` — a reload
+     re-shows the card with a fresh timeout, exactly as windowed cards do. */
+  const silentHiddenUntil = useRef<Record<Lane, number>>({ taylan: 0, nihal: 0 });
   const confirmTimers = useRef<Partial<Record<Lane, ReturnType<typeof setTimeout>>>>({});
 
   const load = useCallback(async (force = false) => {
@@ -319,26 +329,44 @@ export default function OriginsNudges() {
     if (ui[lane].confirm) return true;
     const summary = data[lane];
     if (!summary || summary.state === "onpace" || !summary.next) return false;
-    if (summary.state === "silent") return Date.now() >= snoozedUntil(lane);
+    if (summary.state === "silent")
+      return (
+        Date.now() >= snoozedUntil(lane) &&
+        Date.now() >= silentHiddenUntil.current[lane]
+      );
     if (!windowKey) return false;
     if (spent.current.has(`${lane}|${windowKey}`)) return false;
     return !isDismissed(lane, windowKey);
   };
 
-  /* Auto-dismiss: a visible WINDOWED card leaves after 60 s. Silent cards
-     pin — no timer. Keyed on lane|windowKey so a card re-shown in a later
-     window gets a fresh 60 s. */
+  /* Auto-dismiss: EVERY visible card leaves after the shared AUTO_DISMISS_MS
+     idle timeout — the exit is the same hard cut the mission card uses.
+     Windowed cards are keyed on lane|windowKey so a card re-shown in a later
+     window gets a fresh timeout; a silent card's dismissal instead schedules
+     its hourly return (no pin — owner directive 2026-08-26). */
   const tVis = visibleFor("taylan");
   const nVis = visibleFor("nihal");
   useEffect(() => {
-    if (!data || !windowKey) return;
+    if (!data) return;
     const timers: ReturnType<typeof setTimeout>[] = [];
     for (const { key } of LANES) {
       const summary = data[key];
-      if (!summary || summary.state === "silent") continue;
-      const mark = `${key}|${windowKey}`;
+      if (!summary) continue;
       const vis = key === "taylan" ? tVis : nVis;
-      if (!vis || spent.current.has(mark)) continue;
+      if (!vis) continue;
+      if (summary.state === "silent") {
+        timers.push(
+          setTimeout(() => {
+            // Same recurrence as Later: back in an hour, until a tick lands.
+            silentHiddenUntil.current[key] = Date.now() + SILENT_RETURN_MS;
+            bump();
+          }, AUTO_DISMISS_MS),
+        );
+        continue;
+      }
+      if (!windowKey) continue;
+      const mark = `${key}|${windowKey}`;
+      if (spent.current.has(mark)) continue;
       timers.push(
         setTimeout(() => {
           spent.current.add(mark);
@@ -407,7 +435,7 @@ export default function OriginsNudges() {
       const summary = data?.[lane];
       if (!summary) return;
       if (summary.state === "silent") {
-        // Not forever: the pinned card returns in an hour until a tick lands.
+        // Not forever: the card returns in an hour until a tick lands.
         persistSnooze(lane, Date.now() + SILENT_RETURN_MS);
       } else if (windowKey && now) {
         persistDismiss(lane, windowKey, now.dateKey);
@@ -417,8 +445,11 @@ export default function OriginsNudges() {
     [data, windowKey, now],
   );
 
+  /* One hint style for every card, derived from the shared constant. */
   const hintFor = (lane: LaneSummary): string =>
-    lane.state === "silent" ? "stays until ticked" : `${win} window · hides in 60s`;
+    lane.state === "silent"
+      ? `hides in ${AUTO_DISMISS_MS / 1000}s · back hourly`
+      : `${win} window · hides in ${AUTO_DISMISS_MS / 1000}s`;
 
   const cardFor = (key: Lane, label: string) => {
     const vis = key === "taylan" ? tVis : nVis;

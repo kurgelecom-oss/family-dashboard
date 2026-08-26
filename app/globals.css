@@ -19,15 +19,12 @@
    Reserving 40px first would let a BEHIND lane grow down into the fold. */
 :root { --strip-h: 72px; }
 
-/* RETIRED MECHANISM (2026-08-26): the rule below never matches any more — the
-   strip no longer renders `.strip-compact` (the Flip Pro's engine predates the
-   descendant-sniffing selector it relied on, so compact silently never fired
-   there). OriginsStrip.tsx now lifts the same bit of state onto <html> as
-   `data-strip-compact` (mirroring Header's data-theme), and the live rules sit
-   at the END of this file: `:root[data-strip-compact]`. Rule kept, not edited,
-   per the append-only discipline. Still deliberately not an inline style on
-   <html>: an inline style would out-specify the mobile tier further down and
-   silently break the stacked layout. */
+/* RETIRED MECHANISM (2026-08-26): the rule below never matches any more — no
+   element ever carries `.strip-compact`, and since the same day the strip
+   banner itself renders on NO route (unmounted in app/layout.tsx; owner
+   directive — origins pressure lives only in the face's corner nudges).
+   `--strip-h` is zeroed by a later bare `:root` rule at the END of this
+   file. Rule kept, not edited, per the append-only discipline. */
 :root:has(.origins-strip.strip-compact) { --strip-h: 40px; }
 
 /* ── NIGHT THEME (default before JS runs) ─────────────────────── */
@@ -450,12 +447,11 @@ html, body {
    counter are dropped; lesson, tick and colour state survive — those are what
    the strip is for.
 
-   The second selector below is part of the RETIRED compact mechanism (see the
-   note near the top of this file) and never matches any more. Its job — keep
-   the compact rule from squeezing two stacked lanes into 40px — is done by the
-   `@media (max-width: 768px) :root[data-strip-compact]` rule appended at the
-   END of this file, which out-specifies bare `:root` and, by source order,
-   beats the appended 40px compact rule. */
+   RETIRED (2026-08-26): the strip renders on NO route any more (owner
+   directive; unmounted in app/layout.tsx), so nothing below matches. The
+   bare `:root` 72px here is also overridden at every width by the later
+   appended `:root { --strip-h: 0px }` at the END of this file — equal
+   specificity, later source order wins; media queries add none. */
 @media (max-width: 768px) {
   :root,
   :root:has(.origins-strip.strip-compact) { --strip-h: 72px; }
@@ -1751,14 +1747,6 @@ html, body {
    corner nudges in the shared bottom-right CornerStack (one flex column,
    also carrying the mission/intermission card — cards can never overlap). */
 
-/* Face only: app/page.tsx puts this class on its own .dashboard div (the one
-   element on "/" that reads --strip-h) while OriginsStrip renders null there.
-   An element-local custom property beats EVERY inherited :root value — base,
-   768px tier, and the compact rules alike — by inheritance rules alone, so
-   no selector arms race and nothing the Flip Pro's engine (which already
-   forced color-mix out) cannot parse. */
-.dashboard-nostrip { --strip-h: 0px; }
-
 .corner-stack {
   position: fixed;
   right: 24px;
@@ -1845,22 +1833,17 @@ html, body {
   font-size: 13px; font-weight: 600; cursor: pointer;
 }
 
-/* ── STRIP COMPACT STATE, Flip Pro safe (2026-08-26) — append-only ───────────
-   Replaces the retired descendant-sniffing compact mechanism near the top of
-   this file (which the Flip Pro's engine cannot parse — same class of failure
-   as color-mix, commit f956abe). OriginsStrip.tsx sets `data-strip-compact`
-   on <html> from an effect — exactly how Header.tsx sets data-theme — only
-   while the strip is rendered AND both lanes are ON_PACE. Plain attribute
-   selector, (0,2,0): beats the bare `:root { --strip-h: 72px }` base and the
-   768px tier's bare `:root`; the retired rules never match (no element ever
-   carries .strip-compact any more). The face is untouched by any of this —
-   `.dashboard-nostrip`'s element-local 0px wins there regardless. */
-:root[data-strip-compact] { --strip-h: 40px; }
-
-/* Mobile: lanes stack two rows tall, so compact must NOT shrink the strip.
-   Same specificity as the 40px rule above, later in source order, so within
-   this media query it takes the tie — the retired top-of-file exception did
-   this same job with the old mechanism. */
-@media (max-width: 768px) {
-  :root[data-strip-compact] { --strip-h: 72px; }
-}
+/* ── ORIGINS STRIP RETIRED EVERYWHERE (2026-08-26, owner-directed) ───────────
+   The strip banner renders on NO route any more: <OriginsStrip /> was removed
+   from app/layout.tsx, so every .origins-strip rule above — and the two dead
+   committed :has() compact rules near the top of this file — can never match.
+   The data-strip-compact / .dashboard-nostrip wiring appended for Prompt 7
+   was deleted with it (nothing sets the attribute or carries the class now).
+   Every surface still subtracts --strip-h from the same var (this file's
+   .dashboard, plus the inline math on /board /week /money /business /table
+   /budget /origins), so zeroing it HERE reclaims the height everywhere at
+   once with none of that math touched. Bare :root, later in source order
+   than the committed 72px base, takes the tie; no higher-specificity strip
+   rule matches any more. WeekProgressStrip on /board is a different,
+   in-grid component and reads no part of this. */
+:root { --strip-h: 0px; }

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import TopNav from "./components/TopNav";
-import OriginsStrip from "./components/OriginsStrip";
 
 export const metadata: Metadata = {
   title: "Kurgel Family Dashboard",
@@ -17,9 +16,10 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <TopNav />
-        {/* Directly below the nav, every route, always visible. Hides itself on
-            /ansar; surfaces subtract --strip-h so it costs no card space. */}
-        <OriginsStrip />
+        {/* The OriginsStrip banner is retired everywhere (owner, 2026-08-26):
+            origins pressure exists only as the corner nudges on "/". --strip-h
+            is zeroed at the end of globals.css so every surface that subtracts
+            it reclaims the height without touching its own math. */}
         {children}
       </body>
     </html>
