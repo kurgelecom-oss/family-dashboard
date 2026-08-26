@@ -63,7 +63,7 @@ Mechanics:
 - On `visibilitychange` hidden: pause the timer. On visible: resume at frame 1.
 - Night mode dims all three frames. Do not change how AUTO or LIVE behave; discover what they do first and leave them alone.
 - Frame components live beside the existing face component. The face keeps its route. No new route for the face.
-- Every hero and lane links to its route: Week → `/money`, Test → `/business`, Table → `/table`, Ansar → `ansar-habits-tracker.netlify.app`, Family lane → `/board`.
+- Every hero and lane links to its route: Week → `/money`, Test → `/business`, Table → `/table`, Ansar → no link (owner amendment 2026-08-26: Ansar dashboard link removed everywhere), Family lane → `/board`.
 - Touch on a hero or lane navigates to its route. Any other touch pauses rotation for 60 s, then resumes at frame 1.
 
 Headline rules, priority order, first match wins:
@@ -80,7 +80,7 @@ Face data and sources:
 | Element | Source |
 |---|---|
 | Week spend, month spend, balance, saved % | PocketSmith via existing routes |
-| Test status, next gate, spend vs window, tests 0 of 3 | Launchpad API, `product-test-engine.netlify.app/api`. A product = a test. IDs are 36-char UUIDs. Never wire `ecom-launchpad-mentor.netlify.app`. |
+| Test status, next gate, spend vs window, tests 0 of 3 | Launchpad API, `product-test-engine.netlify.app/api`. A product = a test. IDs are 36-char UUIDs. Data/API calls only ever hit `product-test-engine.netlify.app/api`; user-facing "Open in Launchpad" links go to `ecom-launchpad-mentor.netlify.app` (owner amendment 2026-08-26). |
 | Open decision count, oldest age, oldest title | Notion collection `4431302a-75ed-479f-a5f4-3bfd5e0a4e68` (Daily Discussion Points) via `fetchSource` in `app/lib/notion.ts` |
 | Ansar streak, today % | Supabase via existing routes |
 | Tomorrow's events by person | MS Graph via existing calendar route |
@@ -124,7 +124,7 @@ All four: back link to `/` at top left. Header shows date and time in Australia/
 
 - The existing board stays exactly as `BOARD-SPEC.md` defines it. Nothing below the new bands changes.
 - Add above the board: calendar band. Grid with a row per person (Taylan, Nihal, Ansar) and columns Today · Tomorrow. Events as small blocks with a coloured left border and time. Empty cell shows `—`. Tap → the event.
-- Add below the calendar band: Ansar strip. Day streak (purple), points today, week points / 55, progress bar, link `Open his dashboard` → `ansar-habits-tracker.netlify.app`.
+- Add below the calendar band: Ansar strip. Day streak (purple), points today, week points / 55, progress bar. No dashboard link (owner amendment 2026-08-26).
 - Sources: MS Graph via existing calendar route, Supabase via existing Ansar route.
 
 ---
