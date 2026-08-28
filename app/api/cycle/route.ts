@@ -9,12 +9,13 @@ import {
   parseCivilDate,
   type CivilDate,
 } from "../../lib/time";
+import { cycleDurationDays } from "../../lib/cycle-duration";
 
 /* ────────────────────────────────────────────────────────────────────────────
-   /api/cycle — the discreet 9-day tracker behind the small red nav button.
+   /api/cycle — the discreet cycle tracker behind the small red nav button.
 
    Backed by public.cycle_starts (append-only; one row per button press).
-   GET  → current state: activeDay 1–9 while a tracker is running, else null,
+   GET  → current state while a tracker is running, else activeDay null,
           plus expectedInDays when the NEXT start is predicted within ±3 days
           (needs at least two recorded starts to have a gap to average).
    POST → record today (Sydney) as a new start. Refused with 409 while a
@@ -38,9 +39,6 @@ export const revalidate = 0;
 
 const TABLE = "cycle_starts";
 
-/** Days the tracker stays visible, day 1 through day 9 inclusive. */
-const ACTIVE_DAYS = 9;
-
 /** How many recent starts feed the prediction. */
 const HISTORY_LIMIT = 12;
 
@@ -61,6 +59,7 @@ const BASE_HEADERS = {
 
 interface CycleState {
   activeDay: number | null;
+  totalDays: number | null;
   startedOn: string | null;
   /** Signed days until the predicted next start, only within ±HEADS_UP_WINDOW
       and only while no tracker is active; otherwise null. Negative = overdue. */
@@ -80,7 +79,7 @@ async function readState(): Promise<CycleState | { error: string }> {
 
   if (error) return { error: error.message };
   if (!data || data.length === 0) {
-    return { activeDay: null, startedOn: null, expectedInDays: null };
+    return { activeDay: null, totalDays: null, startedOn: null, expectedInDays: null };
   }
 
   const starts: CivilDate[] = [];
@@ -93,9 +92,11 @@ async function readState(): Promise<CycleState | { error: string }> {
   const today = zoneToday(new Date(), HOUSEHOLD_TZ);
   const latest = starts[0];
   const since = daysBetween(latest, today);
+  const latestIso = isoDate(latest);
+  const durationDays = cycleDurationDays(latestIso);
   // Day 1 is the press day itself. Negative `since` (a future-dated row)
   // reads as not active rather than as a tracker that never expires.
-  const activeDay = since >= 0 && since < ACTIVE_DAYS ? since + 1 : null;
+  const activeDay = since >= 0 && since < durationDays ? since + 1 : null;
 
   /* Prediction: average the sane gaps between consecutive starts (newest-first
      rows, so gap = row[i] - row[i+1]). One sane gap is enough to predict, more
@@ -116,7 +117,12 @@ async function readState(): Promise<CycleState | { error: string }> {
     }
   }
 
-  return { activeDay, startedOn: isoDate(latest), expectedInDays };
+  return {
+    activeDay,
+    totalDays: activeDay === null ? null : durationDays,
+    startedOn: latestIso,
+    expectedInDays,
+  };
 }
 
 export async function GET() {
@@ -137,7 +143,12 @@ export async function POST() {
   if (error) return respond({ error: error.message }, 503);
 
   return respond(
-    { activeDay: 1, startedOn: today, expectedInDays: null } satisfies CycleState,
+    {
+      activeDay: 1,
+      totalDays: cycleDurationDays(today),
+      startedOn: today,
+      expectedInDays: null,
+    } satisfies CycleState,
     201,
   );
 }

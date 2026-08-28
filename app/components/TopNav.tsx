@@ -61,13 +61,14 @@ function IncidentCounter() {
 }
 
 /* Deliberately unlabeled — a small pulsing red button beside the incident
-   counter. One press starts a 9-day countdown pill ("day X of 9") that flashes
+   counter. One press starts a countdown pill ("day X of Y") that flashes
    red beside it, then everything but the button disappears again. While a
    tracker is running the button is inert (the API also 409s), so a stray tap
    cannot restart the count. State lives in Supabase via /api/cycle; if that
    read fails the button still renders — only the pill needs data. */
 function CycleTracker() {
   const [activeDay, setActiveDay] = useState<number | null>(null);
+  const [totalDays, setTotalDays] = useState<number | null>(null);
   const [headsUp, setHeadsUp] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -78,6 +79,7 @@ function CycleTracker() {
         if (!res.ok) return;
         const data = await res.json();
         setActiveDay(typeof data.activeDay === "number" ? data.activeDay : null);
+        setTotalDays(typeof data.totalDays === "number" ? data.totalDays : null);
         // Server only sets expectedInDays inside the ±3-day window and never
         // while a tracker is active, so presence alone is the signal.
         setHeadsUp(typeof data.expectedInDays === "number");
@@ -98,6 +100,7 @@ function CycleTracker() {
       if (res.ok) {
         const data = await res.json();
         setActiveDay(typeof data.activeDay === "number" ? data.activeDay : null);
+        setTotalDays(typeof data.totalDays === "number" ? data.totalDays : null);
       }
     } catch {
       // Failed press stays silent on screen; the next tap retries.
@@ -109,8 +112,8 @@ function CycleTracker() {
   return (
     <div className="cycle-wrap">
       {headsUp && activeDay === null && <span className="cycle-heads-up" />}
-      {activeDay !== null && (
-        <span className="cycle-pill">day {activeDay} of 9</span>
+      {activeDay !== null && totalDays !== null && (
+        <span className="cycle-pill">day {activeDay} of {totalDays}</span>
       )}
       <button
         type="button"

@@ -991,7 +991,7 @@ html, body {
 
 /* ── CYCLE TRACKER (unlabeled) ────────────────────────────────────────────────
    Small glossy red button at the nav's right edge, sized to the incident
-   counter's 12px line. Pressing it starts a 9-day "day X of 9" pill that
+   counter's 12px line. Pressing it starts a "day X of Y" pill that
    flashes red beside it; while the pill is up the button goes quiet (no pulse)
    and inert. No label anywhere — this renders on a family TV.
    ──────────────────────────────────────────────────────────────────────────── */
