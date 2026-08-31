@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const LINKS: { label: string; href: string; external?: boolean }[] = [
   { label: "Family Dashboard",      href: "https://kurgel-dashboard.netlify.app/" },
@@ -66,11 +66,34 @@ function IncidentCounter() {
    tracker is running the button is inert (the API also 409s), so a stray tap
    cannot restart the count. State lives in Supabase via /api/cycle; if that
    read fails the button still renders — only the pill needs data. */
+interface CycleHistoryEntry {
+  startedOn: string;
+  gapDays: number | null;
+  sane: boolean;
+}
+
+interface CycleHistory {
+  entries: CycleHistoryEntry[];
+  count: number;
+  avgGap: number | null;
+  minGap: number | null;
+  maxGap: number | null;
+  expectedNext: string | null;
+  expectedInDays: number | null;
+}
+
 function CycleTracker() {
   const [activeDay, setActiveDay] = useState<number | null>(null);
   const [totalDays, setTotalDays] = useState<number | null>(null);
   const [headsUp, setHeadsUp] = useState(false);
   const [busy, setBusy] = useState(false);
+  /* Long-press (600ms) on the button opens the unlabeled history panel; a
+     plain tap keeps its recording meaning. The panel is the only surface that
+     shows the log, and only on deliberate gesture — nothing leaks to the TV. */
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [history, setHistory] = useState<CycleHistory | null>(null);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressed = useRef(false);
 
   useEffect(() => {
     const load = async () => {
@@ -92,7 +115,47 @@ function CycleTracker() {
     return () => clearInterval(interval);
   }, []);
 
+  const openPanel = async () => {
+    setPanelOpen(true);
+    try {
+      const res = await fetch("/api/cycle?history=1");
+      if (!res.ok) return;
+      setHistory((await res.json()) as CycleHistory);
+    } catch {
+      // Panel opens empty rather than not at all; closing and re-holding retries.
+    }
+  };
+
+  const startHold = () => {
+    longPressed.current = false;
+    holdTimer.current = setTimeout(() => {
+      longPressed.current = true;
+      void openPanel();
+    }, 600);
+  };
+
+  const cancelHold = () => {
+    if (holdTimer.current !== null) {
+      clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
+  };
+
+  useEffect(() => {
+    if (!panelOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPanelOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [panelOpen]);
+
   const press = async () => {
+    // A long press already consumed this gesture — it must not also record.
+    if (longPressed.current) {
+      longPressed.current = false;
+      return;
+    }
     if (activeDay !== null || busy) return;
     setBusy(true);
     try {
@@ -119,8 +182,47 @@ function CycleTracker() {
         type="button"
         className={activeDay === null ? "cycle-btn" : "cycle-btn cycle-btn-quiet"}
         onClick={press}
+        onPointerDown={startHold}
+        onPointerUp={cancelHold}
+        onPointerLeave={cancelHold}
+        onContextMenu={(e) => e.preventDefault()}
         aria-label="tracker"
       />
+      {panelOpen && (
+        <>
+          <div className="cycle-panel-backdrop" onClick={() => setPanelOpen(false)} />
+          <div className="cycle-panel">
+            {history === null ? (
+              <div className="cycle-panel-empty">…</div>
+            ) : history.count === 0 ? (
+              <div className="cycle-panel-empty">no entries yet</div>
+            ) : (
+              <>
+                <div className="cycle-panel-stats">
+                  <span>{history.count} recorded</span>
+                  {history.avgGap !== null && <span>avg {history.avgGap}d</span>}
+                  {history.minGap !== null && history.maxGap !== null && (
+                    <span>{history.minGap}–{history.maxGap}d</span>
+                  )}
+                  {history.expectedNext !== null && (
+                    <span className="cycle-panel-next">next ~{history.expectedNext}</span>
+                  )}
+                </div>
+                <ul className="cycle-panel-list">
+                  {history.entries.map((entry) => (
+                    <li key={entry.startedOn}>
+                      <span>{entry.startedOn}</span>
+                      <span className={entry.gapDays !== null && !entry.sane ? "cycle-gap-odd" : undefined}>
+                        {entry.gapDays === null ? "current" : `${entry.gapDays}d`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -22,7 +22,9 @@ import { cycleDurationDays } from "../../lib/cycle-duration";
           tracker is already active, so a stray second tap cannot restart it.
 
    Deliberately unlabeled in every response — this payload renders on a family
-   TV. No history endpoint; trends stay in the table until someone asks.
+   TV. GET ?history=1 returns the full log with per-gap lengths and summary
+   stats; it feeds the long-press panel behind the button and nothing renders
+   from it unless someone deliberately opens that panel.
 
    CORS: the mission page (jade-bombolone) carries the same button, so this
    route allows exactly that one browser origin — same posture as /api/mission,
@@ -41,6 +43,9 @@ const TABLE = "cycle_starts";
 
 /** How many recent starts feed the prediction. */
 const HISTORY_LIMIT = 12;
+
+/** How many starts the ?history=1 log returns — ten years of monthly presses. */
+const FULL_HISTORY_LIMIT = 120;
 
 /** A gap outside this range is a data blip, not a cycle — it is ignored. */
 const SANE_GAP_MIN = 15;
@@ -125,7 +130,84 @@ async function readState(): Promise<CycleState | { error: string }> {
   };
 }
 
-export async function GET() {
+/* ?history=1 payload. Gaps outside the sane range appear in the log (flagged
+   sane: false) but never feed the stats — a data blip stays visible without
+   skewing the averages. */
+interface CycleHistoryEntry {
+  startedOn: string;
+  /** Days until the NEXT recorded start; null for the latest entry. */
+  gapDays: number | null;
+  sane: boolean;
+}
+
+interface CycleHistory {
+  entries: CycleHistoryEntry[]; // newest first
+  count: number;
+  avgGap: number | null;
+  minGap: number | null;
+  maxGap: number | null;
+  lastStart: string | null;
+  /** lastStart + avgGap, the projected next press. */
+  expectedNext: string | null;
+  /** Days from today until expectedNext; negative = overdue. */
+  expectedInDays: number | null;
+}
+
+async function readHistory(): Promise<CycleHistory | { error: string }> {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("started_on")
+    .order("started_on", { ascending: false })
+    .limit(FULL_HISTORY_LIMIT);
+
+  if (error) return { error: error.message };
+
+  const starts: CivilDate[] = [];
+  for (const row of data ?? []) {
+    const parsed = parseCivilDate(String(row.started_on));
+    if (parsed === null) return { error: `unparseable started_on: ${row.started_on}` };
+    starts.push(parsed);
+  }
+
+  const entries: CycleHistoryEntry[] = [];
+  const saneGaps: number[] = [];
+  for (let i = 0; i < starts.length; i++) {
+    // Newest-first rows: the gap belonging to row i is the distance forward
+    // to the next-newer start, so the latest row has no gap yet.
+    const gap = i === 0 ? null : daysBetween(starts[i], starts[i - 1]);
+    const sane = gap !== null && gap >= SANE_GAP_MIN && gap <= SANE_GAP_MAX;
+    if (gap !== null && sane) saneGaps.push(gap);
+    entries.push({ startedOn: isoDate(starts[i]), gapDays: gap, sane });
+  }
+
+  let avgGap: number | null = null;
+  let expectedNext: string | null = null;
+  let expectedInDays: number | null = null;
+  if (saneGaps.length > 0) {
+    avgGap = Math.round(saneGaps.reduce((a, b) => a + b, 0) / saneGaps.length);
+    const expected = addDays(starts[0], avgGap);
+    expectedNext = isoDate(expected);
+    expectedInDays = daysBetween(zoneToday(new Date(), HOUSEHOLD_TZ), expected);
+  }
+
+  return {
+    entries,
+    count: starts.length,
+    avgGap,
+    minGap: saneGaps.length > 0 ? Math.min(...saneGaps) : null,
+    maxGap: saneGaps.length > 0 ? Math.max(...saneGaps) : null,
+    lastStart: starts.length > 0 ? isoDate(starts[0]) : null,
+    expectedNext,
+    expectedInDays,
+  };
+}
+
+export async function GET(request: Request) {
+  if (new URL(request.url).searchParams.get("history") === "1") {
+    const history = await readHistory();
+    if ("error" in history) return respond(history, 503);
+    return respond(history);
+  }
   const state = await readState();
   if ("error" in state) return respond(state, 503);
   return respond(state);
