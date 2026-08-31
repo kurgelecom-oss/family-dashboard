@@ -1067,9 +1067,12 @@ html, body {
   z-index: 60;
 }
 .cycle-panel {
-  position: absolute;
+  /* Fixed, not absolute: .topnav is overflow auto (it scrolls horizontally on
+     a phone), so an absolute child anchored inside it gets clipped to the
+     40px bar. Fixed escapes that — no transformed ancestors exist to trap it. */
+  position: fixed;
   top: calc(var(--nav-h) + 4px);
-  right: 0;
+  right: 10px;
   z-index: 61;
   min-width: 210px;
   max-height: 320px;
