@@ -56,6 +56,94 @@ const HEADS_UP_WINDOW = 3;
 
 const ALLOWED_ORIGIN = "https://jade-bombolone-82d172.netlify.app";
 
+/* ── Notion mirror ───────────────────────────────────────────────────────────
+   Every successful press also lands a row in the "Cycle Log" database on the
+   Cycle page (NIHAL → Home Hub), so the history is readable in Notion next to
+   the operating guide. Best-effort by design: Supabase stays the source of
+   truth, and a Notion failure must never break the button — every call here
+   is wrapped, bounded by a timeout, and ignored on error.
+
+   The data-source id is not a secret (useless without NOTION_TOKEN, which
+   lives in Netlify env like every other Notion route here uses). */
+const NOTION_CYCLE_SOURCE = "ae2a2c28-b967-4ce4-bde2-59ca193ed874";
+const NOTION_TIMEOUT_MS = 4000;
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function notionHeaders(token: string) {
+  return {
+    "Authorization": `Bearer ${token}`,
+    "Notion-Version": "2025-09-03",
+    "Content-Type": "application/json",
+  };
+}
+
+/** Create the new start's row, and stamp the finished cycle's length onto the
+    previous row (found by its exact start date). */
+async function mirrorToNotion(todayIso: string, prevIso: string | null): Promise<void> {
+  const token = process.env.NOTION_TOKEN;
+  if (!token) return;
+
+  try {
+    const month = MONTHS[Number(todayIso.slice(5, 7)) - 1] ?? "";
+    await fetch("https://api.notion.com/v1/pages", {
+      method: "POST",
+      headers: notionHeaders(token),
+      signal: AbortSignal.timeout(NOTION_TIMEOUT_MS),
+      body: JSON.stringify({
+        parent: { type: "data_source_id", data_source_id: NOTION_CYCLE_SOURCE },
+        properties: {
+          "Name": { title: [{ text: { content: `${month} ${todayIso.slice(0, 4)}` } }] },
+          "Start date": { date: { start: todayIso } },
+          "Source": { select: { name: "Red button" } },
+          "Within normal range": { select: { name: "Pending next press" } },
+        },
+      }),
+    });
+  } catch {
+    // Mirror only; the press already succeeded in Supabase.
+  }
+
+  if (prevIso === null) return;
+  try {
+    const prev = parseCivilDate(prevIso);
+    const today = parseCivilDate(todayIso);
+    if (prev === null || today === null) return;
+    const gap = daysBetween(prev, today);
+    const verdict =
+      gap >= 21 && gap <= 35 ? "Yes"
+      : gap >= SANE_GAP_MIN && gap <= SANE_GAP_MAX ? "Watch"
+      : "Excluded blip";
+
+    const query = await fetch(`https://api.notion.com/v1/data_sources/${NOTION_CYCLE_SOURCE}/query`, {
+      method: "POST",
+      headers: notionHeaders(token),
+      signal: AbortSignal.timeout(NOTION_TIMEOUT_MS),
+      body: JSON.stringify({
+        page_size: 1,
+        filter: { property: "Start date", date: { equals: prevIso } },
+      }),
+    });
+    if (!query.ok) return;
+    const rows = (await query.json()) as { results?: { id?: string }[] };
+    const pageId = rows.results?.[0]?.id;
+    if (!pageId) return;
+
+    await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
+      method: "PATCH",
+      headers: notionHeaders(token),
+      signal: AbortSignal.timeout(NOTION_TIMEOUT_MS),
+      body: JSON.stringify({
+        properties: {
+          "Cycle length (days)": { number: gap },
+          "Within normal range": { select: { name: verdict } },
+        },
+      }),
+    });
+  } catch {
+    // Same posture: the length backfills by hand if this ever misses.
+  }
+}
+
 const BASE_HEADERS = {
   "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
   "Vary": "Origin",
@@ -223,6 +311,9 @@ export async function POST() {
   const today = isoDate(zoneToday(new Date(), HOUSEHOLD_TZ));
   const { error } = await supabase.from(TABLE).insert({ started_on: today });
   if (error) return respond({ error: error.message }, 503);
+
+  // Awaited (serverless kills work after the response), but never fatal.
+  await mirrorToNotion(today, state.startedOn);
 
   return respond(
     {
