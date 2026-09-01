@@ -71,6 +71,13 @@ export interface TableTest {
   windowHigh: number | null;
   /** Days since the newest entry across every trading test, or null if none. */
   lastEntryDaysAgo: number | null;
+  /**
+   * Days since the program last showed a sign of life — the newest of a daily
+   * entry OR a status change (a launch, a kill, a scale) across every trading
+   * test. A kill is a day of work; entries alone read as silence on the day a
+   * test is stopped without a final entry logged against it.
+   */
+  lastActivityDaysAgo: number | null;
   /** Days since the RUNNING test's newest entry, or null. */
   staleDays: number | null;
 }
@@ -157,6 +164,12 @@ interface LpEntry {
   entry_date: string;
   meta_spend: number | null;
 }
+/** A row of the Launchpad's immutable status-change log. */
+interface LpVerdict {
+  test_id: string;
+  verdict_date: string | null;
+  to_status: string | null;
+}
 
 async function buildTest(today: CivilDate): Promise<TableTest> {
   const tests = await launchpad<LpTest[]>("/tests", 0);
@@ -180,6 +193,24 @@ async function buildTest(today: CivilDate): Promise<TableTest> {
   const newestCivil = parseCivilDate(newestIso);
   const lastEntryDaysAgo = newestCivil ? daysBetween(newestCivil, today) : null;
 
+  // Newest sign of life, entries OR status changes. The whole log comes back in
+  // one call; rows without a to_status are phase-skip notes, not transitions.
+  const tradingIds = new Set(trading.map((t) => t.id));
+  let newestActivityIso = newestIso;
+  try {
+    for (const v of await launchpad<LpVerdict[]>("/verdicts", 0)) {
+      if (!v || !tradingIds.has(v.test_id)) continue;
+      if (typeof v.to_status !== "string" || !v.to_status) continue;
+      const d = typeof v.verdict_date === "string" ? v.verdict_date.slice(0, 10) : "";
+      if (!d) continue;
+      if (newestActivityIso === null || d > newestActivityIso) newestActivityIso = d;
+    }
+  } catch {
+    // The log is a bonus signal — losing it degrades to entries-only, never 503.
+  }
+  const activityCivil = parseCivilDate(newestActivityIso);
+  const lastActivityDaysAgo = activityCivil ? daysBetween(activityCivil, today) : null;
+
   const running = loaded
     .filter((x) => RUNNING_STATUSES.has(x.test.status))
     .sort((a, b) => b.test.created_at.localeCompare(a.test.created_at))[0];
@@ -193,6 +224,7 @@ async function buildTest(today: CivilDate): Promise<TableTest> {
       windowLow: null,
       windowHigh: null,
       lastEntryDaysAgo,
+      lastActivityDaysAgo,
       staleDays: null,
     };
   }
@@ -219,6 +251,7 @@ async function buildTest(today: CivilDate): Promise<TableTest> {
     windowLow: running.test.entry_window_low,
     windowHigh: running.test.entry_window_high,
     lastEntryDaysAgo,
+    lastActivityDaysAgo,
     staleDays,
   };
 }

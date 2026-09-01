@@ -336,9 +336,9 @@ export function buildFaceModel(d: FaceData): FaceModel {
     } else if (t.running) {
       testWord = "Stale";
       staleN = t.staleDays;
-    } else if (t.lastEntryDaysAgo !== null) {
+    } else if (t.lastActivityDaysAgo !== null) {
       testWord = "Stale";
-      staleN = t.lastEntryDaysAgo;
+      staleN = t.lastActivityDaysAgo;
     }
   }
   const testStale = testWord === "Stale";
@@ -348,7 +348,14 @@ export function buildFaceModel(d: FaceData): FaceModel {
   const oldestDays = oldest?.ageDays ?? null;
   let headline: string;
   if (testStale && staleN !== null) {
-    headline = `No test is running. Last entry was ${staleN} ${staleN === 1 ? "day" : "days"} ago.`;
+    // A running-but-unfed test is a different sentence to an empty bench —
+    // saying "no test is running" over a Live test was a lie the face told
+    // for as long as one sat unfed.
+    headline = t?.running
+      ? `${t.name ?? "The test"} has not been fed in ${staleN} ${staleN === 1 ? "day" : "days"}.`
+      : staleN === 0
+        ? "No test is running. The last one closed out today."
+        : `No test is running. Last move was ${staleN} ${staleN === 1 ? "day" : "days"} ago.`;
   } else if (
     t?.running &&
     testWord === "Running" &&
@@ -384,7 +391,9 @@ export function buildFaceModel(d: FaceData): FaceModel {
   const testContext = t?.running
     ? (t.name ?? "")
     : staleN !== null
-      ? `last entry ${staleN}d ago`
+      ? staleN === 0
+        ? "closed out today"
+        : `last move ${staleN}d ago`
       : "no entries yet";
 
   /* ---- campaigns word ----------------------------------------------------- */

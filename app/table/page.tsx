@@ -65,10 +65,14 @@ function startHereQuestion(data: TablePayload): string {
   // Rule 1 — active test stale (or no test at all).
   const stale = !test || !test.running;
   if (stale) {
-    const n = test?.lastEntryDaysAgo;
-    return n === null || n === undefined
-      ? "No test is running and no entry has ever been logged. What starts tonight?"
-      : `No test is running. Last entry was ${n} ${n === 1 ? "day" : "days"} ago — what restarts it tonight?`;
+    const n = test?.lastActivityDaysAgo;
+    if (n === null || n === undefined) {
+      return "No test is running and no entry has ever been logged. What starts tonight?";
+    }
+    if (n === 0) {
+      return "No test is running. The last one closed out today — what starts tomorrow?";
+    }
+    return `No test is running. Last move was ${n} ${n === 1 ? "day" : "days"} ago — what restarts it tonight?`;
   }
 
   // Rule 2 — test running, spend under the entry window.
