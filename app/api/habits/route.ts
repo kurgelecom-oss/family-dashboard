@@ -16,6 +16,11 @@ const BLOCK_MAP: Record<string, string> = {
   "Homeschool": "school",
   "Afternoon/Evening": "arvo",
   "Conditional": "conditional",
+  // ansar-habits-tracker's Saturday Push rows (5 Sep 2026). Mapped to their own
+  // key so they never fall through the default ("pre") and get counted as part
+  // of the all-or-nothing Morning block. This dashboard scores Mon–Fri only, so
+  // the key is otherwise inert here.
+  "Saturday Push": "push",
 };
 
 interface Habit {
