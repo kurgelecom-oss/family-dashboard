@@ -11,7 +11,6 @@ const LINKS: { label: string; href: string; external?: boolean }[] = [
   // Absolute like every other entry: the matcher below runs new URL(link.href)
   // with no base, and a bare path would throw there and take active-state
   // detection down for the whole nav, not just this link.
-  { label: "Mission",               href: "https://jade-bombolone-82d172.netlify.app/#board" },
   { label: "ECOM Launchpad",        href: "https://ecom-launchpad-mentor.netlify.app/" },
   { label: "Calculator",            href: "https://kurgel-dashboard.netlify.app/profit.html" },
   { label: "Time Allocation Board", href: "https://kurgel-dashboard.netlify.app/board" },

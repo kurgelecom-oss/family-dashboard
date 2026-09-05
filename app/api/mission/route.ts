@@ -34,19 +34,6 @@ export const dynamic = "force-dynamic";
 // failure, is uncacheable at both the browser and the CDN.
 const NO_STORE = "no-store";
 
-// The single browser origin allowed to read this route cross-origin: the wall
-// display at jade-bombolone-82d172.netlify.app. Exact, never "*" — this payload
-// is family data, and "*" would let any page on the internet read it.
-const ALLOWED_ORIGIN = "https://jade-bombolone-82d172.netlify.app";
-
-// Carried by every response path, including the 503. `Vary: Origin` is not
-// decoration: without it a CDN is free to hand one origin's cached response to
-// another, which is how an allowlist of one silently degrades into "*".
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  "Vary": "Origin",
-} as const;
-
 // The token, the pinned API version, the page size and the two pagination
 // bounds moved to app/lib/notion.ts with fetchSource, which was the only thing
 // in this file that ever read them.
@@ -616,7 +603,7 @@ export async function GET() {
   // construction rather than by remembering to repeat it.
   return NextResponse.json(payload, {
     status,
-    headers: { "Cache-Control": NO_STORE, ...CORS_HEADERS },
+    headers: { "Cache-Control": NO_STORE },
   });
 }
 
@@ -634,7 +621,6 @@ export async function OPTIONS() {
     headers: {
       "Cache-Control": NO_STORE,
       "Access-Control-Allow-Methods": "GET, OPTIONS",
-      ...CORS_HEADERS,
     },
   });
 }

@@ -21,8 +21,8 @@ import { HOUSEHOLD_TZ, zoneToday, daysBetween, type CivilDate } from "../lib/tim
      3. THE DEADLINE     countdown to the dated monthly goal + weekly counts
      4. PINNED           the pinned board note, verbatim (only when one exists)
 
-   Every slide renders the SAME payload the mission board renders —
-   /api/mission, fetched from this origin, never a second derivation. If
+   Every slide renders the goals payload from /api/mission, fetched from this
+   origin, never a second derivation. If
    /api/mission is unreachable the deck is empty and the overlay simply never
    appears — the dashboard underneath is the fallback.
 
@@ -115,7 +115,7 @@ interface MissionPayload {
   notes?: { note: string; pinned: boolean }[];
 }
 
-/** How often the deck re-reads the mission board. The route is force-dynamic
+/** How often the deck re-reads the goals data. The route is force-dynamic
     (four Notion reads per hit), so this deliberately does not follow the
     appearance cadence — one read per quarter hour is plenty for points that
     change a few times a day. */
@@ -207,7 +207,6 @@ function deadlineTone(daysLeft: number | null): ToneKey {
 }
 
 /* ── Stakes lines ─────────────────────────────────────────────────────────────
-   Verbatim from the mission board, so the two surfaces speak one language.
    Rotated under the pressure slides.
    ──────────────────────────────────────────────────────────────────────────── */
 
@@ -511,7 +510,7 @@ export default function GoalsIntermission() {
         const payload = (await res.json()) as MissionPayload;
         if (!cancelled) setMission(payload);
       } catch {
-        // Unreachable mission board must not break the overlay.
+        // Unreachable goals data must not break the overlay.
       }
       try {
         // Same refresh beat as the mission read: while a cycle tracker is

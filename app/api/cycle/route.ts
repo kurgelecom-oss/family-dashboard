@@ -26,11 +26,6 @@ import { cycleDurationDays } from "../../lib/cycle-duration";
    stats; it feeds the long-press panel behind the button and nothing renders
    from it unless someone deliberately opens that panel.
 
-   CORS: the mission page (jade-bombolone) carries the same button, so this
-   route allows exactly that one browser origin — same posture as /api/mission,
-   for the same reason: exact origin, never "*", Vary: Origin always. The POST
-   is a simple request (no custom headers, no body), so no preflight fires, but
-   OPTIONS is answered anyway so a future header can't silently break it.
 
    Same caching posture as /api/incident: force-dynamic, no-store. A wall
    display must never show yesterday's day count.
@@ -53,8 +48,6 @@ const SANE_GAP_MAX = 60;
 
 /** The heads-up shows this many days either side of the expected start. */
 const HEADS_UP_WINDOW = 3;
-
-const ALLOWED_ORIGIN = "https://jade-bombolone-82d172.netlify.app";
 
 /* ── Notion mirror ───────────────────────────────────────────────────────────
    Every successful press also lands a row in the "Cycle Log" database on the
@@ -145,8 +138,6 @@ async function mirrorToNotion(todayIso: string, prevIso: string | null): Promise
 }
 
 const BASE_HEADERS = {
-  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  "Vary": "Origin",
   "Cache-Control": "no-store",
 } as const;
 

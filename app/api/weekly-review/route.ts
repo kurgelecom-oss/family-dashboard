@@ -42,18 +42,6 @@ export const dynamic = "force-dynamic";
 // remove.
 const NO_STORE = "no-store";
 
-// Same allowlist as /api/mission, and exact for the same reason: this is family
-// data and "*" would let any page on the internet read — and POST to — it.
-const ALLOWED_ORIGIN = "https://jade-bombolone-82d172.netlify.app";
-
-// Carried by every response path, including the 400s and the 503. `Vary: Origin`
-// is not decoration: without it a CDN is free to hand one origin's cached
-// response to another, which is how an allowlist of one degrades into "*".
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
-  "Vary": "Origin",
-} as const;
-
 const TABLE = "weekly_reviews";
 
 /**
@@ -190,7 +178,7 @@ const ROW_COLUMNS = "week_key,item_key,ticked_at,ticked_by,snapshot,decision,not
 function json(body: unknown, status: number) {
   return NextResponse.json(body, {
     status,
-    headers: { "Cache-Control": NO_STORE, ...CORS_HEADERS },
+    headers: { "Cache-Control": NO_STORE },
   });
 }
 
@@ -1131,7 +1119,6 @@ export async function OPTIONS() {
       "Cache-Control": NO_STORE,
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
-      ...CORS_HEADERS,
     },
   });
 }

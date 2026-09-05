@@ -284,7 +284,7 @@ export default function PanelCalendar() {
   useEffect(() => {
     loadReview();
     // Hourly like the calendar: the answer only changes when someone ticks a box
-    // on the mission board, and being an hour behind on that costs nothing.
+    // during the weekly review, and being an hour behind on that costs nothing.
     const reviewId = setInterval(loadReview, 60 * 60 * 1000);
     return () => { clearInterval(reviewId); };
   }, [loadReview]);
@@ -440,4 +440,3 @@ export default function PanelCalendar() {
     </>
   );
 }
-
