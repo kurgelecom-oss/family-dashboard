@@ -30,6 +30,7 @@ const POCKETSMITH_MS = 10 * 60 * 1000; // PanelFinance's cadence
 const ECOM_MS = 5 * 60 * 1000; // PanelEcom's cadence
 const ACTIONS_MS = 5 * 60 * 1000; // PanelTodos's cadence
 const TABLE_MS = 5 * 60 * 1000; // /table's cadence
+const STORE_MS = 5 * 60 * 1000; // /table's ShopifyDaily cadence
 const CALENDAR_MS = 60 * 60 * 1000; // PanelCalendar's cadence
 const HABITS_MS = 60 * 1000; // AnsarStrip / WeekProgressStrip's cadence
 
@@ -73,6 +74,17 @@ export interface FaceCalEvent {
   webLink?: string;
 }
 
+/** Today's tryliare.shop numbers — /api/shopify-daily's today row. Sessions and
+ *  add-to-cart are null until the Partner app carries read_reports. */
+export interface FaceStore {
+  orders: number;
+  revenue: number;
+  checkouts: number;
+  sessions: number | null;
+  addToCart: number | null;
+  analyticsAvailable: boolean;
+}
+
 export interface FaceHabits {
   streak: number | null;
   todayPct: number | null;
@@ -83,6 +95,7 @@ export interface FaceData {
   ecom: FaceEcom | null;
   actions: FaceActions | null;
   table: TablePayload | null;
+  store: FaceStore | null;
   calendar: FaceCalEvent[] | null;
   habits: FaceHabits | null;
 }
@@ -156,6 +169,32 @@ export function useFaceData(): FaceData {
     return (await res.json()) as TablePayload;
   }, []);
 
+  const loadStore = useCallback(async (): Promise<FaceStore | null> => {
+    const res = await fetch("/api/shopify-daily");
+    if (!res.ok) return null;
+    const j = (await res.json()) as {
+      days?: {
+        isToday: boolean;
+        orders: number;
+        revenue: number;
+        checkouts: number;
+        sessions: number | null;
+        addToCart: number | null;
+      }[];
+      analytics?: { available: boolean };
+    };
+    const today = (j.days ?? []).find((d) => d.isToday) ?? j.days?.[0];
+    if (!today) return null;
+    return {
+      orders: today.orders,
+      revenue: today.revenue,
+      checkouts: today.checkouts,
+      sessions: today.sessions,
+      addToCart: today.addToCart,
+      analyticsAvailable: j.analytics?.available === true,
+    };
+  }, []);
+
   const loadCalendar = useCallback(async (): Promise<FaceCalEvent[] | null> => {
     const res = await fetch("/api/calendar");
     if (!res.ok) return null;
@@ -167,6 +206,7 @@ export function useFaceData(): FaceData {
   const ecom = usePolled(loadEcom, ECOM_MS);
   const actions = usePolled(loadActions, ACTIONS_MS);
   const table = usePolled(loadTable, TABLE_MS);
+  const store = usePolled(loadStore, STORE_MS);
   const calendar = usePolled(loadCalendar, CALENDAR_MS);
 
   /* Habits — roster once from /api/habits, then Supabase ticks on the strip's
@@ -237,7 +277,7 @@ export function useFaceData(): FaceData {
     return () => clearInterval(id);
   }, [loadHabits]);
 
-  return { ps, ecom, actions, table, calendar, habits };
+  return { ps, ecom, actions, table, store, calendar, habits };
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -303,6 +343,13 @@ export interface FaceModel {
   openCount: number | null;
   oldestDays: number | null;
   oldestTitle: string | null;
+  /* store — today on tryliare.shop (the Table tile, all three frames) */
+  storeOrders: string;
+  storeSessions: string;
+  storeAtc: string;
+  storeRevenue: string;
+  storeCheckouts: string;
+  storeContext: string;
   streak: number | null;
   todayPct: number | null;
   /* traction + tomorrow */
@@ -429,6 +476,21 @@ export function buildFaceModel(d: FaceData): FaceModel {
     }
   }
 
+  /* ---- store: today's orders / sessions / add-to-carts ------------------- */
+  const st = d.store ?? null;
+  const fmtCount = (n: number | null | undefined): string =>
+    typeof n === "number" && Number.isFinite(n) ? n.toLocaleString("en-AU") : "—";
+  const storeOrders = st ? fmtCount(st.orders) : "—";
+  const storeSessions = st ? fmtCount(st.sessions) : "—";
+  const storeAtc = st ? fmtCount(st.addToCart) : "—";
+  const storeRevenue = st ? (fmtMoney(st.revenue) ?? "$0") : "—";
+  const storeCheckouts = st ? fmtCount(st.checkouts) : "—";
+  const storeContext = !st
+    ? "orders today"
+    : st.analyticsAvailable
+      ? `${storeSessions} sessions · ${storeAtc} ATC`
+      : `${storeCheckouts} checkouts · ${storeRevenue}`;
+
   /* ---- tomorrow strip ----------------------------------------------------- */
   const tomorrowIso = isoDate(addDays(zoneToday(new Date()), 1));
   const tomorrow: FaceTomorrowEvent[] = (d.calendar ?? [])
@@ -464,6 +526,12 @@ export function buildFaceModel(d: FaceData): FaceModel {
     openCount: d.table ? d.table.open.length : null,
     oldestDays,
     oldestTitle: oldest?.title ?? null,
+    storeOrders,
+    storeSessions,
+    storeAtc,
+    storeRevenue,
+    storeCheckouts,
+    storeContext,
     streak: d.habits?.streak ?? null,
     todayPct: d.habits?.todayPct ?? null,
     tractionDays,

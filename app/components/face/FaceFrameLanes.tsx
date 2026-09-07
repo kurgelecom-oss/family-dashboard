@@ -92,29 +92,16 @@ export default function FaceFrameLanes({ model }: { model: FaceModel }) {
           }
         />
         <Lane
-          href="/board"
-          label="Family"
-          value={m.openCount !== null ? String(m.openCount) : "—"}
-          context={
-            m.oldestDays !== null ? `on the table · oldest ${m.oldestDays} days` : "on the table"
-          }
+          href="/table"
+          label="Table"
+          value={m.storeOrders}
+          context={`orders today · ${m.storeContext}`}
+          valueColor="var(--green)"
           rows={
             <>
+              <Row label="Sessions" value={m.storeSessions} />
+              <Row label="Add to cart" value={m.storeAtc} />
               <Row label="Ansar" value={ansarValue} valueColor={FACE_PURPLE} />
-              <Row
-                label="Tomorrow"
-                value={
-                  m.tomorrow.length === 0
-                    ? "nothing"
-                    : m.tomorrow.length === 1
-                      ? m.tomorrow[0].subject
-                      : `${m.tomorrow.length} events`
-                }
-              />
-              <Row
-                label="Traction"
-                value={m.tractionDays !== null ? `${m.tractionDays} days` : "—"}
-              />
             </>
           }
         />

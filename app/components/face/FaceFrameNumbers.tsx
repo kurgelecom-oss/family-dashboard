@@ -132,8 +132,16 @@ export default function FaceFrameNumbers({ model }: { model: FaceModel }) {
         <Hero
           href="/table"
           label="Table"
-          value={m.openCount !== null ? String(m.openCount) : "—"}
-          context={m.oldestDays !== null ? `oldest ${m.oldestDays} days` : "table is clear"}
+          value={m.storeOrders}
+          context="orders today · tryliare.shop"
+          valueColor="var(--green)"
+          rows={
+            <>
+              <Row label="Sessions" value={m.storeSessions} />
+              <Row label="Add to cart" value={m.storeAtc} />
+              <Row label="Revenue" value={m.storeRevenue} />
+            </>
+          }
         />
         <Hero
           label="Ansar"
