@@ -131,7 +131,7 @@ export default function FaceFrameNumbers({ model }: { model: FaceModel }) {
         />
         <Hero
           href="/table"
-          label="Table"
+          label="Store"
           value={m.storeOrders}
           context="orders today · tryliare.shop"
           valueColor="var(--green)"

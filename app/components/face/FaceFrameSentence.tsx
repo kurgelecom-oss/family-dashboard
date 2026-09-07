@@ -95,7 +95,7 @@ export default function FaceFrameSentence({ model }: { model: FaceModel }) {
         />
         <Chip
           href="/table"
-          label="Table"
+          label="Store"
           value={m.storeOrders}
           context={m.storeContext}
           valueColor="var(--green)"
