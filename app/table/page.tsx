@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import DrillChrome from "../components/DrillChrome";
+import ShopifyDaily from "./ShopifyDaily";
 import { isActionsPayload } from "../lib/payload-guards";
 import type { TablePayload, TableDecision } from "../api/table/route";
 
@@ -388,6 +389,9 @@ export default function TablePage() {
           </div>
         }
       />
+
+      {/* The store — daily Shopify metrics (orders · sessions · add-to-carts). */}
+      <ShopifyDaily />
 
       {dataError ? (
         <div
