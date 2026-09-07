@@ -515,6 +515,13 @@ export async function GET() {
       series.push({ date: day, contribution: round2(contribution) });
     }
 
+    // Same 30-day window, ad spend only — consumed by Nihal OS's store table.
+    const dailyAdSpend: { date: string; adSpend: number }[] = [];
+    for (let i = 0; i < SPARK_DAYS; i++) {
+      const day = iso(addDays(sparkStart, i));
+      dailyAdSpend.push({ date: day, adSpend: round2(adSpendByDay.get(day) ?? 0) });
+    }
+
     const testSpend = sortedEntries.reduce((s, e) => s + (e.meta_spend ?? 0), 0);
 
     /* ---- PANEL 1 activity state -----------------------------------------
@@ -564,6 +571,8 @@ export async function GET() {
       today: todayISO,
       settings,
       cacheSeconds,
+      // Per-day bank-settled Meta spend (PocketSmith), last 30 days, oldest first.
+      dailyAdSpend,
 
       /* PANEL 1 */
       todayStats: {
