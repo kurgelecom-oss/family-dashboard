@@ -93,7 +93,7 @@ export default function FaceFrameLanes({ model }: { model: FaceModel }) {
         />
         <Lane
           href="/table"
-          label="Store"
+          label={m.storeName}
           value={m.storeOrders}
           context={`orders today · ${m.storeContext}`}
           valueColor="var(--green)"

@@ -15,7 +15,6 @@ import type { DailyPayload, DailyRow } from "../api/shopify-daily/route";
 
 const REFRESH_MS = 5 * 60 * 1000;
 
-const PARTNERS_URL = "https://partners.shopify.com/";
 
 const fmtInt = (n: number | null) =>
   n === null ? "—" : new Intl.NumberFormat("en-AU").format(n);
@@ -111,7 +110,7 @@ export default function ShopifyDaily() {
         <div
           style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}
         >
-          <div className="card-title">Today · tryliare.shop</div>
+          <div className="card-title">Today · {data?.shop?.domain ?? "tryliare.shop"}</div>
           <span className="badge badge-cyan">
             {today ? today.label : data ? "—" : "Loading…"}
           </span>
@@ -155,19 +154,10 @@ export default function ShopifyDaily() {
         >
           {data?.analytics.reason === "scope" ? (
             <>
-              Sessions and add-to-carts are locked until the Shopify app has the{" "}
-              <code>read_reports</code> scope. Orders, checkouts and revenue are live.{" "}
-              <a
-                href={PARTNERS_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: "var(--cyan)", fontWeight: 800 }}
-              >
-                Partner Dashboard
-              </a>{" "}
-              → Apps → Family Dashboard → Configuration → add <code>read_reports</code>; then
-              API access requests → Protected customer data → request Level 2. This table fills
-              itself on the next refresh.
+              Sessions and add-to-carts are locked until the Shopify app carries the{" "}
+              <code>read_reports</code> scope. Orders, checkouts and revenue are live. Fix: release a
+              new app version with <code>read_reports</code> added, then re-consent through Composio.
+              This table fills itself on the next refresh.
             </>
           ) : (
             <>Sessions unavailable — {data?.analytics.reason}</>

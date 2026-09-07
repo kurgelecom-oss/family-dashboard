@@ -77,6 +77,9 @@ export interface FaceCalEvent {
 /** Today's tryliare.shop numbers — /api/shopify-daily's today row. Sessions and
  *  add-to-cart are null until the Partner app carries read_reports. */
 export interface FaceStore {
+  /** Store name/domain from Shopify — the tile label, so the card says whose store it is. */
+  name: string;
+  domain: string;
   orders: number;
   revenue: number;
   checkouts: number;
@@ -182,10 +185,13 @@ export function useFaceData(): FaceData {
         addToCart: number | null;
       }[];
       analytics?: { available: boolean };
+      shop?: { name: string; domain: string };
     };
     const today = (j.days ?? []).find((d) => d.isToday) ?? j.days?.[0];
     if (!today) return null;
     return {
+      name: j.shop?.name ?? "tryliare.shop",
+      domain: j.shop?.domain ?? "tryliare.shop",
       orders: today.orders,
       revenue: today.revenue,
       checkouts: today.checkouts,
@@ -344,6 +350,8 @@ export interface FaceModel {
   oldestDays: number | null;
   oldestTitle: string | null;
   /* store — today on tryliare.shop (the Table tile, all three frames) */
+  /** Tile label: the store's own name (e.g. "tryliare.shop"), falls back to "Store". */
+  storeName: string;
   storeOrders: string;
   storeSessions: string;
   storeAtc: string;
@@ -480,6 +488,7 @@ export function buildFaceModel(d: FaceData): FaceModel {
   const st = d.store ?? null;
   const fmtCount = (n: number | null | undefined): string =>
     typeof n === "number" && Number.isFinite(n) ? n.toLocaleString("en-AU") : "—";
+  const storeName = st?.domain || st?.name || "Store";
   const storeOrders = st ? fmtCount(st.orders) : "—";
   const storeSessions = st ? fmtCount(st.sessions) : "—";
   const storeAtc = st ? fmtCount(st.addToCart) : "—";
@@ -526,6 +535,7 @@ export function buildFaceModel(d: FaceData): FaceModel {
     openCount: d.table ? d.table.open.length : null,
     oldestDays,
     oldestTitle: oldest?.title ?? null,
+    storeName,
     storeOrders,
     storeSessions,
     storeAtc,

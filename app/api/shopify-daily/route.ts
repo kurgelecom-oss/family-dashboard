@@ -53,6 +53,8 @@ export interface DailyRow {
 export interface DailyPayload {
   generatedAt: string;
   timezone: string;
+  /** Store identity straight from Shopify, so every card can say whose numbers these are. */
+  shop: { name: string; domain: string };
   days: DailyRow[];
   analytics: {
     available: boolean;
@@ -298,11 +300,11 @@ export async function GET() {
 
   try {
     const token = await getAccessToken();
-    const { shop } = await shopifyGql<{ shop: { ianaTimezone: string } }>(
-      token,
-      `{ shop { ianaTimezone } }`,
-    );
+    const { shop } = await shopifyGql<{
+      shop: { ianaTimezone: string; name: string; primaryDomain: { host: string } };
+    }>(token, `{ shop { ianaTimezone name primaryDomain { host } } }`);
     const tz = shop.ianaTimezone;
+    const shopIdentity = { name: shop.name, domain: shop.primaryDomain?.host ?? shop.name };
 
     const todayIso = dateInZone(new Date(), tz);
     const firstIso = shiftIso(todayIso, -(DAYS - 1));
@@ -386,6 +388,7 @@ export async function GET() {
     const payload: DailyPayload = {
       generatedAt: new Date().toISOString(),
       timezone: tz,
+      shop: shopIdentity,
       days: [...byDay.values()],
       analytics,
       errors,
@@ -396,6 +399,7 @@ export async function GET() {
       {
         generatedAt: new Date().toISOString(),
         timezone: "",
+        shop: { name: "tryliare.shop", domain: "tryliare.shop" },
         days: [],
         analytics,
         errors: [...errors, String(err)],
