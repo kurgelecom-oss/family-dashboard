@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+const base=process.env.FAMILY_TEST_URL||'http://localhost:3094';
+const started=Date.now();
+const response=await fetch(`${base}/api/sunday`,{signal:AbortSignal.timeout(25000)});
+assert.equal(response.status,200,'Weekly report must respond successfully');
+const report=await response.json();
+assert.equal(report.sources.find(s=>s.id==='os_activity')?.state,'connected');
+assert.equal(report.sources.find(s=>s.id==='manual')?.state,'connected');
+assert.equal(report.sources.find(s=>s.id==='radar')?.state,'partial');
+assert.equal(report.people.find(p=>p.id==='nihal').metrics.find(m=>m.key==='os_opens').daily.length,7);
+console.log(JSON.stringify({weeklyReport:'passed',milliseconds:Date.now()-started}));

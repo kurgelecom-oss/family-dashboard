@@ -47,7 +47,8 @@ export async function buildWeeklyReport(day=civilDay()):Promise<WeeklyReport> {
   fetchSource('3a3a6e65-2cb3-40ba-810a-b19406e8b085','Origins'),
   fetchSource('3f93b40d-6cdc-44dc-9197-779758f9150c','Homeschool work log'),
   json<Test[]>(`${ENGINE}/api/tests`),json<Verdict[]>(`${ENGINE}/api/verdicts`),
-  db`select id,name,source,raw from cos_radar_products where lower(raw->'intake'->>'found_by')='nihal'`,
+  // Bind even this constant: mixed describe/execute batches can stall the shared pooler.
+  db`select id,name,source,raw from cos_radar_products where lower(raw->'intake'->>'found_by')=${'nihal'}`,
   ads(week.start,through),completions(week.start,through),
   json<{id:string;block:string;days:string[]}[]>(`${FAMILY}/api/habits`),
   db`select member,metric,value,note,version,updated_at,mode from fds_weekly_manual where workspace=${familyWorkspace()} and week_start=${week.start}`,
