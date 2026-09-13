@@ -4,6 +4,7 @@ import { fetchSource, type NotionPage } from '../notion';
 import { scoreDay, WEEKLY_MAX } from '../scoring';
 import { habitsOnDay } from '../habit-days';
 import {readOsActivity} from '../os-activity';
+import {PRODUCT_SURFACE_SOURCE,PRODUCT_SURFACE_URL,surfaceLogWeek} from './surface-log';
 import { MEMBERS, civilDay, dateOf, inWeek, weekFor, quranWeek, mergeCount, type WeeklyReport, type MemberId, type Metric, type MetricKey, type ManualEntry, type QuranSession } from './model';
 const FAMILY='https://kurgel-dashboard.netlify.app';
 const QURAN='https://quran-os.netlify.app';
@@ -43,33 +44,26 @@ export async function buildWeeklyReport(day=civilDay()):Promise<WeeklyReport> {
  const today=civilDay(),week=weekFor(day),through=week.end<today?week.end:today,db=familyDb();
  const jobs=await Promise.allSettled([
   json<{members:{id:string;sessions:QuranSession[]}[]}>(`${QURAN}/api/snapshot?days=30`,{'x-qos-token':process.env.QURAN_OS_TOKEN||''}),
-  fetchSource('1d35429a-fa90-81a0-bf47-000b7fe8803d','Product validation'),
+  fetchSource(PRODUCT_SURFACE_SOURCE,'Nihal product surface log'),
   fetchSource('3a3a6e65-2cb3-40ba-810a-b19406e8b085','Origins'),
   fetchSource('3f93b40d-6cdc-44dc-9197-779758f9150c','Homeschool work log'),
   json<Test[]>(`${ENGINE}/api/tests`),json<Verdict[]>(`${ENGINE}/api/verdicts`),
-  // Bind even this constant: mixed describe/execute batches can stall the shared pooler.
-  db`select id,name,source,raw from cos_radar_products where lower(raw->'intake'->>'found_by')=${'nihal'}`,
   ads(week.start,through),completions(week.start,through),
   json<{id:string;block:string;days:string[]}[]>(`${FAMILY}/api/habits`),
   db`select member,metric,value,note,version,updated_at,mode from fds_weekly_manual where workspace=${familyWorkspace()} and week_start=${week.start}`,
   readOsActivity(day),
  ] as const);
- const [q,products,origins,school,tests,verdicts,radar,ad,habits,roster,manualResult,osActivity]=jobs;
+ const [q,products,origins,school,tests,verdicts,ad,habits,roster,manualResult,osActivity]=jobs;
  const sources:WeeklyReport['sources']=[];
  const addSource=(id:string,label:string,ok:boolean,detail:string,href:string,partial=false)=>sources.push({id,label,state:ok?(partial?'partial':'connected'):'unavailable',detail:ok?detail:'Connection unavailable. Refresh to retry; manual entries remain available.',href});
  const manual:ManualEntry[]=manualResult.status==='fulfilled'?manualResult.value.map(r=>({mode:r.mode as ManualEntry['mode'],member:r.member as MemberId,metric:r.metric as MetricKey,value:r.value===null?null:Number(r.value),note:r.note,version:r.version,updated_at:new Date(r.updated_at).toISOString()})):[];
  addSource('manual','Family check-ins',manualResult.status==='fulfilled','Saved separately for this week.',FAMILY);
  addSource('os_activity','Nihal OS opens',osActivity.status==='fulfilled','Authenticated visits, with a new visit after 30 minutes away. Quick refreshes count once; Melbourne calendar days. Earlier untracked dates show a dash.',NIHAL);
  const productRows=products.status==='fulfilled'?products.value:[];
- const discovered=products.status==='fulfilled'?productRows.filter(r=>inWeek(prop(r,'Submission Date').date?.start,week.start,through)).length:null;
+ const surfaceLog=surfaceLogWeek(products.status==='fulfilled'?productRows:null,week,through);
+ const discovered=surfaceLog?.total??null;
  const validated=products.status==='fulfilled'?productRows.filter(r=>inWeek(prop(r,'Validated On').date?.start,week.start,through)).length:null;
- const productNihal=productRows.filter(r=>['Found by','Submitted by','Owner'].some(k=>owner(r,k)==='nihal')&&inWeek(prop(r,'Submission Date').date?.start,week.start,through));
- const radarNihal=radar.status==='fulfilled'?radar.value.filter(r=>inWeek((r.raw as {intake?:{at?:string}})?.intake?.at,week.start,through)):[];
- const discoveryNames=new Set([...productNihal.map(r=>label(r,'Product Name').trim().toLowerCase()),...radarNihal.map(r=>String(r.name).trim().toLowerCase())].filter(Boolean));
- // A healthy feed without an owner is incomplete attribution, not "Nihal found zero".
- const nihalFound=discoveryNames.size>0?discoveryNames.size:null;
- addSource('products','Product logs & validations',products.status==='fulfilled',`${discovered??0} logged; ${validated??0} dated validation reviews. Older logs do not identify the finder.`,`${FAMILY}/business`,true);
- addSource('radar','Creative OS research',radar.status==='fulfilled','Counts dated intake records marked “found by Nihal”; nightly automated discoveries are excluded.',`${CREATIVE}/radar`,true);
+ addSource('products','Nihal’s product surface log',products.status==='fulfilled',`${discovered??0} products surfaced; ${validated??0} dated validation reviews. Each Notion product record counts once by Submission Date, or Created time when no submission date is saved. Days and times use Melbourne time.`,PRODUCT_SURFACE_URL);
  const watched=origins.status==='fulfilled'?origins.value.filter(r=>{
   const who=owner(r,'Completed By')||originsOwners[prop(r,'Module No').number||0];
   return who==='nihal'&&prop(r,'Done').checkbox===true&&label(r,'Type')==='Training'&&inWeek(prop(r,'Completed On').date?.start,week.start,through);
@@ -101,14 +95,14 @@ export async function buildWeeklyReport(day=civilDay()):Promise<WeeklyReport> {
   const m=manual.find(r=>r.member===member&&r.metric===key);const manualValue=m?.value??null;
   const editable=auto===null||['discoveries','mentorship','validated','launched'].includes(key);
   const canSupplement=['discoveries','mentorship','validated','launched'].includes(key);
-  const mode=m?.mode ?? (canSupplement && (auto!==null || (key==='discoveries' && radar.status==='fulfilled' && products.status==='fulfilled'))?'supplement':'fallback');
-  return {key,label:labelText,...mergeCount(key==='discoveries' && auto===null && m?.mode==='supplement' && radar.status==='fulfilled' && products.status==='fulfilled' ? 0 : auto,m),unit,detail,manualValue,manualMode:mode,canEdit:editable||!!m,href};
+  const mode=m?.mode ?? (canSupplement && auto!==null?'supplement':'fallback');
+  return {key,label:labelText,...mergeCount(auto,m),unit,detail,manualValue,manualMode:mode,canEdit:editable||!!m,href};
  }
  const people=MEMBERS.map(id=>{
   const ss=q.status==='fulfilled'?q.value.members.find(m=>m.id===id)?.sessions:undefined;
   const metrics:Metric[]=[];
   if(id==='taylan')metrics.push(metric(id,'ad_leads','custm ad leads',ad.status==='fulfilled'?ad.value.leads:null,ad.status==='fulfilled'&&ad.value.leads?`$${(ad.value.spend/ad.value.leads).toFixed(2)} per lead`:'Enquiries from Meta ads',`${CREATIVE}/mission-control`),metric(id,'ad_spend','Ad spend',ad.status==='fulfilled'?Math.round(ad.value.spend*100)/100:null,'AUD · selected week',`${CREATIVE}/mission-control`,'AUD'),metric(id,'validated','Products validated',validated,'Shared pipeline · dated reviews, including passes and kills',`${FAMILY}/business`),metric(id,'launched','Products launched',launched,'Shared pipeline · first launch in the test log','https://ecom-launchpad-mentor.netlify.app'));
-  if(id==='nihal')metrics.push(metric(id,'discoveries','Products found',nihalFound,nihalFound===null?'Add finds missing your name in the source log':'Attributed research records',`${CREATIVE}/radar`),metric(id,'mentorship','Mentorship watched',watched,'Completed Origins training sessions',`${FAMILY}/origins`));
+  if(id==='nihal')metrics.push({...metric(id,'discoveries','Products found',discovered,surfaceLog?'Nihal’s Notion surface log · Melbourne time':'Notion surface log unavailable · refresh to retry',PRODUCT_SURFACE_URL),daily:surfaceLog?.daily,entries:surfaceLog?.entries},metric(id,'mentorship','Mentorship watched',watched,'Completed Origins training sessions',`${FAMILY}/origins`));
   if(id==='nihal'){
    const activity=osActivity.status==='fulfilled'?osActivity.value:null;
    metrics.push({key:'os_opens',label:'OS opens',value:activity?.total??null,detail:activity?.trackingSince?`${activity.activeDays} ${activity.activeDays===1?'day':'days'} opened · tracking from ${activity.trackingSince}`:'Visit count unavailable',source:activity?'auto':'missing',href:NIHAL,canEdit:false,manualValue:null,manualMode:'fallback',backupIgnored:false,daily:activity?.days});
