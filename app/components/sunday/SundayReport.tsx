@@ -23,14 +23,14 @@ function QuranTable({report}:{report:WeeklyReport}){
   <div className="su-section-heading"><h2 id="quran-heading">Our week with Quran</h2><a href="https://quran-os.netlify.app/" target="_blank" rel="noreferrer">Open Quran OS ↗</a></div>
   <div className="su-quran-head"><span>Finished sessions</span><div className="su-days">{DAY_NAMES.map((d,i)=><span key={d}>{d.slice(0,3)} <small>{report.week.days[i].slice(-2)}</small></span>)}</div><span>Days</span><span>Sessions</span><span>Minutes</span></div>
   {report.people.map(p=><div className="su-quran-row" key={p.id} data-person={p.id}>
-   <a className="su-person-name" href={`https://quran-os.netlify.app/m/${p.id}`} target="_blank" rel="noreferrer"><span className="su-initial">{p.name[0]}</span>{p.name}</a><Dots person={p}/>
+   <a className="su-person-name" href={`https://quran-os.netlify.app/m/${p.id}`} target="_blank" rel="noreferrer"><span className="su-initial">{p.name[0]}</span>{p.name}</a><Dots person={p} labels={p.id==='taylan'}/>
    <strong>{p.quran.available?`${p.quran.totalDays} / 7`:'—'}</strong><span>{p.quran.available?p.quran.sessions:'—'}</span><span>{p.quran.available?p.quran.minutes:'—'}</span>
   </div>)}
  </section>;
 }
 function MetricRow({metric:m,onEdit}:{metric:Metric;onEdit:()=>void}){
  const formatted=m.value===null?'—':m.unit==='AUD'?new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD',maximumFractionDigits:0}).format(m.value):`${m.value}${m.unit==='%'?'%':''}`;
- return <div className="su-metric" data-metric={m.key}>
+ return <div className="su-metric" data-metric={m.key} title={m.detail}>
   <div><span className="su-metric-name">{m.label}</span><small title={m.detail}>{m.source==='missing'&&m.manualValue!==null?`${m.manualValue} extra saved · connected total unavailable`:m.backupIgnored?'Connected again · backup excluded':m.source==='manual'?'Manually recorded':m.source==='mixed'?`Connected + ${m.manualValue} manual`:m.detail}</small></div>
   <strong>{formatted}</strong>
   {m.canEdit?<button type="button" className="su-add" onClick={onEdit} aria-label={`${m.manualValue!==null?'Edit':'Add'} ${m.label}`}>{m.manualValue!==null?'Edit':'+ Add'}</button>:<a className="su-auto" href={m.href} target="_blank" rel="noreferrer" title={m.detail}>Linked</a>}

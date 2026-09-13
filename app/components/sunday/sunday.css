@@ -15,3 +15,5 @@ html:has(.su-root),body:has(.su-root){height:auto;min-height:100%;overflow-x:hid
 .su-metric>strong{line-height:1.1}
 @media(min-width:1300px) and (max-height:950px){.su-mosaic .su-quran-row{row-gap:7px;padding:7px 0}.su-mosaic .su-quran-row>.su-days{padding:4px 0}.su-mosaic .su-metric{min-height:32px}.su-mosaic .su-person{min-height:256px}.su-mosaic .su-person-heading{margin-bottom:8px}.su-mosaic .su-section-heading h2{font-size:26px}.su-mosaic .su-quran{padding-bottom:28px}}
 @media(max-width:700px){.su-scorecard .su-person,.su-mosaic .su-person{padding-bottom:28px}}
+
+.su-quran .su-day-label{display:none}.su-mosaic .su-quran .su-day-label{display:block}.su-scorecard [data-metric=ad_leads] small,.su-scorecard [data-metric=school_work] small{display:block;font-size:9px;line-height:1.3}
