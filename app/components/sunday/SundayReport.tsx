@@ -31,7 +31,7 @@ function QuranTable({report}:{report:WeeklyReport}){
 function MetricRow({metric:m,onEdit}:{metric:Metric;onEdit:()=>void}){
  const formatted=m.value===null?'—':m.unit==='AUD'?new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD',maximumFractionDigits:0}).format(m.value):`${m.value}${m.unit==='%'?'%':''}`;
  return <div className="su-metric" data-metric={m.key} title={m.detail}>
-  <div><span className="su-metric-name">{m.label}</span><small title={m.detail}>{m.source==='missing'&&m.manualValue!==null?`${m.manualValue} extra saved · connected total unavailable`:m.backupIgnored?'Connected again · backup excluded':m.source==='manual'?'Manually recorded':m.source==='mixed'?`Connected + ${m.manualValue} manual`:m.detail}</small></div>
+  <div><span className="su-metric-name">{m.label}</span><small title={m.detail}>{m.source==='missing'&&m.manualValue!==null?`${m.manualValue} extra saved · connected total unavailable`:m.backupIgnored?'Connected again · backup excluded':m.source==='manual'?'Manually recorded':m.source==='mixed'?`Connected + ${m.manualValue} manual`:m.detail}</small>{m.daily&&<div className="su-os-days" aria-label="Nihal OS opens by day">{m.daily.map((d,i)=><span key={d.date} aria-label={`${DAY_NAMES[i]}: ${d.count??'not tracked'}`} title={`${DAY_NAMES[i]} ${dateLabel(d.date)}: ${d.count??'not tracked'}`}><small>{DAY_NAMES[i].slice(0,3)}</small><b>{d.count??'—'}</b></span>)}</div>}</div>
   <strong>{formatted}</strong>
   {m.canEdit?<button type="button" className="su-add" onClick={onEdit} aria-label={`${m.manualValue!==null?'Edit':'Add'} ${m.label}`}>{m.manualValue!==null?'Edit':'+ Add'}</button>:<a className="su-auto" href={m.href} target="_blank" rel="noreferrer" title={m.detail}>Linked</a>}
  </div>;
@@ -40,7 +40,7 @@ function PersonCard({person:p,onEdit,compact=false}:{person:PersonReport;onEdit:
  return <article className="su-person" data-person={p.id}>
   <div className="su-person-heading"><div><span className="su-initial">{p.name[0]}</span><h2>{p.name}</h2></div><span className="su-person-focus">{p.id==='taylan'?'Build & launch':p.id==='nihal'?'Find & learn':p.id==='ansar'?'Learn & grow':'Little steps'}</span></div>
   {compact&&<div className="su-person-quran"><Dots person={p} labels/><p><b>{p.quran.available?p.quran.totalDays:'—'}/7</b> Quran days <span>{p.quran.available?p.quran.sessions:'—'} sessions</span></p></div>}
-  <div className="su-metrics">{p.metrics.map(m=><MetricRow key={m.key} metric={m} onEdit={()=>onEdit(m.key)}/>)}</div>
+  <div className="su-metrics">{p.metrics.map(m=><MetricRow key={m.key} metric={m} onEdit={()=>{if(m.key!=='os_opens')onEdit(m.key);}}/>)}</div>
   {p.id==='ayah'&&<div className="su-ayah"><div className="su-petal" aria-hidden="true"><span/><span/><span/><span/><i/></div><div><strong>{p.quran.available?p.quran.totalDays:'—'} little steps</strong><p>Days with Quran this week.</p><small>{p.quran.available?`${p.quran.newAyahs} new ayahs · ${p.quran.minutes} minutes together`:'Quran connection unavailable'}</small></div></div>}
   <div className="su-win"><div><span>{p.win?'This week’s note':'One win. One next step.'}</span><p>{p.win||'Keep the next week simple.'}</p></div><button type="button" onClick={()=>onEdit('win')} aria-label={`Edit ${p.name} week note`}>{p.win?'Edit':'+ Note'}</button></div>
  </article>;

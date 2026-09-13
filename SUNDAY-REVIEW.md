@@ -47,3 +47,13 @@ The live Family report returned HTTP 200, production workspace, zero test entrie
 Live browser checks passed: all three theme choices; theme persistence; Sunday automatic Weekly review; manual Daily view surviving reload; restore-Sunday control; all four people; no fixed ten-day countdown. Each theme was measured on the three wall-screen sizes and 390px mobile. No horizontal overflow. Desktop footer visible; minimum card bottom room 28px. Mobile reports scroll fully.
 
 Nihal's existing login is preserved. Its two-way API bridge and UI were exercised against isolated preview records before production; production deployment and Family destination/key configuration were verified. No real period toggles or invented family check-ins were made during live testing.
+
+## Nihal OS opens — 13 September 2026
+
+The Today panel in Nihal OS records authenticated visits and displays today's count plus the seven-day breakdown. All three weekly family designs use the same persisted counts. Visits are informational; no habit point weights change.
+
+A visit begins on opening/returning after at least 30 minutes away, or on the next Melbourne calendar day. Visible tabs send a minute heartbeat; hidden tabs do not. Quick refreshes and concurrent tabs share a persistent first-party browser cookie. The Family service serialises writes per browser with a transaction lock. Different devices contribute to the shared total. Anonymous requests cannot write. Browser identifiers never appear in report payloads.
+
+Storage: `db/002-os-activity.sql`; initialise preview with `node --env-file=.env.local scripts/prepare-os-activity.mjs`, production with the same command plus `--production`. Tracking starts on the recorded activation date. Earlier dates remain untracked, rather than showing invented zeroes. No new production environment variables are required.
+
+Local checks: 20 Family tests, 45 Nihal tests, both builds and typechecks; browser auth rejection, simultaneous refresh deduplication, return after a 31-minute gap, matching weekly totals, and all three family designs at 1905×923, 1920×936, 1920×1080, 390×844. Nihal checked at 1280×960 and 390×844. No horizontal overflow; minimum card bottom room 28px. Test sessions are isolated to preview and removed after verification.

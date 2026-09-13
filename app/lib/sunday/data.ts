@@ -3,6 +3,7 @@ import { supabase } from '../supabase';
 import { fetchSource, type NotionPage } from '../notion';
 import { scoreDay, WEEKLY_MAX } from '../scoring';
 import { habitsOnDay } from '../habit-days';
+import {readOsActivity} from '../os-activity';
 import { MEMBERS, civilDay, dateOf, inWeek, weekFor, quranWeek, mergeCount, type WeeklyReport, type MemberId, type Metric, type MetricKey, type ManualEntry, type QuranSession } from './model';
 const FAMILY='https://kurgel-dashboard.netlify.app';
 const QURAN='https://quran-os.netlify.app';
@@ -50,12 +51,14 @@ export async function buildWeeklyReport(day=civilDay()):Promise<WeeklyReport> {
   ads(week.start,through),completions(week.start,through),
   json<{id:string;block:string;days:string[]}[]>(`${FAMILY}/api/habits`),
   db`select member,metric,value,note,version,updated_at,mode from fds_weekly_manual where workspace=${familyWorkspace()} and week_start=${week.start}`,
+  readOsActivity(day),
  ] as const);
- const [q,products,origins,school,tests,verdicts,radar,ad,habits,roster,manualResult]=jobs;
+ const [q,products,origins,school,tests,verdicts,radar,ad,habits,roster,manualResult,osActivity]=jobs;
  const sources:WeeklyReport['sources']=[];
  const addSource=(id:string,label:string,ok:boolean,detail:string,href:string,partial=false)=>sources.push({id,label,state:ok?(partial?'partial':'connected'):'unavailable',detail:ok?detail:'Connection unavailable. Refresh to retry; manual entries remain available.',href});
  const manual:ManualEntry[]=manualResult.status==='fulfilled'?manualResult.value.map(r=>({mode:r.mode as ManualEntry['mode'],member:r.member as MemberId,metric:r.metric as MetricKey,value:r.value===null?null:Number(r.value),note:r.note,version:r.version,updated_at:new Date(r.updated_at).toISOString()})):[];
  addSource('manual','Family check-ins',manualResult.status==='fulfilled','Saved separately for this week.',FAMILY);
+ addSource('os_activity','Nihal OS opens',osActivity.status==='fulfilled','Authenticated visits, with a new visit after 30 minutes away. Quick refreshes count once; Melbourne calendar days. Earlier untracked dates show a dash.',NIHAL);
  const productRows=products.status==='fulfilled'?products.value:[];
  const discovered=products.status==='fulfilled'?productRows.filter(r=>inWeek(prop(r,'Submission Date').date?.start,week.start,through)).length:null;
  const validated=products.status==='fulfilled'?productRows.filter(r=>inWeek(prop(r,'Validated On').date?.start,week.start,through)).length:null;
@@ -105,6 +108,10 @@ export async function buildWeeklyReport(day=civilDay()):Promise<WeeklyReport> {
   const metrics:Metric[]=[];
   if(id==='taylan')metrics.push(metric(id,'ad_leads','custm ad leads',ad.status==='fulfilled'?ad.value.leads:null,ad.status==='fulfilled'&&ad.value.leads?`$${(ad.value.spend/ad.value.leads).toFixed(2)} per lead`:'Enquiries from Meta ads',`${CREATIVE}/mission-control`),metric(id,'ad_spend','Ad spend',ad.status==='fulfilled'?Math.round(ad.value.spend*100)/100:null,'AUD · selected week',`${CREATIVE}/mission-control`,'AUD'),metric(id,'validated','Products validated',validated,'Shared pipeline · dated reviews, including passes and kills',`${FAMILY}/business`),metric(id,'launched','Products launched',launched,'Shared pipeline · first launch in the test log','https://ecom-launchpad-mentor.netlify.app'));
   if(id==='nihal')metrics.push(metric(id,'discoveries','Products found',nihalFound,nihalFound===null?'Add finds missing your name in the source log':'Attributed research records',`${CREATIVE}/radar`),metric(id,'mentorship','Mentorship watched',watched,'Completed Origins training sessions',`${FAMILY}/origins`));
+  if(id==='nihal'){
+   const activity=osActivity.status==='fulfilled'?osActivity.value:null;
+   metrics.push({key:'os_opens',label:'OS opens',value:activity?.total??null,detail:activity?.trackingSince?`${activity.activeDays} ${activity.activeDays===1?'day':'days'} opened · tracking from ${activity.trackingSince}`:'Visit count unavailable',source:activity?'auto':'missing',href:NIHAL,canEdit:false,manualValue:null,manualMode:'fallback',backupIgnored:false,daily:activity?.days});
+  }
   if(id==='ansar')metrics.push(metric(id,'school_score','Overall week score',schoolScore,points===null?'Add the weekly score if the tracker is unavailable':`${points} / ${WEEKLY_MAX} Ansar OS points · week to date`,'https://ansar-habits-tracker.netlify.app','%'),metric(id,'school_work','Homeschool work',work===null?null:work.length,work===null?'Add this week’s work count':`${workDays.size} days · ${areas.size} learning areas`,NIHAL));
   if(id!=='ayah')metrics.push(metric(id,'sleep','Back to sleep',null,'Mornings after first waking · enter 0 for none'));
   return {id,name:id[0].toUpperCase()+id.slice(1),quran:quranWeek(ss??[],week.days,through,ss!==undefined),metrics,win:manual.find(r=>r.member===id&&r.metric==='win')?.note??''};
