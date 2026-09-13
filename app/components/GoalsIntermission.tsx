@@ -518,7 +518,7 @@ export default function GoalsIntermission() {
         const res = await fetch("/api/cycle");
         if (!res.ok) return;
         const data = await res.json();
-        if (!cancelled) setCycleActive(typeof data.activeDay === "number");
+        if (!cancelled) setCycleActive(data.active === true);
       } catch {
         // No cycle read → no softening; the deck still runs.
       }

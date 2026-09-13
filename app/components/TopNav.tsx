@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import {familyWrite} from "./FamilyEditGate";
 
 const LINKS: { label: string; href: string; external?: boolean }[] = [
   { label: "Family Dashboard",      href: "https://kurgel-dashboard.netlify.app/" },
@@ -82,8 +83,9 @@ interface CycleHistory {
 }
 
 function CycleTracker() {
-  const [activeDay, setActiveDay] = useState<number | null>(null);
-  const [totalDays, setTotalDays] = useState<number | null>(null);
+  const [active, setCycleActive] = useState<boolean | null>(null);
+  const [version, setVersion] = useState<number | null>(null);
+  const [saveError, setSaveError] = useState('');
   const [headsUp, setHeadsUp] = useState(false);
   const [busy, setBusy] = useState(false);
   /* Long-press (600ms) on the button opens the unlabeled history panel; a
@@ -100,8 +102,9 @@ function CycleTracker() {
         const res = await fetch("/api/cycle");
         if (!res.ok) return;
         const data = await res.json();
-        setActiveDay(typeof data.activeDay === "number" ? data.activeDay : null);
-        setTotalDays(typeof data.totalDays === "number" ? data.totalDays : null);
+        setCycleActive(data.active === true);
+        setVersion(data.version);
+
         // Server only sets expectedInDays inside the ±3-day window and never
         // while a tracker is active, so presence alone is the signal.
         setHeadsUp(typeof data.expectedInDays === "number");
@@ -110,8 +113,9 @@ function CycleTracker() {
       }
     };
     load();
-    const interval = setInterval(load, 60000);
-    return () => clearInterval(interval);
+    const interval = setInterval(load, 30000);
+    window.addEventListener("focus", load);
+    return () => { clearInterval(interval); window.removeEventListener("focus", load); };
   }, []);
 
   const openPanel = async () => {
@@ -155,17 +159,21 @@ function CycleTracker() {
       longPressed.current = false;
       return;
     }
-    if (activeDay !== null || busy) return;
+    if (active === null || version === null || busy) return;
+    setSaveError('');
     setBusy(true);
     try {
-      const res = await fetch("/api/cycle", { method: "POST" });
-      if (res.ok) {
+      const res = await familyWrite("/api/cycle", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({active:!active,version}) });
+      if (res.ok || res.status === 409) {
         const data = await res.json();
-        setActiveDay(typeof data.activeDay === "number" ? data.activeDay : null);
-        setTotalDays(typeof data.totalDays === "number" ? data.totalDays : null);
-      }
+        if (!res.ok) setSaveError(data.error);
+        window.dispatchEvent(new Event("cycle-changed"));
+        setCycleActive(data.active === true);
+        setVersion(data.version);
+
+      } else { setSaveError("Not saved — retry"); }
     } catch {
-      // Failed press stays silent on screen; the next tap retries.
+      setSaveError("Not saved — retry");
     } finally {
       setBusy(false);
     }
@@ -173,20 +181,23 @@ function CycleTracker() {
 
   return (
     <div className="cycle-wrap">
-      {headsUp && activeDay === null && <span className="cycle-heads-up" />}
-      {activeDay !== null && totalDays !== null && (
-        <span className="cycle-pill">day {activeDay} of {totalDays}</span>
-      )}
+      {headsUp && active === false && <span className="cycle-heads-up" />}
       <button
         type="button"
-        className={activeDay === null ? "cycle-btn" : "cycle-btn cycle-btn-quiet"}
+        className={"cycle-switch" + (active ? " is-on" : "")}
+        role="switch"
+        aria-checked={active === true}
+        disabled={active === null || busy}
+        title="Period: on when it starts, off when it finishes. Hold for history."
         onClick={press}
         onPointerDown={startHold}
         onPointerUp={cancelHold}
         onPointerLeave={cancelHold}
+        onPointerCancel={cancelHold}
         onContextMenu={(e) => e.preventDefault()}
-        aria-label="tracker"
-      />
+        aria-label="Period tracking"
+      ><span className="cycle-switch-knob" />{active === null ? "…" : active ? "ON" : "OFF"}</button>
+      {saveError && <span className="cycle-save-error" role="alert">{saveError}</span>}
       {panelOpen && (
         <>
           <div className="cycle-panel-backdrop" onClick={() => setPanelOpen(false)} />

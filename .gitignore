@@ -53,3 +53,7 @@ next-env.d.ts
 # Local Netlify folder
 .netlify
 deno.lock
+
+!/scripts/prepare-sunday-preview.mjs
+
+!/scripts/prepare-family-production.mjs

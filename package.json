@@ -8,13 +8,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test app/components/spend-tier.test.ts app/lib/cycle-duration.test.ts"
+    "test": "node --test app/components/spend-tier.test.ts app/lib/sunday/model.test.ts"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",
     "@fontsource/space-grotesk": "^5.2.10",
     "@supabase/supabase-js": "^2.108.1",
     "next": "16.2.9",
+    "postgres": "^3.4.9",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },

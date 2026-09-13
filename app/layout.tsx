@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import TopNav from "./components/TopNav";
+import FamilyEditGate from "./components/FamilyEditGate";
 
 export const metadata: Metadata = {
   title: "Kurgel Family Dashboard",
@@ -16,6 +17,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <TopNav />
+        <FamilyEditGate />
         {/* The OriginsStrip banner is retired everywhere (owner, 2026-08-26):
             origins pressure exists only as the corner nudges on "/". --strip-h
             is zeroed at the end of globals.css so every surface that subtracts
