@@ -37,3 +37,13 @@ Preview initialization: `node --env-file=.env.local scripts/prepare-sunday-previ
 - Preview test entries removed and copied cycle state restored after tests.
 
 Production verification and deployment IDs are appended after live checks.
+
+## Live verification — 13 September 2026
+
+Family deployment `6aa5f3fe232cfc0008fe803f` serves code commit `550263b`; Nihal deployment `6aa5f3d5f24f7a0008e303a7` serves `4c67da0`. Both Netlify production deployments reached ready.
+
+The live Family report returned HTTP 200, production workspace, zero test entries, and all nine connections available (three correctly marked partial attribution/coverage). Its cycle endpoint returned ON, started 2026-09-11, version 1, totalDays null. An authenticated idempotent write returned 200 without changing state; unauthenticated manual writes returned 401.
+
+Live browser checks passed: all three theme choices; theme persistence; Sunday automatic Weekly review; manual Daily view surviving reload; restore-Sunday control; all four people; no fixed ten-day countdown. Each theme was measured on the three wall-screen sizes and 390px mobile. No horizontal overflow. Desktop footer visible; minimum card bottom room 28px. Mobile reports scroll fully.
+
+Nihal's existing login is preserved. Its two-way API bridge and UI were exercised against isolated preview records before production; production deployment and Family destination/key configuration were verified. No real period toggles or invented family check-ins were made during live testing.
