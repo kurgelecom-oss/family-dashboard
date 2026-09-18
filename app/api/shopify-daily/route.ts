@@ -241,10 +241,10 @@ interface SessionDay {
   reachedCheckout: number;
 }
 
+// No bot filter: Shopify Analytics counts all sessions (35 vs 13 human-only on 18 Sep 2026).
 const SESSIONS_QL = (days: number) =>
   `FROM sessions ` +
   `SHOW sessions, sessions_with_cart_additions, sessions_that_reached_checkout ` +
-  `WHERE human_or_bot_session = 'human' ` +
   `TIMESERIES day SINCE -${days - 1}d UNTIL today ORDER BY day ASC`;
 
 function num(v: unknown): number {

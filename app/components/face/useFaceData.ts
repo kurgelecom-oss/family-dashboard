@@ -488,7 +488,8 @@ export function buildFaceModel(d: FaceData): FaceModel {
   const st = d.store ?? null;
   const fmtCount = (n: number | null | undefined): string =>
     typeof n === "number" && Number.isFinite(n) ? n.toLocaleString("en-AU") : "—";
-  const storeName = st?.domain || st?.name || "Store";
+  // tk 19 Sep 2026: the tile reads "Tryliare", not the shop domain.
+  const storeName = st ? "Tryliare" : "Store";
   const storeOrders = st ? fmtCount(st.orders) : "—";
   const storeSessions = st ? fmtCount(st.sessions) : "—";
   const storeAtc = st ? fmtCount(st.addToCart) : "—";
