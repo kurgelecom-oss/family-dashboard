@@ -1939,3 +1939,8 @@ html, body {
 .cycle-switch:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}.cycle-switch:disabled{opacity:.5;cursor:wait}.cycle-save-error{font-size:10px;color:var(--red);max-width:200px}
 
 .family-edit-dialog{position:fixed;inset:0;margin:auto;width:min(390px,calc(100vw - 32px));border:1px solid #d1dfda;border-radius:14px;background:#fff;color:#21483f;padding:25px;font:14px Inter,Arial,sans-serif;box-shadow:0 20px 90px #0003}.family-edit-dialog::backdrop{background:#1e303877;backdrop-filter:blur(3px)}.family-edit-dialog h2{font-size:22px;font-weight:600;margin-bottom:10px}.family-edit-dialog p{font-size:12px;line-height:1.6;margin-bottom:16px;color:#60736a}.family-edit-dialog label{font-size:12px}.family-edit-dialog input{display:block;width:100%;font-size:22px;padding:9px;border:1px solid #b7cec1;border-radius:6px;margin:7px 0 18px;color:#21483f;background:#f5faf8}.family-edit-dialog form>div{display:flex;justify-content:flex-end;gap:10px}.family-edit-dialog button{border:1px solid #c9d5cc;border-radius:7px;padding:9px 12px;font-size:12px;cursor:pointer}.family-edit-dialog button[type=submit]{background:#245d50;color:#fff}
+
+/* Daily view ("Today, together."): Nihal's card carries the incident counter
+   and cycle switch, so the top bar's copies step aside on that screen only. */
+html[data-family-view=daily] .topnav .incident-counter,
+html[data-family-view=daily] .topnav .cycle-wrap{display:none}

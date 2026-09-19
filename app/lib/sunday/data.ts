@@ -62,12 +62,18 @@ export async function buildWeeklyReport(day=civilDay()):Promise<WeeklyReport> {
  const productRows=products.status==='fulfilled'?products.value:[];
  const surfaceLog=surfaceLogWeek(products.status==='fulfilled'?productRows:null,week,through);
  const discovered=surfaceLog?.total??null;
- const validated=products.status==='fulfilled'?productRows.filter(r=>inWeek(prop(r,'Validated On').date?.start,week.start,through)).length:null;
+ const validatedRows=products.status==='fulfilled'?productRows.filter(r=>inWeek(prop(r,'Validated On').date?.start,week.start,through)):null;
+ const validated=validatedRows?.length??null;
+ // Per-date counts feed the daily screen's auto ticks; the weekly review ignores them.
+ const tally=(dates:(string|null)[])=>dates.reduce<Record<string,number>>((m,d)=>{if(d)m[d]=(m[d]??0)+1;return m;},{});
+ const validatedByDay=validatedRows?tally(validatedRows.map(r=>dateOf(prop(r,'Validated On').date?.start))):undefined;
  addSource('products','Nihal’s product surface log',products.status==='fulfilled',`${discovered??0} products surfaced; ${validated??0} dated validation reviews. Each Notion product record counts once by Submission Date, or Created time when no submission date is saved. Days and times use Melbourne time.`,PRODUCT_SURFACE_URL);
- const watched=origins.status==='fulfilled'?origins.value.filter(r=>{
+ const watchedRows=origins.status==='fulfilled'?origins.value.filter(r=>{
   const who=owner(r,'Completed By')||originsOwners[prop(r,'Module No').number||0];
   return who==='nihal'&&prop(r,'Done').checkbox===true&&label(r,'Type')==='Training'&&inWeek(prop(r,'Completed On').date?.start,week.start,through);
- }).length:null;
+ }):null;
+ const watched=watchedRows?.length??null;
+ const watchedByDay=watchedRows?tally(watchedRows.map(r=>dateOf(prop(r,'Completed On').date?.start))):undefined;
  addSource('mentorship','Origins mentorship',origins.status==='fulfilled','Completed training lessons by Nihal (or her assigned modules). Action items and ambiguous shared lessons are excluded.',`${FAMILY}/origins`);
  let launched:number|null=null;
  if(tests.status==='fulfilled'&&verdicts.status==='fulfilled'){
@@ -101,8 +107,8 @@ export async function buildWeeklyReport(day=civilDay()):Promise<WeeklyReport> {
  const people=MEMBERS.map(id=>{
   const ss=q.status==='fulfilled'?q.value.members.find(m=>m.id===id)?.sessions:undefined;
   const metrics:Metric[]=[];
-  if(id==='taylan')metrics.push(metric(id,'ad_leads','custm ad leads',ad.status==='fulfilled'?ad.value.leads:null,ad.status==='fulfilled'&&ad.value.leads?`$${(ad.value.spend/ad.value.leads).toFixed(2)} per lead`:'Enquiries from Meta ads',`${CREATIVE}/mission-control`),metric(id,'ad_spend','Ad spend',ad.status==='fulfilled'?Math.round(ad.value.spend*100)/100:null,'AUD · selected week',`${CREATIVE}/mission-control`,'AUD'),metric(id,'validated','Products validated',validated,'Shared pipeline · dated reviews, including passes and kills',`${FAMILY}/business`),metric(id,'launched','Products launched',launched,'Shared pipeline · first launch in the test log','https://ecom-launchpad-mentor.netlify.app'));
-  if(id==='nihal')metrics.push({...metric(id,'discoveries','Products found',discovered,surfaceLog?'Nihal’s Notion surface log · Melbourne time':'Notion surface log unavailable · refresh to retry',PRODUCT_SURFACE_URL),daily:surfaceLog?.daily,entries:surfaceLog?.entries},metric(id,'mentorship','Mentorship watched',watched,'Completed Origins training sessions',`${FAMILY}/origins`));
+  if(id==='taylan')metrics.push(metric(id,'ad_leads','custm ad leads',ad.status==='fulfilled'?ad.value.leads:null,ad.status==='fulfilled'&&ad.value.leads?`$${(ad.value.spend/ad.value.leads).toFixed(2)} per lead`:'Enquiries from Meta ads',`${CREATIVE}/mission-control`),metric(id,'ad_spend','Ad spend',ad.status==='fulfilled'?Math.round(ad.value.spend*100)/100:null,'AUD · selected week',`${CREATIVE}/mission-control`,'AUD'),{...metric(id,'validated','Products validated',validated,'Shared pipeline · dated reviews, including passes and kills',`${FAMILY}/business`),perDay:validatedByDay},metric(id,'launched','Products launched',launched,'Shared pipeline · first launch in the test log','https://ecom-launchpad-mentor.netlify.app'));
+  if(id==='nihal')metrics.push({...metric(id,'discoveries','Products found',discovered,surfaceLog?'Nihal’s Notion surface log · Melbourne time':'Notion surface log unavailable · refresh to retry',PRODUCT_SURFACE_URL),daily:surfaceLog?.daily,entries:surfaceLog?.entries},{...metric(id,'mentorship','Mentorship watched',watched,'Completed Origins training sessions',`${FAMILY}/origins`),perDay:watchedByDay});
   if(id==='nihal'){
    const activity=osActivity.status==='fulfilled'?osActivity.value:null;
    metrics.push({key:'os_opens',label:'OS opens',value:activity?.total??null,detail:activity?.trackingSince?`${activity.activeDays} ${activity.activeDays===1?'day':'days'} opened · tracking from ${activity.trackingSince}`:'Visit count unavailable',source:activity?'auto':'missing',href:NIHAL,canEdit:false,manualValue:null,manualMode:'fallback',backupIgnored:false,daily:activity?.days});

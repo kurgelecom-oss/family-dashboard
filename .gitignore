@@ -59,3 +59,4 @@ deno.lock
 !/scripts/prepare-family-production.mjs
 !/scripts/prepare-os-activity.mjs
 !/scripts/check-os-report.mjs
+!/scripts/prepare-daily-ticks.mjs

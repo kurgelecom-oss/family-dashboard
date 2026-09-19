@@ -54,7 +54,7 @@ export function parseManual(body: unknown, today = civilDay()) {
 }
 export type SourceState = 'connected'|'unavailable'|'partial';
 export interface ProductSurfaceEntry {id:string;name:string;date:string;timestamp:string|null;dateSource:'Submission Date'|'Created time';href:string}
-export interface Metric {manualMode:ManualMode;backupIgnored:boolean;key:MetricKey|'os_opens';label:string;value:number|null;unit?:string;detail:string;source:'auto'|'manual'|'mixed'|'missing';href?:string;canEdit:boolean;manualValue:number|null;daily?:{date:string;count:number|null}[];entries?:ProductSurfaceEntry[]}
+export interface Metric {manualMode:ManualMode;backupIgnored:boolean;key:MetricKey|'os_opens';label:string;value:number|null;unit?:string;detail:string;source:'auto'|'manual'|'mixed'|'missing';href?:string;canEdit:boolean;manualValue:number|null;daily?:{date:string;count:number|null}[];entries?:ProductSurfaceEntry[];perDay?:Record<string,number>}
 export interface QuranDay { date:string;sessions:number;minutes:number;newAyahs:number;pages:number;future:boolean }
 export interface PersonReport {id:MemberId;name:string;quran:{available:boolean;days:QuranDay[];totalDays:number;sessions:number;minutes:number;newAyahs:number;pages:number};metrics:Metric[];win:string}
 export interface WeeklyReport {week:{start:string;end:string;days:string[]};today:string;through:string;generatedAt:string;preview:boolean;people:PersonReport[];manual:ManualEntry[];sources:{id:string;label:string;state:SourceState;detail:string;href:string}[];shared:{discoveries:number|null;validations:number|null;launched:number|null};}

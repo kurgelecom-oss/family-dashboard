@@ -28,7 +28,7 @@ function normPath(p: string): string {
   return trimmed === "" ? "/" : trimmed;
 }
 
-function IncidentCounter() {
+export function IncidentCounter() {
   const [daysSince, setDaysSince] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -82,7 +82,7 @@ interface CycleHistory {
   expectedInDays: number | null;
 }
 
-function CycleTracker() {
+export function CycleTracker() {
   const [active, setCycleActive] = useState<boolean | null>(null);
   const [version, setVersion] = useState<number | null>(null);
   const [saveError, setSaveError] = useState('');
