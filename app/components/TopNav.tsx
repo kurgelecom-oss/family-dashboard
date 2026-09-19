@@ -16,7 +16,6 @@ const LINKS: { label: string; href: string; external?: boolean }[] = [
   { label: "Calculator",            href: "https://kurgel-dashboard.netlify.app/profit.html" },
   { label: "Time Allocation Board", href: "https://kurgel-dashboard.netlify.app/board" },
   { label: "ORIGINS",               href: "https://kurgel-dashboard.netlify.app/origins" },
-  { label: "Link Board",            href: "https://luxury-kringle-cf4171.netlify.app/" },
   // Off-network surface, unlike every entry above it: opens in its own tab so
   // the dashboard stays put on the TV. `external` is the only per-link flag —
   // className and wrapper stay identical to the siblings.
