@@ -67,8 +67,6 @@ export interface TableTest {
   name: string | null;
   status: string | null;
   spend: number | null;
-  windowLow: number | null;
-  windowHigh: number | null;
   /** Days since the newest entry across every trading test, or null if none. */
   lastEntryDaysAgo: number | null;
   /**
@@ -156,8 +154,6 @@ interface LpTest {
   id: string;
   name: string;
   status: string;
-  entry_window_low: number | null;
-  entry_window_high: number | null;
   created_at: string;
 }
 interface LpEntry {
@@ -221,8 +217,6 @@ async function buildTest(today: CivilDate): Promise<TableTest> {
       name: null,
       status: null,
       spend: null,
-      windowLow: null,
-      windowHigh: null,
       lastEntryDaysAgo,
       lastActivityDaysAgo,
       staleDays: null,
@@ -248,8 +242,6 @@ async function buildTest(today: CivilDate): Promise<TableTest> {
     name: running.test.name,
     status: running.test.status,
     spend: Math.round(spend * 100) / 100,
-    windowLow: running.test.entry_window_low,
-    windowHigh: running.test.entry_window_high,
     lastEntryDaysAgo,
     lastActivityDaysAgo,
     staleDays,

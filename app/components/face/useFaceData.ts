@@ -343,7 +343,6 @@ export interface FaceModel {
   testWord: "Running" | "Stale" | "None";
   testStale: boolean;
   testContext: string;
-  nextGate: string | null;
   campaigns: string;
   testsLine: string;
   openCount: number | null;
@@ -411,36 +410,14 @@ export function buildFaceModel(d: FaceData): FaceModel {
       : staleN === 0
         ? "No test is running. The last one closed out today."
         : `No test is running. Last move was ${staleN} ${staleN === 1 ? "day" : "days"} ago.`;
-  } else if (
-    t?.running &&
-    testWord === "Running" &&
-    t.spend !== null &&
-    t.windowLow !== null &&
-    t.spend < t.windowLow
-  ) {
-    // §2: no $0.00 on the face — a not-yet-fed test gets words, not a zero.
-    headline =
-      Math.abs(t.spend) < 0.005
-        ? `${t.name} is yet to spend into the $${t.windowLow} window.`
-        : `${t.name} is at $${Math.round(t.spend)} of the $${t.windowLow} window.`;
   } else if (oldestDays !== null && oldestDays > 7) {
     headline = `One decision has sat ${oldestDays} days. Close it tonight.`;
   } else {
     headline = "Nothing on the table. Run the check-in short.";
   }
 
-  /* ---- next-action line: the test's next gate, else the oldest title ----- */
-  let nextGate: string | null = null;
-  if (t?.running && t.windowLow !== null) {
-    const spend = t.spend ?? 0;
-    const inWindow = t.windowHigh !== null && spend >= t.windowLow && spend <= t.windowHigh;
-    nextGate = inWindow
-      ? "Entry-window verdict"
-      : spend < t.windowLow
-        ? `Reach $${t.windowLow} entry window`
-        : "Exit / scale decision";
-  }
-  const nextAction = t?.running && nextGate ? nextGate : (oldest?.title ?? null);
+  /* ---- next-action line: the oldest open decision's title ---------------- */
+  const nextAction = oldest?.title ?? null;
 
   /* ---- test context line -------------------------------------------------- */
   const testContext = t?.running
@@ -530,7 +507,6 @@ export function buildFaceModel(d: FaceData): FaceModel {
     testWord,
     testStale,
     testContext,
-    nextGate,
     campaigns,
     testsLine: clock ? `${clock.tests.completed} of ${clock.tests.target}` : "—",
     openCount: d.table ? d.table.open.length : null,

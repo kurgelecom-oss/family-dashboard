@@ -107,7 +107,6 @@ interface LaunchpadTest {
   id: string;
   name: string;
   status: string;
-  entry_window_low: number | null;
   exit_negative_days: number | null;
   created_at: string;
 }
@@ -267,17 +266,14 @@ export async function GET() {
         cacheSeconds,
       );
       const sorted = [...entries].sort((a, b) => a.entry_date.localeCompare(b.entry_date));
-      const spend = sorted.reduce((s, e) => s + (e.meta_spend ?? 0), 0);
       const last = sorted.at(-1);
       const staleDays = last ? daysBetween(last.entry_date, todayISO) : null;
       const negStreak = last?.days_negative_streak ?? 0;
 
-      // Gates that demand a call: the entry window is spent (verdict gate), the
-      // negative-day exit threshold is hit, or the test has gone unfed past the
-      // red staleness line — an abandoned Live test is itself an exit decision.
-      if (activeTest.entry_window_low !== null && spend >= activeTest.entry_window_low) {
-        decisionDue = { name: activeTest.name, reason: "entry window spent" };
-      } else if (
+      // Gates that demand a call: the negative-day exit threshold is hit, or the
+      // test has gone unfed past the red staleness line — an abandoned Live test
+      // is itself an exit decision.
+      if (
         activeTest.exit_negative_days !== null &&
         negStreak >= activeTest.exit_negative_days
       ) {

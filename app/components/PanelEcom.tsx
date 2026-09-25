@@ -40,8 +40,6 @@ interface ActiveTest {
   lastEntryDate: string | null;
   staleDays: number | null;
   cumulativeSpend: number;
-  entryWindowLow: number | null;
-  entryWindowHigh: number | null;
   testRevenue: number;
   testOrders: number;
   targetCpa: number | null;
@@ -526,23 +524,9 @@ function ActiveTestPanel({
     );
   }
 
-  const low = test.entryWindowLow ?? 0;
-  const high = test.entryWindowHigh ?? 0;
-  const windowPct = high > 0 ? Math.min((test.cumulativeSpend / high) * 100, 100) : 0;
-  const lowMarkPct = high > 0 ? Math.min((low / high) * 100, 100) : 0;
-  const insideWindow = test.cumulativeSpend >= low && test.cumulativeSpend <= high;
-
   const roas = test.cumulativeSpend > 0 ? test.testRevenue / test.cumulativeSpend : null;
   // Breakeven for the test uses the same margin basis as the month panel.
   const be = breakevenRoas(test.testRevenue, test.testRevenue * 0.282);
-
-  // The gate the test is actually waiting on: it cannot be judged until
-  // cumulative spend clears the bottom of the entry window.
-  const nextGate = insideWindow
-    ? "Entry-window verdict"
-    : test.cumulativeSpend < low
-      ? `Reach $${low} entry window`
-      : "Exit / scale decision";
 
   /*
    * Staleness. A test can sit in "Live" indefinitely while nobody feeds it, so
@@ -633,7 +617,7 @@ function ActiveTestPanel({
           </div>
         )}
 
-        {/* Cumulative spend against the entry window */}
+        {/* Cumulative spend */}
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 2 }}>
           <span
             style={{
@@ -643,37 +627,17 @@ function ActiveTestPanel({
               letterSpacing: "0.04em",
             }}
           >
-            Spend vs ${low}–{high}
+            Cumulative spend
           </span>
           <span
             style={{
               fontSize: 10,
-              color: insideWindow ? "var(--green)" : "var(--amber)",
+              color: "var(--text-primary)",
               fontVariantNumeric: "tabular-nums",
             }}
           >
             {money(test.cumulativeSpend)}
           </span>
-        </div>
-        <div className="progress-track thick" style={{ position: "relative" }}>
-          <div
-            className="progress-fill"
-            style={{
-              width: `${windowPct}%`,
-              background: insideWindow ? "var(--green)" : "var(--cyan)",
-            }}
-          />
-          {/* entry-window floor marker */}
-          <div
-            style={{
-              position: "absolute",
-              left: `${lowMarkPct}%`,
-              top: 0,
-              bottom: 0,
-              width: 2,
-              background: "var(--amber)",
-            }}
-          />
         </div>
 
         {/* ROAS against breakeven */}
@@ -688,10 +652,6 @@ function ActiveTestPanel({
             value={be === null ? "—" : `${be.toFixed(2)}×`}
             tone="var(--text-muted)"
           />
-        </div>
-
-        <div style={{ borderTop: "1px solid var(--border)", paddingTop: 4, marginTop: 1 }}>
-          <LabelledRow label="Next gate" value={nextGate} last />
         </div>
       </div>
     </div>

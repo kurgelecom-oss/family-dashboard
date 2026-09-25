@@ -76,17 +76,12 @@ function startHereQuestion(data: TablePayload): string {
     return `No test is running. Last move was ${n} ${n === 1 ? "day" : "days"} ago — what restarts it tonight?`;
   }
 
-  // Rule 2 — test running, spend under the entry window.
-  if (test.spend !== null && test.windowLow !== null && test.spend < test.windowLow) {
-    return `${test.name} is at $${Math.round(test.spend)} of the $${test.windowLow} window — what does tonight's entry say?`;
-  }
-
-  // Rule 3 — oldest open decision older than 7 days.
+  // Rule 2 — oldest open decision older than 7 days.
   if (oldest && oldest.ageDays !== null && oldest.ageDays > OLD_DAYS) {
     return `One decision has sat ${oldest.ageDays} days. Will you close it tonight?`;
   }
 
-  // Rule 4.
+  // Rule 3.
   return "Nothing on the table. Run the check-in short?";
 }
 

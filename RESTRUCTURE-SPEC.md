@@ -49,7 +49,7 @@ Chip → hero → lane mapping:
 | Chip / hero | Value | Frame 3 lane |
 |---|---|---|
 | Week | last-week spend, cyan | Money — rows: Month, Balance, Saved % |
-| Test | test status word (Stale / Running / None), red when stale | Business — rows: Campaigns, Next gate, Tests 0 of 3 |
+| Test | test status word (Stale / Running / None), red when stale | Business — rows: Campaigns, Tests 0 of 3 |
 | Table | open decision count, "oldest N days" | Family — rows: Ansar streak + today %, Tomorrow, Traction days |
 | Ansar | day streak, purple | folded into Family lane |
 
@@ -69,18 +69,17 @@ Mechanics:
 Headline rules, priority order, first match wins:
 
 1. Active test stale → `No test is running. Last entry was N days ago.`
-2. Test running, spend under entry window → `[Test name] is at $X of the $350 window.`
-3. Oldest open decision older than 7 days → `One decision has sat N days. Close it tonight.`
-4. Otherwise → `Nothing on the table. Run the check-in short.`
+2. Oldest open decision older than 7 days → `One decision has sat N days. Close it tonight.`
+3. Otherwise → `Nothing on the table. Run the check-in short.`
 
-Next-action line: the test's next gate when a test exists, else the oldest open decision's title.
+Next-action line: the oldest open decision's title.
 
 Face data and sources:
 
 | Element | Source |
 |---|---|
 | Week spend, month spend, balance, saved % | PocketSmith via existing routes |
-| Test status, next gate, spend vs window, tests 0 of 3 | Launchpad API, `product-test-engine.netlify.app/api`. A product = a test. IDs are 36-char UUIDs. Data/API calls only ever hit `product-test-engine.netlify.app/api`; user-facing "Open in Launchpad" links go to `ecom-launchpad-mentor.netlify.app` (owner amendment 2026-08-26). |
+| Test status, cumulative spend, tests 0 of 3 | Launchpad API, `product-test-engine.netlify.app/api`. A product = a test. IDs are 36-char UUIDs. Data/API calls only ever hit `product-test-engine.netlify.app/api`; user-facing "Open in Launchpad" links go to `ecom-launchpad-mentor.netlify.app` (owner amendment 2026-08-26). |
 | Open decision count, oldest age, oldest title | Notion collection `4431302a-75ed-479f-a5f4-3bfd5e0a4e68` (Daily Discussion Points) via `fetchSource` in `app/lib/notion.ts` |
 | Ansar streak, today % | Supabase via existing routes |
 | Tomorrow's events by person | MS Graph via existing calendar route |
@@ -104,7 +103,7 @@ All four: back link to `/` at top left. Header shows date and time in Australia/
 ### `/business` — Column B
 
 - Campaign status pill at top right (amber when none live).
-- Active test tile: name, day, last entry date, days silent, Stale/Running label. Two buttons: Open in Launchpad, Open in calculator (`/profit.html` in Auto mode with the test UUID prefilled). Spend-vs-window bar with the window marked. ROAS (red under breakeven), Breakeven, Next gate. Entry log below, newest first, scrolls.
+- Active test tile: name, day, last entry date, days silent, Stale/Running label. Two buttons: Open in Launchpad, Open in calculator (`/profit.html` in Auto mode with the test UUID prefilled). Cumulative spend. ROAS (red under breakeven), Breakeven. Entry log below, newest first, scrolls.
 - Test selector appears only when more than one test exists.
 - P&L tile: Revenue, COGS with unverified flag when unverified, Ad spend settled, hairline, Contribution.
 - Product tests tile: `0 of 3`, days since Launchpad go-live, queue of validated-not-run products from the Launchpad API.

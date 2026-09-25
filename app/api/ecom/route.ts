@@ -309,8 +309,6 @@ interface LaunchpadTest {
   status: string;
   cogs_per_unit: number | null;
   target_cpa: number | null;
-  entry_window_low: number | null;
-  entry_window_high: number | null;
   validation_min_purchases: number | null;
   bundles_config: Bundle[] | null;
   /** Launchpad's own verification flag on the COGS figures. */
@@ -394,16 +392,6 @@ export async function GET() {
       settings,
       "TARGET_MONTHLY_REVENUE",
       SETTING_DEFAULTS.TARGET_MONTHLY_REVENUE,
-    );
-    const entryWindowLow = getSetting(
-      settings,
-      "TEST_ENTRY_WINDOW_LOW",
-      SETTING_DEFAULTS.TEST_ENTRY_WINDOW_LOW,
-    );
-    const entryWindowHigh = getSetting(
-      settings,
-      "TEST_ENTRY_WINDOW_HIGH",
-      SETTING_DEFAULTS.TEST_ENTRY_WINDOW_HIGH,
     );
     const staleAmberDays = getSetting(
       settings,
@@ -608,9 +596,6 @@ export async function GET() {
               ? daysBetween(sortedEntries.at(-1)!.entry_date, todayISO)
               : null,
             cumulativeSpend: round2(testSpend),
-            // Settings win over the test record; both currently agree.
-            entryWindowLow,
-            entryWindowHigh,
             testRevenue: round2(sortedEntries.reduce((s, e) => s + (e.revenue ?? 0), 0)),
             testOrders: sortedEntries.reduce((s, e) => s + (e.orders ?? 0), 0),
             targetCpa: activeTest.target_cpa,
