@@ -36,8 +36,6 @@ interface ActiveTest {
   lastEntryDate: string | null;
   staleDays: number | null;
   cumulativeSpend: number;
-  entryWindowLow: number | null;
-  entryWindowHigh: number | null;
   testRevenue: number;
   testOrders: number;
 }
@@ -328,19 +326,8 @@ export default function BusinessPage() {
     const firstEntry = sortedEntries.at(-1)?.entry_date ?? null;
     const dayNumber = firstEntry ? (daysBetweenISO(firstEntry, todayISO) ?? 0) + 1 : 0;
     // Same shapes PanelEcom renders for the active test.
-    const low = (selectedTest as { entry_window_low?: number | null }).entry_window_low ?? null;
-    const high = (selectedTest as { entry_window_high?: number | null }).entry_window_high ?? null;
     const roas = spend > 0 ? revenue / spend : null;
     const be = breakevenRoas(revenue, revenue * 0.282);
-    const insideWindow = low !== null && high !== null && spend >= low && spend <= high;
-    const nextGate =
-      low === null
-        ? "—"
-        : insideWindow
-          ? "Entry-window verdict"
-          : spend < low
-            ? `Reach $${low} entry window`
-            : "Exit / scale decision";
     const stale = staleDays !== null && staleDays > staleRedDays;
     return {
       spend,
@@ -348,11 +335,8 @@ export default function BusinessPage() {
       lastEntry,
       staleDays,
       dayNumber,
-      low,
-      high,
       roas,
       be,
-      nextGate,
       stale,
     };
   }, [selectedTest, sortedEntries, todayISO, staleRedDays]);
@@ -564,7 +548,7 @@ export default function BusinessPage() {
                 </a>
               </div>
 
-              {/* Spend vs entry window, window floor marked. */}
+              {/* Cumulative spend. */}
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
                 <span
                   style={{
@@ -574,7 +558,7 @@ export default function BusinessPage() {
                     letterSpacing: "0.04em",
                   }}
                 >
-                  Spend vs ${testView.low ?? 0}–{testView.high ?? 0}
+                  Cumulative spend
                 </span>
                 <span
                   style={{
@@ -586,31 +570,6 @@ export default function BusinessPage() {
                 >
                   {money(testView.spend)}
                 </span>
-              </div>
-              <div className="progress-track thick" style={{ position: "relative" }}>
-                <div
-                  className="progress-fill"
-                  style={{
-                    width: `${
-                      testView.high && testView.high > 0
-                        ? Math.min((testView.spend / testView.high) * 100, 100)
-                        : 0
-                    }%`,
-                    background: "var(--cyan)",
-                  }}
-                />
-                {testView.low !== null && testView.high ? (
-                  <div
-                    style={{
-                      position: "absolute",
-                      left: `${Math.min((testView.low / testView.high) * 100, 100)}%`,
-                      top: 0,
-                      bottom: 0,
-                      width: 2,
-                      background: "var(--amber)",
-                    }}
-                  />
-                ) : null}
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -637,8 +596,6 @@ export default function BusinessPage() {
                   <div className="stat-sublabel">Breakeven</div>
                 </div>
               </div>
-
-              <Row label="Next gate" value={testView.nextGate} />
 
               {/* Entry log — newest first, scrolls. */}
               <div
