@@ -38,7 +38,7 @@ export interface DailyPayload { today: string; weekday: string; dayOfWeek: numbe
 
 const FOCUS: Record<MemberId, string> = { taylan: 'Build & launch', nihal: 'Find & learn', ansar: 'Learn & grow', ayah: 'Little steps' };
 const HOME: Record<MemberId, string> = {
-  taylan: 'https://creative-os-318.netlify.app/mission-control',
+  taylan: 'https://kurgel-mission-control.netlify.app/mission-control',
   nihal: 'https://nihal-os-control-room.netlify.app/#homeschool',
   ansar: 'https://ansar-habits-tracker.netlify.app/',
   ayah: 'https://quran-os.netlify.app/m/ayah',

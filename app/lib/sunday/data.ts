@@ -8,7 +8,7 @@ import {PRODUCT_SURFACE_SOURCE,PRODUCT_SURFACE_URL,surfaceLogWeek} from './surfa
 import { MEMBERS, civilDay, dateOf, inWeek, weekFor, quranWeek, mergeCount, type WeeklyReport, type MemberId, type Metric, type MetricKey, type ManualEntry, type QuranSession } from './model';
 const FAMILY='https://kurgel-dashboard.netlify.app';
 const QURAN='https://quran-os.netlify.app';
-const CREATIVE='https://creative-os-318.netlify.app';
+const CREATIVE='https://kurgel-mission-control.netlify.app';
 const ENGINE='https://product-test-engine.netlify.app';
 const NIHAL='https://nihal-os-control-room.netlify.app/#homeschool';
 // Read-only, bounded upstream requests. Source failure remains unknown, never zero.
