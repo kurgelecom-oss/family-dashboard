@@ -9,7 +9,7 @@ import { MEMBERS, civilDay, dateOf, inWeek, weekFor, quranWeek, mergeCount, type
 const FAMILY='https://kurgel-dashboard.netlify.app';
 const QURAN='https://quran-os.netlify.app';
 const CREATIVE='https://kurgel-mission-control.netlify.app';
-const ENGINE='https://product-test-engine.netlify.app';
+const ENGINE='https://ecom-launchpad-mentor.netlify.app'; // ONE OS: proxy adds the Launchpad key server-side
 const NIHAL='https://nihal-os-control-room.netlify.app/#homeschool';
 // Read-only, bounded upstream requests. Source failure remains unknown, never zero.
 async function json<T>(url:string,headers?:HeadersInit):Promise<T> {

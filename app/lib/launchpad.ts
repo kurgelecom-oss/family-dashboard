@@ -12,7 +12,7 @@
    ══════════════════════════════════════════════════════════════════════════ */
 
 /** Public read-only API of the ECOM Launchpad's backend. No auth required. */
-export const LAUNCHPAD_API = "https://product-test-engine.netlify.app/api";
+export const LAUNCHPAD_API = "https://ecom-launchpad-mentor.netlify.app/api";
 
 export interface LaunchpadBundle {
   id: number;

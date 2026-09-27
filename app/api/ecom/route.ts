@@ -45,7 +45,7 @@ const POCKETSMITH_KEY = process.env["POCKETSMITH_KEY"];
 const POCKETSMITH_BASE = "https://api.pocketsmith.com/v2";
 
 /** Public read-only API of the ECOM Launchpad's backend. No auth required. */
-const LAUNCHPAD_API = "https://product-test-engine.netlify.app/api";
+const LAUNCHPAD_API = "https://ecom-launchpad-mentor.netlify.app/api";
 
 /** Meta charges appear under these payees regardless of category. */
 const META_PAYEE = /facebk|facebook|meta platforms|meta ads/i;

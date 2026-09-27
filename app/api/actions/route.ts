@@ -17,7 +17,7 @@ export const revalidate = 300;
 
 const ACTION_ITEMS_DS = "38e5429a-fa90-8035-8b09-000b2e78cdc3";
 const NOTION_VERSION = "2025-09-03";
-const LAUNCHPAD_API = "https://product-test-engine.netlify.app/api";
+const LAUNCHPAD_API = "https://ecom-launchpad-mentor.netlify.app/api";
 
 /** Only these statuses mean a product test actually finished. */
 const COMPLETED_STATUSES = new Set(["Killed", "Scaled"]);
