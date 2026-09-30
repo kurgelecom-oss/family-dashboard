@@ -5,11 +5,12 @@ import SundayReport from './SundayReport';
 import GoalsIntermission from '../GoalsIntermission';
 import CornerStack from '../CornerStack';
 import TodayTogether from '../daily/TodayTogether';
+import GoalsSnapshot,{GOAL_DESIGNS} from '../GoalsSnapshot';
 const KEY='family-view-override';
 const THEME_KEY='family-sunday-theme';
 const DIRECTIONS:{id:Theme;name:string;detail:string}[]=[{id:'gather',name:'Gather',detail:'Spacious family overview'},{id:'scorecard',name:'Scorecard',detail:'Compact weekly focus'},{id:'mosaic',name:'Mosaic',detail:'A brighter family rhythm'}];
 export default function SundayShell({preview=false,initialWeekly=false}:{preview?:boolean;initialWeekly?:boolean}){
- const [mode,setMode]=useState<Mode|null>(null),[theme,setTheme]=useState<Theme>('gather'),[manual,setManual]=useState(false),[today,setToday]=useState(civilDay());
+ const [mode,setMode]=useState<Mode|null>(null),[theme,setTheme]=useState<Theme>('gather'),[manual,setManual]=useState(false),[today,setToday]=useState(civilDay()),[goals,setGoals]=useState<number|null>(null);
  useEffect(()=>{
   function update(){const day=civilDay();setToday(day);let override=null;try{override=JSON.parse(localStorage.getItem(KEY)||'null');}catch{}setMode(viewFor(day,override));setManual(override?.day===day);}
   const p=new URLSearchParams(window.location.search).get('theme');let saved=null;try{saved=localStorage.getItem(THEME_KEY);}catch{}const chosen=p||saved;if(DIRECTIONS.some(d=>d.id===chosen))setTheme(chosen as Theme);
@@ -20,15 +21,15 @@ export default function SundayShell({preview=false,initialWeekly=false}:{preview
  // Nihal's incident counter + cycle switch live on her card in the daily view; the top bar hides its copy there.
  useEffect(()=>{document.documentElement.dataset.familyView=mode??'';return()=>{delete document.documentElement.dataset.familyView;};},[mode]);
  function chooseTheme(next:Theme){setTheme(next);try{localStorage.setItem(THEME_KEY,next);}catch{}const u=new URL(window.location.href);u.searchParams.set('theme',next);window.history.replaceState(null,'',u);}
- function choose(next:Mode){if(initialWeekly&&next==='daily')window.history.replaceState(null,'','/'+window.location.search);setMode(next);if(!preview){try{localStorage.setItem(KEY,JSON.stringify({day:civilDay(),mode:next}));}catch{}setManual(true);}}
+ function choose(next:Mode){setGoals(null);if(initialWeekly&&next==='daily')window.history.replaceState(null,'','/'+window.location.search);setMode(next);if(!preview){try{localStorage.setItem(KEY,JSON.stringify({day:civilDay(),mode:next}));}catch{}setManual(true);}}
  function automatic(){if(initialWeekly)window.history.replaceState(null,'','/'+window.location.search);try{localStorage.removeItem(KEY);}catch{}setManual(false);setMode(viewFor(civilDay()));}
  if(!mode)return <div className="su-boot" role="status">Opening the family dashboard…</div>;
  return <>
   <div className={`su-toolbar ${preview?'su-toolbar-preview':''}`}>
-   <div className="su-mode-switch" aria-label="Dashboard view"><button type="button" aria-pressed={mode==='daily'} onClick={()=>choose('daily')}>Daily dashboard</button><button type="button" aria-pressed={mode==='weekly'} onClick={()=>choose('weekly')}>Weekly review</button></div>
+   <div className="su-mode-switch" aria-label="Dashboard view"><button type="button" aria-pressed={goals==null&&mode==='daily'} onClick={()=>choose('daily')}>Daily dashboard</button><button type="button" aria-pressed={goals==null&&mode==='weekly'} onClick={()=>choose('weekly')}>Weekly review</button><button type="button" aria-pressed={goals!=null} title="Press again for the next design" onClick={()=>setGoals(g=>g==null?0:(g+1)%GOAL_DESIGNS.length)}>{goals==null?'Family goals':`Family goals · ${goals+1}/${GOAL_DESIGNS.length}`}</button></div>
    {preview?<span className="su-preview-badge">Preview · live sources, separate test entries</span>:<div className="su-schedule-label">{manual?<><span>Manual view for today</span><button onClick={automatic}>Restore Sunday schedule</button></>:<span>{viewFor(today)==='weekly'?'Sunday review is on automatically':'Weekly review opens automatically on Sunday'}</span>}</div>}
-   {mode==='weekly'&&<div className="su-theme-picker" aria-label="Sunday design">{DIRECTIONS.map(d=><button type="button" key={d.id} title={d.detail} aria-pressed={theme===d.id} onClick={()=>chooseTheme(d.id)}>{d.name}</button>)}</div>}
+   {goals==null&&mode==='weekly'&&<div className="su-theme-picker" aria-label="Sunday design">{DIRECTIONS.map(d=><button type="button" key={d.id} title={d.detail} aria-pressed={theme===d.id} onClick={()=>chooseTheme(d.id)}>{d.name}</button>)}</div>}
   </div>
-  {mode==='weekly'?<SundayReport theme={theme} preview={preview}/>:<div className="dashboard su-daily-dashboard"><GoalsIntermission/><CornerStack/><TodayTogether/></div>}
+  {goals!=null?<GoalsSnapshot design={goals}/>:mode==='weekly'?<SundayReport theme={theme} preview={preview}/>:<div className="dashboard su-daily-dashboard"><GoalsIntermission/><CornerStack/><TodayTogether/></div>}
  </>;
 }
