@@ -3,7 +3,6 @@ import {useEffect,useState} from 'react';
 import {civilDay,viewFor,type Mode,type Theme} from '../../lib/sunday/model';
 import SundayReport from './SundayReport';
 import GoalsIntermission from '../GoalsIntermission';
-import OriginsNudges from '../OriginsNudges';
 import CornerStack from '../CornerStack';
 import TodayTogether from '../daily/TodayTogether';
 const KEY='family-view-override';
@@ -30,6 +29,6 @@ export default function SundayShell({preview=false,initialWeekly=false}:{preview
    {preview?<span className="su-preview-badge">Preview · live sources, separate test entries</span>:<div className="su-schedule-label">{manual?<><span>Manual view for today</span><button onClick={automatic}>Restore Sunday schedule</button></>:<span>{viewFor(today)==='weekly'?'Sunday review is on automatically':'Weekly review opens automatically on Sunday'}</span>}</div>}
    {mode==='weekly'&&<div className="su-theme-picker" aria-label="Sunday design">{DIRECTIONS.map(d=><button type="button" key={d.id} title={d.detail} aria-pressed={theme===d.id} onClick={()=>chooseTheme(d.id)}>{d.name}</button>)}</div>}
   </div>
-  {mode==='weekly'?<SundayReport theme={theme} preview={preview}/>:<div className="dashboard su-daily-dashboard"><GoalsIntermission/><OriginsNudges/><CornerStack/><TodayTogether/></div>}
+  {mode==='weekly'?<SundayReport theme={theme} preview={preview}/>:<div className="dashboard su-daily-dashboard"><GoalsIntermission/><CornerStack/><TodayTogether/></div>}
  </>;
 }
