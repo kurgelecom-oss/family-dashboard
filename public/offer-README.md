@@ -9,10 +9,10 @@ Enter a delivered total for each 1–4-unit pack. Blank optional pack sizes are
 unavailable until a quote is entered. Select a pack, then compare its four
 margin tiers. The light/dark preference is saved in the browser.
 
-There is no separate shipping charge or manual bundle-discount calculator.
-If supplier freight stops at a warehouse, enter outbound postage under
-**Cost settings → Other order costs**, along with any uncovered fulfilment
-costs. Zero extras assumes the quote covers delivery to the customer.
+There is no separate shipping charge, cost-settings panel, or manual
+bundle-discount calculator. Enter the fully delivered total for each pack.
+The page uses the canonical defaults for Shopify Basic, return assumptions,
+GST, and retained margin; additional per-order costs default to zero.
 
 The browser uses generated modules in `public/offer-math/`. Both `npm test`
 and `npm run build` regenerate them from the canonical
