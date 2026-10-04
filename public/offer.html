@@ -287,7 +287,13 @@
 </nav>
 <script>
   (function(){
-    var norm=function(p){var t=p.replace(/\/+$/,'');return t===''?'/':t;};
+    // Netlify serves pretty URLs, so an href written as "/offer.html" arrives
+    // as "/offer" while location.pathname stays "/offer.html". Strip the
+    // extension on both sides or the active state never matches.
+    var norm=function(p){
+      var t=p.replace(/\.html?$/i,'').replace(/\/+$/,'');
+      return t===''?'/':t;
+    };
     var host=location.hostname,path=norm(location.pathname);
     var links=document.querySelectorAll('.topnav-link');
     for(var i=0;i<links.length;i++){
