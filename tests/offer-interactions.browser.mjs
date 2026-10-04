@@ -27,6 +27,9 @@ assert('invalid input explained',!$('#inputError').hidden&&$('#c1').getAttribute
 assert('invalid input holds previous result',$('#selectedPrice').textContent===previous);input('c1','7.40');
 assert('valid input clears error',$('#inputError').hidden);
 $('#settingsBtn').click();assert('settings disclosure opens',!$('#settingsPanel').hidden&&$('#settingsBtn').getAttribute('aria-expanded')==='true');
+const boxes=[...document.querySelectorAll('.settings-grid > .field')].map(e=>e.getBoundingClientRect());
+assert('cost settings never overlap',boxes.every((a,i)=>boxes.slice(i+1).every(b=>a.right<=b.left||b.right<=a.left||a.bottom<=b.top||b.bottom<=a.top)));
+assert('cost settings fit their panel',boxes.every(b=>b.left>=$('#settingsPanel').getBoundingClientRect().left&&b.right<=$('#settingsPanel').getBoundingClientRect().right));
 input('retPct','100');input('retLossPct','100');
 assert('impossible margins handled',$('#offerState').textContent==='No price reaches this margin'&&!document.body.innerText.includes('NaN'));
 input('retPct','8');input('retLossPct','25');$('#settingsBtn').click();
