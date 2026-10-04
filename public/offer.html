@@ -82,7 +82,9 @@
     font-size:12px;font-weight:600;color:#6B6B6B;text-decoration:none;
     white-space:nowrap;transition:color .3s ease-in-out;
   }
-  .topnav-link:hover{color:#FFFFFF}
+  @media (hover: hover) and (pointer: fine){
+    .topnav-link:hover{color:#FFFFFF}
+  }
   .topnav-link.active{color:#ABF43F}
   .topnav-link.active::after{content:"";position:absolute;left:10px;right:10px;bottom:0;height:2px;background:#ABF43F;border-radius:1px 1px 0 0}
 
@@ -109,7 +111,9 @@
     background:var(--surface);color:var(--ink-2);display:grid;place-items:center;box-shadow:var(--shadow-sm);
     transition:transform .16s var(--ease), color .22s var(--ease), background .3s var(--ease);
   }
-  .themebtn:hover{color:var(--accent-ink);transform:translateY(-1px)}
+  @media (hover: hover) and (pointer: fine){
+    .themebtn:hover{color:var(--accent-ink);transform:translateY(-1px)}
+  }
   .themebtn:active{transform:scale(.94)}
   .themebtn:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
   html[data-theme="dark"] .themebtn .i-sun{display:block}
@@ -173,7 +177,9 @@
 
   input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:8px;background:var(--sunk);border-radius:6px;margin-top:10px;cursor:pointer;box-shadow:inset 0 1px 2px var(--glow)}
   input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:var(--surface);cursor:grab;border:0;box-shadow:0 0 0 1.5px var(--line), 0 3px 10px -2px var(--glow);transition:transform .18s var(--ease), box-shadow .18s var(--ease)}
-  input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.1);box-shadow:0 0 0 1.5px var(--accent), 0 4px 14px -2px var(--glow)}
+  @media (hover: hover) and (pointer: fine){
+    input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.1);box-shadow:0 0 0 1.5px var(--accent), 0 4px 14px -2px var(--glow)}
+  }
   input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:50%;background:var(--surface);border:1.5px solid var(--line)}
   input[type=range]:focus{outline:none}
 
@@ -209,7 +215,9 @@
   .rbtn{appearance:none;border:0;cursor:pointer;width:100%;margin-top:13px;padding:8px;border-radius:var(--r-sm);
     background:var(--sunk);color:var(--ink-2);font-family:'Inter',sans-serif;font-size:11px;font-weight:700;
     letter-spacing:.04em;text-transform:uppercase;transition:background .2s var(--ease), color .2s var(--ease)}
-  .rbtn:hover{background:var(--accent-wash);color:var(--accent-ink)}
+  @media (hover: hover) and (pointer: fine){
+    .rbtn:hover{background:var(--accent-wash);color:var(--accent-ink)}
+  }
   .rbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .rung.pick .rbtn{background:var(--accent);color:var(--on-accent)}
 
@@ -245,7 +253,9 @@
   .jbtn{appearance:none;border:0;cursor:pointer;font-family:'Inter',sans-serif;font-size:11.5px;font-weight:600;
     padding:7px 12px;border-radius:20px;background:var(--sunk);color:var(--ink-2);
     transition:background .2s var(--ease), color .2s var(--ease), transform .14s var(--ease)}
-  .jbtn:hover{transform:translateY(-1px);color:var(--ink)}
+  @media (hover: hover) and (pointer: fine){
+    .jbtn:hover{transform:translateY(-1px);color:var(--ink)}
+  }
   .jbtn:active{transform:scale(.95)}
   .jbtn.on{background:var(--accent-wash);color:var(--accent-ink)}
   .jbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -297,11 +307,44 @@
   .blendgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}
   @media(max-width:900px){.blendgrid{grid-template-columns:repeat(2,1fr)}}
   @media(max-width:480px){.blendgrid{grid-template-columns:1fr}}
+  /* Emil interaction layer: preserve the resting visual design. */
+  :focus-visible{outline:2px solid var(--accent-ink);outline-offset:3px}
+  input[type=range]:focus-visible{outline:2px solid var(--accent-ink);outline-offset:6px}
+  .topnav-link:focus-visible{outline-color:#ABF43F;outline-offset:-3px}
+  button,a,input,select{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+  .rbtn,.jbtn,.themebtn{transition:background .2s var(--ease),color .2s var(--ease),transform .12s var(--ease)}
+  .rbtn:active,.jbtn:active,.themebtn:active{transform:scale(.97)}
+  .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+  @media (pointer: coarse){
+    .rbtn,.jbtn,input[type=number],select{min-height:44px}
+    .topnav{height:44px}
+    .topnav-link{line-height:44px;min-width:44px}
+    input[type=range]{height:44px;background:linear-gradient(var(--sunk),var(--sunk)) center/100% 8px no-repeat;box-shadow:none}
+  }
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}
+    .rbtn:active,.jbtn:active,.themebtn:active{transform:none}
+    @media (hover: hover) and (pointer: fine){
+      .jbtn:hover,.themebtn:hover,input[type=range]::-webkit-slider-thumb:hover{transform:none}
+    }
+  }
+
+  .costgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .costcell .clab{font-size:10.5px;font-weight:700;letter-spacing:.04em;color:var(--accent-ink);opacity:.7;margin-bottom:5px;text-align:center}
+  .hero-in .costgrid input{font-size:17px;font-weight:700;padding:11px 8px 11px 22px;text-align:left}
+  .hero-in .costgrid .inputwrap .pre{font-size:13px;left:9px}
+  /* At phone width four cells leave ~60px each; the 17px figure plus the $
+     prefix clips, so step both down rather than wrap the row. */
+  @media(max-width:460px){
+    .hero-in .costgrid input{font-size:14px;padding:10px 4px 10px 17px}
+    .hero-in .costgrid .inputwrap .pre{font-size:11px;left:6px}
+    .costgrid{gap:6px}
+  }
 </style>
 </head>
 <body>
 
-<nav class="topnav">
+<nav class="topnav" aria-label="Main navigation">
   <a class="topnav-link" href="https://kurgel-dashboard.netlify.app/">Family Dashboard</a>
   <a class="topnav-link" href="https://ecom-launchpad-mentor.netlify.app/">ECOM Launchpad</a>
   <a class="topnav-link" href="https://kurgel-dashboard.netlify.app/offer.html">Offer Engine</a>
@@ -322,12 +365,13 @@
     var links=document.querySelectorAll('.topnav-link');
     for(var i=0;i<links.length;i++){
       var u=new URL(links[i].href);
-      if(u.hostname===host&&norm(u.pathname)===path) links[i].classList.add('active');
+      if(u.hostname===host&&norm(u.pathname)===path) { links[i].classList.add('active'); links[i].setAttribute('aria-current','page'); }
     }
   })();
 </script>
 
 <div class="wrap">
+<p id="offerStatus" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
 
 <header>
   <div class="brand">
@@ -353,12 +397,18 @@
   <!-- ───────── inputs ───────── -->
   <div>
     <div class="card feature">
-      <div class="chead"><h2>The numbers only you know</h2></div>
+      <div class="chead"><h2>What the supplier quotes</h2><span class="per" id="volEcho">&mdash;</span></div>
+      <p class="subnote" style="margin-bottom:13px">Paste the <strong>Total</strong> column straight off the quote &mdash; cost and freight already combined, one row per pack size. Totals are never linear, so do not multiply anything out.</p>
 
       <div class="hero-in">
-        <div class="hk">Landed cost per unit</div>
-        <div class="inputwrap"><span class="pre">$</span><input type="number" id="cogs" step="0.5" min="0"></div>
-        <p class="note">Invoice <em>plus</em> freight, duty, brokerage and inbound handling. Ex-GST. Invoice alone understates this by 20&ndash;40%.</p>
+        <div class="hk">Landed total per pack</div>
+        <div class="costgrid">
+          <div class="costcell"><div class="clab">1</div><div class="inputwrap"><span class="pre">$</span><input type="number" id="c1" step="0.1" min="0"></div></div>
+          <div class="costcell"><div class="clab">2</div><div class="inputwrap"><span class="pre">$</span><input type="number" id="c2" step="0.1" min="0"></div></div>
+          <div class="costcell"><div class="clab">3</div><div class="inputwrap"><span class="pre">$</span><input type="number" id="c3" step="0.1" min="0"></div></div>
+          <div class="costcell"><div class="clab">4</div><div class="inputwrap"><span class="pre">$</span><input type="number" id="c4" step="0.1" min="0"></div></div>
+        </div>
+        <p class="note" id="perUnitEcho">&mdash;</p>
       </div>
 
       <div class="field">
@@ -367,17 +417,11 @@
       </div>
       <p class="subnote">Ad spend &divide; orders. One order costs one CPA whether it holds 1 unit or 4 &mdash; which is the entire reason bundles work.</p>
 
-      <div class="duo2">
-        <div class="field">
-          <label><span class="name">Ship 1 unit</span></label>
-          <div class="inputwrap"><span class="pre">$</span><input type="number" id="ship" step="0.5" min="0"></div>
-        </div>
-        <div class="field">
-          <label><span class="name">Each extra</span></label>
-          <div class="inputwrap"><span class="pre">$</span><input type="number" id="shipPerExtra" step="0.25" min="0"></div>
-        </div>
+      <div class="field">
+        <label><span class="name">Your extra per order</span><span class="hint">not in the quote</span></label>
+        <div class="inputwrap"><span class="pre">$</span><input type="number" id="extraPerOrder" step="0.5" min="0"></div>
       </div>
-      <p class="subnote">The second number is the one that flatters bundles. Set it to zero and every bundle looks better than it is &mdash; a 4-pack crosses weight breaks and needs a bigger box.</p>
+      <p class="subnote">Only what the supplier total does <em>not</em> cover: your own packaging, pick-and-pack, insert cards. Leave at 0 when the quote is landed and delivered &mdash; otherwise you count freight twice.</p>
 
       <div class="duo2">
         <div class="field">
@@ -401,32 +445,19 @@
           <option value="advanced">Advanced &mdash; 1.4% + 30c</option>
         </select>
       </div>
-      <p class="subnote">Australian online card rates. GST is on at 10%, card mix domestic-heavy, no third-party gateway. Those are baked in &mdash; edit <code>BAKED</code> in the page source to change them.</p>
+      <p class="subnote">Australian online card rates. GST on at 10%, card mix domestic-heavy, no third-party gateway, 20% margin kept, $50/day overhead, 45-day lead time. Baked in &mdash; edit <code>BAKED</code> in the page source.</p>
     </div>
 
     <div class="card">
-      <div class="chead"><h2>Bundle offers</h2><span class="per" id="mixEcho">&mdash;</span></div>
-
-      <div class="field">
-        <label><span class="name">Discount off list</span><span class="hint">buy 2 / 3 / 4</span></label>
-        <div class="trio">
-          <div class="inputwrap"><input class="pct" type="number" id="d2" step="1" min="0" max="90"><span class="suf">%</span></div>
-          <div class="inputwrap"><input class="pct" type="number" id="d3" step="1" min="0" max="90"><span class="suf">%</span></div>
-          <div class="inputwrap"><input class="pct" type="number" id="d4" step="1" min="0" max="90"><span class="suf">%</span></div>
-        </div>
+      <div class="chead"><h2>Take rate</h2><span class="per" id="mixEcho">&mdash;</span></div>
+      <p class="subnote" style="margin-bottom:11px">Share of orders choosing each pack. Prices are solved from the quote, so this is the only thing left to guess &mdash; and everything depends on it.</p>
+      <div class="mixrow">
+        <div class="mixcell"><div class="mlab">1</div><div class="inputwrap"><input class="pct" type="number" id="m1" step="5" min="0"><span class="suf">%</span></div></div>
+        <div class="mixcell"><div class="mlab">2</div><div class="inputwrap"><input class="pct" type="number" id="m2" step="5" min="0"><span class="suf">%</span></div></div>
+        <div class="mixcell"><div class="mlab">3</div><div class="inputwrap"><input class="pct" type="number" id="m3" step="5" min="0"><span class="suf">%</span></div></div>
+        <div class="mixcell"><div class="mlab">4</div><div class="inputwrap"><input class="pct" type="number" id="m4" step="5" min="0"><span class="suf">%</span></div></div>
       </div>
-
-      <div class="field">
-        <label><span class="name">Take rate</span><span class="hint">share of orders</span></label>
-        <div class="mixrow">
-          <div class="mixcell"><div class="mlab">1</div><div class="inputwrap"><input class="pct" type="number" id="m1" step="5" min="0"><span class="suf">%</span></div></div>
-          <div class="mixcell"><div class="mlab">2</div><div class="inputwrap"><input class="pct" type="number" id="m2" step="5" min="0"><span class="suf">%</span></div></div>
-          <div class="mixcell"><div class="mlab">3</div><div class="inputwrap"><input class="pct" type="number" id="m3" step="5" min="0"><span class="suf">%</span></div></div>
-          <div class="mixcell"><div class="mlab">4</div><div class="inputwrap"><input class="pct" type="number" id="m4" step="5" min="0"><span class="suf">%</span></div></div>
-        </div>
-        <div class="mixbar" id="mixBar"></div>
-      </div>
-      <p class="subnote">Take rate is the number nobody has and everything depends on. At an all-singles mix, bundles change nothing at all.</p>
+      <div class="mixbar" id="mixBar"></div>
     </div>
   </div>
 
@@ -444,8 +475,9 @@
     <div class="card feature">
       <div class="chead"><h2>The bundle ladder</h2><span class="per" id="bmxTag">&mdash;</span></div>
       <p class="ctitle" id="bmxIntro">&mdash;</p>
-      <div class="scroller"><table class="bmx" id="bmx"></table></div>
-      <div class="caveat info"><span>A four-pack saves <span id="savedFF">&mdash;</span> of shipping and fixed fees against four separate orders. It also saves <strong><span id="savedCpa">&mdash;</span> of CPA</strong>, because you buy the customer once instead of four times. That ratio is why bundles work, and it is not a fulfilment story.</span></div>
+      <div class="scroller" tabindex="0" role="region" aria-label="Bundle ladder, scroll horizontally for more columns"><table class="bmx" id="bmx"></table></div>
+      <div class="caveat info"><span><strong>Prices are solved, not entered.</strong> Each pack is priced to leave the same share of the order before advertising, from its own line on the quote. The discount is therefore an output &mdash; it is what the offer works out to be, and <strong>max cut</strong> is how far further you could go before that pack earns less than selling one.</span></div>
+      <div class="caveat info"><span id="margNoteTxt">&mdash;</span></div>
       <div class="caveat" id="discWarn" hidden><span id="discWarnTxt"></span></div>
     </div>
 
@@ -516,7 +548,7 @@
     <div class="card">
       <div class="chead"><h2>$50 a day versus $5,000 a day</h2><span class="per" id="cmpTag">—</span></div>
       <p class="ctitle">The same rung at both ends of the budget. Revenue always grows. Profit does not, and the cash the stock needs grows fastest of all.</p>
-      <div class="scroller">
+      <div class="scroller" tabindex="0" role="region" aria-label="Spend comparison, scroll horizontally for more columns">
         <table class="grid" id="cmpTable"></table>
       </div>
       <div class="caveat" id="cashWarn" hidden><span id="cashWarnTxt"></span></div>
@@ -529,7 +561,7 @@
         <div class="metric" id="mFloor"><div class="mk">Minimum viable price</div><div class="mv" id="vFloor">—</div><div class="mn" id="nFloor"></div></div>
         <div class="metric"><div class="mk">Cheapest viable rung</div><div class="mv" id="vBest">—</div><div class="mn" id="nBest"></div></div>
         <div class="metric"><div class="mk">Multiple on cost needed</div><div class="mv" id="vMult">—</div><div class="mn" id="nMult"></div></div>
-        <div class="metric"><div class="mk">Break-even ROAS there</div><div class="mv" id="vBeRoas">—</div><div class="mn" id="nBeRoas"></div></div>
+        <div class="metric"><div class="mk">Supplier volume discount</div><div class="mv" id="vVol">—</div><div class="mn" id="nVol"></div></div>
       </div>
     </div>
 
@@ -537,10 +569,12 @@
 </div>
 
 <footer>
-  <strong>You enter one number.</strong> Everything else on this page is solved from the landed cost: the four prices, Shopify's cut at each of them, GST, the expected cost of returns, the ad budget each price can fund, and the most you can pay for a customer.<br>
-  <strong>The tiers are the slice that survives.</strong> A rung is named for how much of each order is left before advertising: Excellent 65%, Good 55%, Average 45%, Poor 35% of revenue after GST. Those cut-offs come from the published benchmarks, where a kept margin of 20% plus ad spend of 25% of revenue is an average offer, and the top decile keeps 28%+.<br>
-  <strong>Price is solved, not marked up.</strong> Shopify's fee, GST and returns all scale with the price, so a flat 3x on cost lands in the wrong place. The engine solves for the price where the maths actually closes.<br>
-  <strong>Two things the margin alone will not tell you.</strong> A rung can look excellent and still be unaffordable, because the CPA you face is higher than the rung can fund. And a profitable day at $5,000 of spend can still sink you, because the stock behind it is paid for weeks before the money arrives.
+  <strong>You enter the quote.</strong> Paste the supplier's Total column - one landed, delivered total per pack size - and everything else on this page is solved from it: four single-unit prices, a price for every pack, Shopify's cut at each of them, GST, the expected cost of returns, the ad budget each price can fund, and the most you can pay for a customer.<br>
+  <strong>Totals are never linear, so nothing is multiplied out.</strong> Two units cost less than twice one because the supplier already prices freight at volume. That volume discount is margin you receive before you discount anything, and it is why each extra unit is nearly all contribution.<br>
+  <strong>The discount is an output.</strong> Each pack is priced to leave the same share of the order before advertising, so what the offer "reads" as - 31% off, 42% off - is what the maths produced, not a number anyone guessed. <strong>Max cut</strong> is how much further you could go before a pack earns less than selling one.<br>
+  <strong>Two constraints, and the higher one binds.</strong> A margin tier gives the minimum viable price. <strong>Needs for CPA</strong> gives the price a pack must reach to fund the traffic you are actually buying. On cheap goods the second is almost always the one that matters, and the page says so rather than letting a healthy-looking margin hide it.<br>
+  <strong>Take rate is the only guess left.</strong> CPA is charged per order and every order is one pack, so the blended target CPA is the single number to hold ads to. At an all-singles mix it equals the single exactly and the ladder changes nothing.<br>
+  <strong>Bundles improve profit and worsen cash at the same time.</strong> Four units per order is four times the stock, paid for weeks before the revenue lands. The scale panel and the stock-cash figure both run on blended cost per order so the two move together where you can see them.
   <span class="src">Shopify Payments Australia online card rates verified 4 Oct 2026 (Basic 1.75% + 30c, Grow 1.6% + 30c, Advanced 1.4% + 30c; Amex and international rates and the third-party gateway surcharge per the same published schedule). Tier cut-offs and the seeded CPA bands come from 2026 DTC and Meta-ads benchmark data: contribution-margin deciles (Level CFO, Commerce Catalyst), Meta purchase CPA by vertical (Triple Whale, AdLibrary), return rates and the cost of a return (ShipNetwork, 3PL Guys), and landed-cost composition (Syncost, Passport). CPA bands are US-sourced. The rate of CPA climb as spend rises has no published constant and is an operator dial, not a prediction.</span>
 </footer>
 
@@ -586,17 +620,23 @@
   var TIER_VAR = {excellent:"--pos", good:"--info", average:"--warn", poor:"--muted"};
   var BUNDLE_VAR = ["--muted","--info","--accent","--pos"];
 
+  /* The supplier Total column, pasted in. Never multiplied out: two units
+     cost less than twice one because the quote already prices freight at
+     volume. Seeded with the Doctea joint-support quote. */
   var S = {
-    cogs:12, ship:7, shipPerExtra:1.5, retPct:8, retLossPct:25,
-    plan:"basic", actualCpa:25,
-    disc:[0,10,20,25],          // buy 1..4, percent off list
-    mix:[60,25,10,5],           // take rate per rung, any scale
+    costs:[7.40,10.40,13.90,17.70],   // landed + delivered total per pack
+    extraPerOrder:0,                  // only what the quote does NOT cover
+    retPct:8, retLossPct:25,
+    plan:"basic", actualCpa:12,
+    mix:[60,25,10,5],                 // take rate per pack, any scale
     spend:700, pick:"excellent"
   };
 
   /* ── money ── */
-  function money(n){ return !isFinite(n)?"—":(n<0?"−$":"$")+Math.abs(n).toLocaleString("en-AU",{minimumFractionDigits:0,maximumFractionDigits:0}); }
-  function money2(n){ return !isFinite(n)?"—":(n<0?"−$":"$")+Math.abs(n).toLocaleString("en-AU",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  var wholeMoney=new Intl.NumberFormat("en-AU",{minimumFractionDigits:0,maximumFractionDigits:0});
+  var preciseMoney=new Intl.NumberFormat("en-AU",{minimumFractionDigits:2,maximumFractionDigits:2});
+  function money(n){ return !isFinite(n)?"—":(n<0?"−$":"$")+wholeMoney.format(Math.abs(n)); }
+  function money2(n){ return !isFinite(n)?"—":(n<0?"−$":"$")+preciseMoney.format(Math.abs(n)); }
   function pct1(n){ return isFinite(n)?n.toFixed(1)+"%":"—"; }
   function pct0(n){ return isFinite(n)?Math.round(n)+"%":"—"; }
   function raw(id){ var v=parseFloat($(id).value); return isFinite(v)?v:0; }
@@ -626,31 +666,58 @@
   /* How much of each retail dollar survives GST, fees, returns and the margin
      kept. Shared by the price solve, the bundle model and the discount solver
      so they cannot drift apart. */
-  function cpaSlope(){ return (1-retRate()-keep())/(1+gst()) - blendedFee().pct/100; }
-  function fixedCosts(units){
+  function slopeAt(target){ return (1-retRate()-target)/(1+gst()) - blendedFee().pct/100; }
+  function cpaSlope(){ return slopeAt(keep()); }
+
+  /* Supplier total for a pack, falling back to the largest quoted size. */
+  function supplierTotal(units){
+    var u=Math.max(Math.round(units),1), t=S.costs;
+    if(!t.length) return 0;
+    return Math.max(t[u-1]!=null?t[u-1]:t[t.length-1],0);
+  }
+  function costPerUnit(units){ return supplierTotal(units)/Math.max(Math.round(units),1); }
+  function marginalCost(units){
     var u=Math.max(Math.round(units),1);
-    return S.cogs*u + S.ship + S.shipPerExtra*(u-1) + blendedFee().fixed;
+    return u<2 ? NaN : supplierTotal(u)-supplierTotal(u-1);
+  }
+  /* Everything per order that does not scale with the retail price. */
+  function fixedCosts(units){
+    return supplierTotal(units) + Math.max(S.extraPerOrder,0) + blendedFee().fixed;
+  }
+  function solvePrice(target, units){
+    var sl=slopeAt(target);
+    return sl<=0 ? Infinity : fixedCosts(units)/sl;
+  }
+  /* The other constraint: the price a pack needs to fund the CPA being paid.
+     A margin percentage alone prices a cheap product below what traffic costs. */
+  function cpaFundedPrice(units, cpa){
+    var A=cpaSlope();
+    return A<=0 ? Infinity : (fixedCosts(units)+Math.max(cpa,0))/A;
+  }
+  function volumeDiscount(){
+    var n=S.costs.length;
+    if(n<2) return NaN;
+    var one=costPerUnit(1);
+    return one>0 ? 1-costPerUnit(n)/one : NaN;
   }
 
   /* ── single-unit quality ladder ── */
-  function priceFor(target){
-    var b=blendedFee(), bracket=(1-retRate()-target)/(1+gst()) - b.pct/100;
-    if(bracket<=0) return Infinity;
-    return (S.cogs + S.ship + b.fixed)/bracket;
-  }
+  function priceFor(target){ return solvePrice(target, 1); }
   function rung(tier){
     var price=priceFor(tier.before);
     if(!isFinite(price)) return {tier:tier,price:Infinity,unreachable:true,cpaShort:true,viable:false,netRev:NaN,before:NaN,targetCpa:NaN};
     var netRev=price/(1+gst()), gstAmt=price-netRev;
     var fee=feeOn(price), returns=retRate()*netRev;
-    var before=netRev-S.cogs-S.ship-fee-returns;
+    var cost=supplierTotal(1)+Math.max(S.extraPerOrder,0);
+    var before=netRev-cost-fee-returns;
     var targetCpa=before-keep()*netRev;
     var unreachable=targetCpa<=0, cpaShort=S.actualCpa>0 && targetCpa<S.actualCpa;
     return {
       tier:tier, price:price, netRev:netRev, gst:gstAmt, fee:fee, returns:returns,
       before:before, breakEvenCpa:before, targetCpa:targetCpa, kept:keep()*netRev,
-      multiple:S.cogs>0?price/S.cogs:Infinity,
-      gmPct:(netRev-S.cogs)/netRev*100,
+      cost:cost,
+      multiple:cost>0?price/cost:Infinity,
+      gmPct:(netRev-cost)/netRev*100,
       beRoas:targetCpa>0?price/targetCpa:Infinity,
       unreachable:unreachable, cpaShort:cpaShort,
       cpaHeadroom:S.actualCpa>0?targetCpa-S.actualCpa:NaN,
@@ -658,43 +725,56 @@
     };
   }
   function ladder(){ return TIERS.map(rung); }
-  function minViablePrice(cpa){
-    var b=blendedFee(), A=cpaSlope();
-    if(A<=0) return Infinity;
-    return (S.cogs + S.ship + b.fixed + Math.max(cpa,0))/A;
-  }
+  var minViablePrice = function(cpa){ return cpaFundedPrice(1, cpa); };
 
   /* ── bundles ──────────────────────────────────────────────────────────────
      A bundle multiplies product cost but not the order-level costs: one
      parcel base, one flat transaction cent, and above all ONE CPA. That last
      one is most of the advantage. */
-  function bundleRow(unitPrice, units, discPct, singleTarget){
+  function bundleRow(target, units, singlePrice, singleTarget){
     var u=Math.max(Math.round(units),1);
-    var list=unitPrice*u;
-    var price=list*(1-clamp(discPct,0,100)/100);
+    var price=solvePrice(target,u);
+    var list=singlePrice*u;
+    if(!isFinite(price)){
+      return {units:u, price:Infinity, unreachable:true, fundsCpa:false,
+              supplierTotal:supplierTotal(u), supplierPerUnit:costPerUnit(u),
+              marginalCost:marginalCost(u), impliedDisc:NaN, maxDisc:NaN,
+              targetCpa:NaN, before:NaN, headroom:NaN};
+    }
     var netRev=price/(1+gst());
-    var fee=feeOn(price), cogs=S.cogs*u, ship=S.ship+S.shipPerExtra*(u-1);
+    var fee=feeOn(price);
+    var cost=supplierTotal(u)+Math.max(S.extraPerOrder,0);
     var returns=retRate()*netRev;
-    var before=netRev-cogs-ship-fee-returns;
+    var before=netRev-cost-fee-returns;
     var targetCpa=before-keep()*netRev;
-    /* targetCpa = P*A - C, so the price that ties the one-pack is
-       P=(T+C)/A and the deepest discount is 1 - P/list. */
+    /* targetCpa = P*A - C, so the price that ties the single is (T+C)/A and
+       the cut from this pack's own list price down to it is its room. */
     var A=cpaSlope(), C=fixedCosts(u), maxDisc=NaN;
     if(A>0 && list>0) maxDisc=1-(singleTarget+C)/(A*list);
     return {
-      units:u, discPct:discPct, price:price, pricePerUnit:price/u,
-      netRev:netRev, gst:price-netRev, fee:fee, cogs:cogs, ship:ship, returns:returns,
+      units:u, price:price, pricePerUnit:price/u,
+      supplierTotal:supplierTotal(u), supplierPerUnit:costPerUnit(u),
+      marginalCost:marginalCost(u),
+      impliedDisc:list>0?1-price/list:NaN,
+      netRev:netRev, gst:price-netRev, fee:fee, cost:cost, returns:returns,
       before:before, breakEvenCpa:before, targetCpa:targetCpa,
       headroom:singleTarget>0?targetCpa/singleTarget:NaN,
-      maxDisc:maxDisc,
+      maxDisc:maxDisc, unreachable:false,
+      cpaFundedPrice:cpaFundedPrice(u,S.actualCpa),
       fundsCpa:S.actualCpa<=0 ? true : targetCpa>=S.actualCpa
     };
   }
-  function bundleLadder(unitPrice){
-    if(!isFinite(unitPrice)) return [];
-    var single=bundleRow(unitPrice,1,0,1);
-    var t=single.targetCpa;
-    return [1,2,3,4].map(function(u,i){ return bundleRow(unitPrice,u,S.disc[i],t); });
+  /* One row per quoted pack size, every one solved at the same before-ads
+     target so the tier means the same thing across the ladder. */
+  function bundleLadder(target){
+    var n=Math.max(S.costs.length,1);
+    var p1=solvePrice(target,1);
+    if(!isFinite(p1)) return [];
+    var single=bundleRow(target,1,p1,1);
+    var st=single.targetCpa;
+    var out=[];
+    for(var u=1;u<=n;u++) out.push(bundleRow(target,u,p1,st));
+    return out;
   }
 
   function normMix(){
@@ -713,7 +793,7 @@
       weights:w,
       unitsPerOrder:sum(function(r){return r.units;}),
       aov:sum(function(r){return r.price;}),
-      cogsPerOrder:sum(function(r){return r.cogs;}),
+      costPerOrder:sum(function(r){return r.cost;}),
       breakEvenCpa:sum(function(r){return r.before;}),
       targetCpa:targetCpa,
       uplift:single.targetCpa>0?targetCpa/single.targetCpa:NaN,
@@ -748,7 +828,7 @@
       revenue:revenue, contribution:contribution,
       profit:contribution-BAKED.fixedPerDay,
       roas:spend>0?revenue/spend:Infinity,
-      stockCash:orders*bl.unitsPerOrder*S.cogs*Math.max(BAKED.leadDays,0)
+      stockCash:orders*bl.costPerOrder*Math.max(BAKED.leadDays,0)
     };
   }
   function peak(bl){
@@ -788,15 +868,17 @@
 
   /* ── render ── */
   function syncInputs(){
-    $("cogs").value=S.cogs; $("ship").value=S.ship; $("shipPerExtra").value=S.shipPerExtra;
+    ["c1","c2","c3","c4"].forEach(function(id,i){ $(id).value=S.costs[i]; });
+    $("extraPerOrder").value=S.extraPerOrder;
     $("retPct").value=S.retPct; $("retLossPct").value=S.retLossPct;
     $("plan").value=S.plan; $("actualCpa").value=S.actualCpa;
-    $("d2").value=S.disc[1]; $("d3").value=S.disc[2]; $("d4").value=S.disc[3];
     $("m1").value=S.mix[0]; $("m2").value=S.mix[1]; $("m3").value=S.mix[2]; $("m4").value=S.mix[3];
   }
 
   function renderLadder(L){
-    var host=$("ladder"); host.innerHTML="";
+    var host=$("ladder");
+    var focused=host.contains(document.activeElement)?document.activeElement.getAttribute("data-pick"):null;
+    host.innerHTML="";
     L.forEach(function(r){
       var d=document.createElement("div");
       d.className="rung "+r.tier.key+(r.viable?"":" dead")+(S.pick===r.tier.key?" pick":"");
@@ -813,13 +895,14 @@
         +'<div class="rprice">'+(isFinite(r.price)?money2(r.price):"—")+'</div>'
         +'<div class="rsub">'+(isFinite(r.multiple)?r.multiple.toFixed(2)+"× landed cost":"&nbsp;")+'</div>'
         +'<div class="rrows">'+rows+'</div>'
-        +'<button class="rbtn" type="button" data-pick="'+r.tier.key+'">'
+        +'<button class="rbtn" type="button" data-pick="'+r.tier.key+'" aria-label="Bundle the '+r.tier.label+' price" aria-pressed="'+(S.pick===r.tier.key)+'">'
         +(S.pick===r.tier.key?"Bundling this":"Bundle this")+'</button>';
       host.appendChild(d);
     });
     Array.prototype.forEach.call(host.querySelectorAll("[data-pick]"),function(b){
-      b.addEventListener("click",function(){ S.pick=b.getAttribute("data-pick"); render(); });
+      b.addEventListener("click",function(){ S.pick=b.getAttribute("data-pick"); render(); announceResults(); });
     });
+    if(focused) host.querySelector('[data-pick="'+focused+'"]').focus({preventScroll:true});
   }
 
   function renderStacks(L){
@@ -831,71 +914,95 @@
       var lab=document.createElement("div"); lab.className="stacklab"; lab.textContent=r.tier.label;
       var bar=document.createElement("div"); bar.className="stackbar";
       if(!isFinite(r.price)){ bar.style.background="var(--sunk)"; row.appendChild(lab); row.appendChild(bar); host.appendChild(row); return; }
+      bar.setAttribute("role","img");
+      var breakdown=[];
       bar.style.width=(r.price/maxP*100)+"%";
       var ad=Math.max(r.targetCpa,0);
-      [["--c-cogs",S.cogs,"Landed COGS"],["--c-ship",S.ship,"Ship & fulfil"],
+      [["--c-cogs",r.cost,"Landed total from the quote"],
        ["--c-fee",r.fee,"Shopify fee"],["--c-gst",r.gst,"GST"],["--c-ret",r.returns,"Returns"],
        ["--c-ads",ad,"Ad budget"],
-       ["--c-keep",Math.max(r.price-S.cogs-S.ship-r.fee-r.gst-r.returns-ad,0),"Kept"]
+       ["--c-keep",Math.max(r.price-r.cost-r.fee-r.gst-r.returns-ad,0),"Kept"]
       ].forEach(function(pp){
         if(pp[1]<=0) return;
         var sg=document.createElement("div"); sg.className="seg";
         sg.style.width=(pp[1]/r.price*100)+"%"; sg.style.background="var("+pp[0]+")";
-        sg.title=pp[2]+": "+money2(pp[1]); bar.appendChild(sg);
+        sg.title=pp[2]+": "+money2(pp[1]); breakdown.push(sg.title); bar.appendChild(sg);
       });
+      bar.setAttribute("aria-label",r.tier.label+" price breakdown. "+breakdown.join(". "));
       row.appendChild(lab); row.appendChild(bar); host.appendChild(row);
     });
   }
 
   function renderBundles(rows, picked){
     var t=$("bmx");
-    if(!rows.length){ t.innerHTML=""; $("bmxTag").textContent="—"; $("bmxIntro").textContent="No reachable price for this rung."; return; }
-    $("bmxTag").textContent=picked.tier.label+" · "+money2(picked.price)+" a unit";
-    $("bmxIntro").innerHTML="One order costs one CPA whether it holds 1 unit or 4. These are the same "
-      +"product at four order sizes, and <strong>max discount</strong> is how deep each one can be cut "
-      +"before it stops beating a single sale.";
-    t.innerHTML="<thead><tr><th>Offer</th><th>Price</th><th>Per unit</th><th>Discount</th>"
-      +"<th>Break-even CPA</th><th>Target CPA</th><th>Headroom</th><th>Max discount</th></tr></thead><tbody>"
+    if(!rows.length){
+      t.innerHTML=""; $("bmxTag").textContent="—";
+      $("bmxIntro").textContent="No reachable price for this margin tier at this cost base.";
+      $("margNoteTxt").textContent="—"; $("discWarn").hidden=true; return;
+    }
+    $("bmxTag").textContent=picked.tier.label+" · "+pct0(picked.tier.before*100)+" before ads";
+    $("bmxIntro").innerHTML="Every pack solved from its own line on the quote, all at the same "
+      +"before-ads margin. One order costs one CPA whether it holds 1 unit or "+rows.length
+      +", which is why the target CPA climbs even as the price per unit falls.";
+
+    t.innerHTML="<thead><tr><th>Offer</th><th>Quote</th><th>Price</th>"
+      +"<th>Price / unit</th><th>Offer reads</th><th>Needs for CPA</th><th>Break-even CPA</th>"
+      +"<th>Target CPA</th><th>Headroom</th><th>Max cut</th></tr></thead><tbody>"
       + rows.map(function(b,i){
-          var over=isFinite(b.maxDisc) && b.discPct > b.maxDisc*100;
-          return "<tr"+(b.fundsCpa?"":" class='dim'")+">"
-            +"<td><span class='bname'><span class='bdot' style='background:var("+BUNDLE_VAR[i]+")'></span>Buy "+b.units+"</span></td>"
-            +"<td>"+money2(b.price)+"</td>"
+          var vcol=BUNDLE_VAR[Math.min(i,BUNDLE_VAR.length-1)];
+          var name="<td><span class='bname'><span class='bdot' style='background:var("+vcol+")'></span>Buy "+b.units+"</span></td>";
+          if(b.unreachable){
+            return "<tr class='dim'>"+name+"<td>"+money2(b.supplierTotal)
+              +"</td><td colspan='8'>No price reaches this margin at this cost base.</td></tr>";
+          }
+          return "<tr"+(b.fundsCpa?"":" class='dim'")+">"+name
+            +"<td>"+money2(b.supplierTotal)+"</td>"
+            +"<td class='head'>"+money2(b.price)+"</td>"
             +"<td class='info'>"+money2(b.pricePerUnit)+"</td>"
-            +"<td>"+pct0(b.discPct)+"</td>"
+            +"<td>"+(b.units===1?"—":pct0(b.impliedDisc*100)+" off")+"</td>"
+            +"<td class='"+(b.fundsCpa?"":"neg")+"'>"+money2(b.cpaFundedPrice)+"</td>"
             +"<td>"+money2(b.breakEvenCpa)+"</td>"
             +"<td class='"+(b.fundsCpa?"pos":"neg")+"'>"+money2(b.targetCpa)+"</td>"
             +"<td>"+(isFinite(b.headroom)?b.headroom.toFixed(2)+"×":"—")+"</td>"
-            +"<td class='"+(over?"neg":"")+"'>"+(isFinite(b.maxDisc)?pct0(b.maxDisc*100):"—")+"</td>"
+            +"<td>"+(isFinite(b.maxDisc)?pct0(b.maxDisc*100):"—")+"</td>"
             +"</tr>";
         }).join("")
       +"</tbody>";
 
-    // What a four-pack really saves against four separate orders, counting
-    // only costs it genuinely avoids: three parcel bases and three flat
-    // transaction cents. The percentage fee is not a saving - four full-price
-    // orders pay more of it only because they total more money.
-    var one=rows[0], four=rows[3];
-    var ff=(one.ship*4-four.ship)+blendedFee().fixed*3;
-    $("savedFF").textContent=money2(ff);
-    $("savedCpa").textContent=money2(one.targetCpa*3);
+    /* The real reason a quote shaped like this makes bundles work: each extra
+       unit costs a fraction of the first, so nearly everything the customer
+       pays for it is contribution. */
+    var one=rows[0], top=rows[rows.length-1];
+    var marg=rows.slice(1).map(function(b){
+      return "unit "+b.units+" adds "+money2(b.marginalCost);
+    }).join(", ");
+    var margShare=(isFinite(top.marginalCost)&&top.pricePerUnit>0)
+      ? (1-top.marginalCost/top.pricePerUnit)*100 : NaN;
+    $("margNoteTxt").innerHTML = rows.length<2
+      ? "Add more pack sizes from the quote to see the bundle economics."
+      : "The first unit costs "+money2(one.supplierTotal)+", then "+marg+". So at the buy-"
+        +top.units+" price of "+money2(top.pricePerUnit)+" a unit, <strong>"+pct1(margShare)
+        +"</strong> of every extra unit sold is contribution. That, plus paying one CPA instead of "
+        +top.units+", is the whole case for the ladder.";
 
-    var over=rows.filter(function(b){ return isFinite(b.maxDisc) && b.discPct>b.maxDisc*100; });
-    var under=rows.filter(function(b){ return b.units>1 && isFinite(b.maxDisc) && b.maxDisc*100-b.discPct>10; });
+    /* Solved prices are the floor for this tier. Say so when a pack still
+       cannot fund the CPA, because that is a pricing problem the ladder alone
+       will not fix. */
+    var short=rows.filter(function(b){ return !b.unreachable && !b.fundsCpa; });
     var w=$("discWarn");
-    if(over.length){
+    if(short.length && short.length<rows.length){
       w.hidden=false; w.className="caveat";
-      $("discWarnTxt").innerHTML=over.map(function(b){
-        return "<strong>Buy "+b.units+" is cut too deep.</strong> At "+pct0(b.discPct)
-          +" off it earns less per order than selling one unit. The limit is "+pct0(b.maxDisc*100)+".";
-      }).join(" ");
-    } else if(under.length){
-      w.hidden=false; w.className="caveat info";
-      $("discWarnTxt").innerHTML="You have discount room you are not using: "
-        + under.map(function(b){ return "buy "+b.units+" could go to "+pct0(b.maxDisc*100)
-            +" instead of "+pct0(b.discPct); }).join(", ")
-        + " and still beat a single sale. Deeper discounts buy take rate, which is what the blend below runs on.";
-    } else { w.hidden=true; }
+      $("discWarnTxt").innerHTML=short.map(function(b){ return "Buy "+b.units; }).join(", ")
+        +" cannot fund the "+money2(S.actualCpa)+" CPA at this tier. Buy "+short[0].units
+        +" would need to sell for <strong>"+money2(short[0].cpaFundedPrice)+"</strong> instead of "
+        +money2(short[0].price)+" to carry it alone — or the mix has to lean on the packs that do.";
+    } else if(short.length===rows.length){
+      w.hidden=false; w.className="caveat bad";
+      $("discWarnTxt").innerHTML="<strong>No pack funds the "+money2(S.actualCpa)
+        +" CPA at this margin tier.</strong> A single would have to sell for "
+        +money2(one.cpaFundedPrice)+" rather than "+money2(one.price)
+        +". Price above the tier, cut the quote, or accept a thinner margin.";
+    } else w.hidden=true;
   }
 
   function renderBlend(bl, rows){
@@ -917,6 +1024,8 @@
 
     // the take-rate mix bar on the left
     var bar=$("mixBar"); bar.innerHTML="";
+    bar.setAttribute("role","img");
+    bar.setAttribute("aria-label",bl.weights.map(function(w,i){return "Buy "+(i+1)+": "+pct0(w*100)+" of orders";}).join(". "));
     bl.weights.forEach(function(w,i){
       if(w<=0) return;
       var sg=document.createElement("div"); sg.className="mixseg";
@@ -1054,8 +1163,11 @@
   function renderScenario(bl, picked){
     $("pickTag").textContent = picked.tier.label+" ladder"+(bl?" · AOV "+money2(bl.aov):"");
     $("spendVal").textContent=money(S.spend);
+    $("spend").setAttribute("aria-valuetext",money(S.spend)+" per day");
     Array.prototype.forEach.call(document.querySelectorAll(".jbtn"),function(b){
-      b.classList.toggle("on",Math.abs(Number(b.getAttribute("data-s"))-S.spend)<1);
+      var selected=Math.abs(Number(b.getAttribute("data-s"))-S.spend)<1;
+      b.classList.toggle("on",selected);
+      b.setAttribute("aria-pressed",String(selected));
     });
     if(!bl){
       ["vProfit","vCpa","vRoas","vCash"].forEach(function(id){ $(id).textContent="—"; });
@@ -1134,20 +1246,29 @@
       : (bl&&bl.targetCpa>=S.actualCpa
           ? "No single unit funds your CPA, but the blended ladder does at "+money2(bl.targetCpa)+"."
           : "Nothing funds your CPA. Fix landed cost, fulfilment, price or the bundle mix.");
-    $("vMult").textContent=(S.cogs>0&&isFinite(floor))?(floor/S.cogs).toFixed(2)+"×":"—";
-    $("nMult").textContent=(S.cogs>0&&isFinite(floor))
+    $("vMult").textContent=(supplierTotal(1)>0&&isFinite(floor))?(floor/supplierTotal(1)).toFixed(2)+"×":"—";
+    $("nMult").textContent=(supplierTotal(1)>0&&isFinite(floor))
       ? "Keystone is 2×, triple keystone 4×. Above 4× the supplier price is the problem."
       : "Enter a landed cost.";
-    var at=isFinite(floor)?floor/Math.max(S.actualCpa,0.01):NaN;
-    $("vBeRoas").textContent=isFinite(at)?at.toFixed(2)+"×":"—";
-    $("nBeRoas").textContent=isFinite(at)?"What the ads must return at the floor price to hold the margin.":"";
+    var vd=volumeDiscount();
+    $("vVol").textContent=isFinite(vd)?(vd*100).toFixed(1)+"%":"-";
+    $("nVol").textContent=isFinite(vd)
+      ? "Per-unit cost falls from "+money2(costPerUnit(1))+" to "+money2(costPerUnit(S.costs.length))
+        +" across the quote. Margin you get before discounting anything."
+      : "Add more pack sizes from the quote.";
   }
 
   function render(){
     var L=ladder();
     $("feeEcho").textContent=blendedFee().pct.toFixed(2)+"% + "+money2(blendedFee().fixed);
-    $("ladderTag").textContent="landed "+money2(S.cogs)+" · CPA "+money2(S.actualCpa);
-    $("ladderIntro").innerHTML="At "+money2(S.cogs)+" landed, these are the four single-unit prices. "
+    $("perUnitEcho").innerHTML="Per unit that is "
+      + S.costs.map(function(_,i){ return money2(costPerUnit(i+1)); }).join(" / ")
+      + (isFinite(volumeDiscount()) ? " &mdash; the supplier is already giving you <strong>"
+          + (volumeDiscount()*100).toFixed(0) + "% off</strong> per unit at the top pack." : "");
+    $("volEcho").textContent=isFinite(volumeDiscount())
+      ? (volumeDiscount()*100).toFixed(0)+"% volume discount" : "-";
+    $("ladderTag").textContent="quote "+money2(supplierTotal(1))+" · CPA "+money2(S.actualCpa);
+    $("ladderIntro").innerHTML="At "+money2(supplierTotal(1))+" landed for one unit, these are the four single-unit prices. "
       +"<strong>"+money2(S.actualCpa)+"</strong> is the CPA you pay, so a rung whose target CPA sits under "
       +"that cannot fund its own traffic on single sales alone — which is what the bundle ladder below fixes.";
 
@@ -1158,7 +1279,7 @@
       var fl=minViablePrice(S.actualCpa);
       $("ladderWarnTxt").innerHTML="<strong>No single-unit rung works at this cost base.</strong> "
         +(isFinite(fl)?("A single would have to sell for <strong>"+money2(fl)+"</strong>"
-          +(S.cogs>0?" — "+(fl/S.cogs).toFixed(2)+"× the landed cost":"")
+          +(supplierTotal(1)>0?" - "+(fl/supplierTotal(1)).toFixed(2)+"x the quoted cost":"")
           +". Check the bundle ladder before writing the product off: a multi-unit mix can fund a CPA a single cannot.")
           :"The variable rates alone exceed the order. Nothing can be priced out of this.");
     } else if(dead.length){
@@ -1172,8 +1293,8 @@
       if(first) S.pick=first.tier.key;
     }
     var picked=L.filter(function(r){ return r.tier.key===S.pick; })[0]||L[0];
-    var blends=L.map(function(r){ var rows=bundleLadder(r.price); return rows.length?blend(rows):null; });
-    var rows=bundleLadder(picked.price);
+    var blends=L.map(function(r){ var rr=bundleLadder(r.tier.before); return rr.length?blend(rr):null; });
+    var rows=bundleLadder(picked.tier.before);
     var bl=rows.length?blend(rows):null;
 
     renderLadder(L);
@@ -1187,34 +1308,55 @@
     renderFloor(L, bl);
   }
 
+  // Coalesce rapid input events and announce only after the user pauses.
+  var pendingRender=0, announcementTimer;
+  function announceResults(){
+    clearTimeout(announcementTimer);
+    announcementTimer=setTimeout(function(){
+      $("offerStatus").textContent=$("pickTag").textContent+". Daily ad spend "+money(S.spend)
+        +". Projected daily profit "+$("vProfit").textContent+". "+$("nBlendCpa").textContent;
+    },350);
+  }
+  function scheduleRender(){
+    if(pendingRender) return;
+    pendingRender=requestAnimationFrame(function(){pendingRender=0; render(); announceResults();});
+  }
+  function syncThemeLabel(){
+    var label=document.documentElement.getAttribute("data-theme")==="dark"?"Switch to light mode":"Switch to dark mode";
+    $("themeBtn").setAttribute("aria-label",label);
+    $("themeBtn").title=label;
+  }
+
   /* ── wiring ── */
-  ["cogs","ship","shipPerExtra","retPct","retLossPct","actualCpa"].forEach(function(k){
-    $(k).addEventListener("input",function(){ S[k]=raw(k); render(); });
+  ["extraPerOrder","retPct","retLossPct","actualCpa"].forEach(function(k){
+    $(k).addEventListener("input",function(){ S[k]=raw(k); scheduleRender(); });
   });
-  [["d2",1],["d3",2],["d4",3]].forEach(function(pair){
-    $(pair[0]).addEventListener("input",function(){ S.disc[pair[1]]=raw(pair[0]); render(); });
+  [["c1",0],["c2",1],["c3",2],["c4",3]].forEach(function(pair){
+    $(pair[0]).addEventListener("input",function(){ S.costs[pair[1]]=raw(pair[0]); render(); });
   });
   [["m1",0],["m2",1],["m3",2],["m4",3]].forEach(function(pair){
-    $(pair[0]).addEventListener("input",function(){ S.mix[pair[1]]=raw(pair[0]); render(); });
+    $(pair[0]).addEventListener("input",function(){ S.mix[pair[1]]=raw(pair[0]); scheduleRender(); });
   });
-  $("plan").addEventListener("change",function(){ S.plan=$("plan").value; render(); });
-  $("spend").addEventListener("input",function(){ S.spend=Math.round(sliderToSpend(raw("spend"))); render(); });
+  $("plan").addEventListener("change",function(){ S.plan=$("plan").value; scheduleRender(); });
+  $("spend").addEventListener("input",function(){ S.spend=Math.round(sliderToSpend(raw("spend"))); scheduleRender(); });
   Array.prototype.forEach.call(document.querySelectorAll(".jbtn"),function(b){
     b.addEventListener("click",function(){
       S.spend=Number(b.getAttribute("data-s"));
-      $("spend").value=Math.round(spendToSlider(S.spend)); render();
+      $("spend").value=Math.round(spendToSlider(S.spend)); scheduleRender();
     });
   });
   $("themeBtn").addEventListener("click",function(){
     var e=document.documentElement;
     e.setAttribute("data-theme", e.getAttribute("data-theme")==="dark"?"light":"dark");
     try{ localStorage.setItem("offerTheme", e.getAttribute("data-theme")); }catch(err){}
+    syncThemeLabel();
     render();
   });
-  try{ var saved=localStorage.getItem("offerTheme"); if(saved) document.documentElement.setAttribute("data-theme",saved); }catch(err){}
+  try{ var saved=localStorage.getItem("offerTheme"); if(saved==="dark" || saved==="light") document.documentElement.setAttribute("data-theme",saved); }catch(err){}
 
   S.spend=Math.round(sliderToSpend(Number($("spend").value)));
   syncInputs();
+  syncThemeLabel();
   render();
 })();
 </script>

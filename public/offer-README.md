@@ -1,34 +1,45 @@
 # Offer Engine — how to read the ladder
 
-Live at `/offer.html`. You enter one number: what the supplier charges you,
-landed. Everything else is solved.
+Live at `/offer.html`. You paste in your supplier's quote. Everything else on
+the page is solved from it.
 
 ---
 
-## The two inputs
+## The input: your supplier's quote
 
-**Landed cost per unit.** Not the invoice price. The invoice *plus* freight,
-duty, brokerage and inbound handling, ex-GST.
+Suppliers quote like this, and this is what you paste in:
 
-**The CPA you actually pay.** Ad spend divided by orders. One order costs one
-CPA whether it holds one unit or four, which is the entire reason bundles
-work and the reason this number sits next to landed cost rather than buried
-in a settings panel.
+| PCS | Cost | Freight | **Total** |
+|---|---|---|---|
+| 1 | $2.40 | $5.00 | **$7.40** |
+| 2 | $4.50 | $5.90 | **$10.40** |
+| 3 | $6.60 | $7.30 | **$13.90** |
+| 4 | $8.70 | $9.00 | **$17.70** |
 
-This matters more than any other field on the page. In global trade the
-product itself is about 45% of the total landed cost — freight 25%, duties
-15%, taxes 10%, handling 5%. Brands that price off the invoice price alone
-understate their cost base by 20–40%, which is more than most of them make.
+Four numbers off the **Total** column. Cost and freight already combined.
 
-Everything else on the left is either a cost you already know (fulfilment,
-returns, the shipping increment per extra unit) or an offer you are designing
-(the bundle discounts and the take-rate mix).
+Two things follow, and both were wrong in the earlier version of this page.
+
+**Totals are never linear.** Two units cost $10.40, not $14.80. Four cost
+$17.70, not $29.60. The supplier has already priced freight at volume, so a
+single per-unit cost multiplied by quantity overstates every bundle. The
+implied per-unit cost across this quote falls **$7.40 → $5.20 → $4.63 →
+$4.43**, a 40% volume discount you receive before discounting anything
+yourself.
+
+**The Total already includes delivery.** A separate shipping field would
+count freight twice. That is why **Your extra per order** defaults to zero
+and means only what the quote does *not* cover: your own packaging,
+pick-and-pack, insert cards.
+
+The only other number you enter is **the CPA you actually pay** — ad spend
+divided by orders. One order costs one CPA whether it holds one unit or four,
+which is why it sits beside the quote rather than in a settings panel.
 
 ### What became a constant
 
-These were fields and are now baked in, because they are set once per store
-rather than per product. They live in the `BAKED` object at the top of the
-page's script, and editing them there is a one-line change:
+Set once per store, not per product. They live in the `BAKED` object at the
+top of the page's script; editing them there is a one-line change.
 
 | Baked value | Default |
 |---|---|
@@ -41,12 +52,9 @@ page's script, and editing them there is a one-line change:
 | Supplier lead time | 45 days |
 | CPA climb per doubling of spend | 15% |
 
-One capability went with them: there is no market-price field any more, so no
-rung is flagged **Above market**. The page can tell you a price is
-unaffordable at your CPA; it can no longer tell you customers will not pay
-it. That judgement is now yours.
-
----
+There is no market-price field, so nothing is flagged *Above market*. The
+page can tell you a price is unaffordable at your CPA; whether customers
+would pay it is your call.
 
 ## The four tiers
 
@@ -170,26 +178,44 @@ a fulfilment-efficiency play, which is the small half.
 Three costs do not multiply with units: the parcel base, the flat 30c, and
 the CPA. Everything else does.
 
-### Max discount
+### Prices are solved, discounts are reported
 
-The column that matters. For each bundle it solves the deepest discount that
-still beats selling a single unit:
+Every pack is priced from its own line on the quote, all to the same
+before-ads margin. So the discount is an **output** — what the offer works
+out to be, not a number anyone guessed:
 
-```
-targetCpa = P x A - C
+| Offer | Quote | Price | Per unit | Offer reads | Needs for CPA | Target CPA |
+|---|---|---|---|---|---|---|
+| Buy 1 | $7.40 | $27.48 | $27.48 | — | $47.44 | $11.24 |
+| Buy 2 | $10.40 | $38.19 | $19.10 | 31% off | $51.79 | $15.62 |
+| Buy 3 | $13.90 | $50.68 | $16.89 | 39% off | $56.87 | $20.73 |
+| Buy 4 | $17.70 | $64.25 | $16.06 | 42% off | $62.39 | $26.28 |
 
-  A = (1 - returnRate - keep) / (1 + gst) - feeRate      (price slope)
-  C = cogs x units + ship + shipPerExtra x (units-1) + feeFixed
+**Max cut** is how much further a pack could go before it earns less than
+selling one unit. On this quote: 42% / 55% / 61%.
 
-so the price that ties the one-pack is P = (singleTarget + C) / A
-and the deepest discount is 1 - P / (units x unitPrice)
-```
+### Two constraints, and the higher one binds
 
-Bigger bundles carry deeper discounts, because `C` grows slower than the list
-price. On a typical set-up the room is roughly **36% on a 2-pack, 48% on a
-3-pack, 54% on a 4-pack** — far deeper than the 10/20/25% usually advertised.
-The page says so when you are leaving room unused, and warns when a discount
-is cut past the line and the bundle now earns less than a single sale.
+A margin tier gives the **minimum viable price**. It does not know what
+traffic costs, so on a cheap product it prices far too low: a $7.40 bottle
+satisfies a 65% before-ads margin at $27.48, which cannot fund a $25 CPA.
+
+**Needs for CPA** is the other constraint — the price a pack must reach to
+fund the traffic you are buying. In the table above only Buy 4 has a tier
+price ($64.25) above what the CPA needs ($62.39), which is why it is the only
+pack that stands alone.
+
+This is the failure a healthy-looking margin hides, and the page states it
+rather than leaving you to notice.
+
+### Why each extra unit is nearly all profit
+
+The marginal cost of each added unit is tiny: unit two adds **$3.00**, unit
+three **$3.50**, unit four **$3.80**. At the buy-4 price of $16.06 a unit,
+about **76%** of every extra unit sold is contribution.
+
+That, plus paying one CPA instead of four, is the entire case for the ladder.
+
 
 ### The take-rate mix
 
@@ -219,10 +245,10 @@ the business can fund.
 - **Same SKU only.** Buy-2/3/4 are multi-buys of one product. A mixed bundle
   of different products needs a per-component landed cost and is not
   modelled.
-- **The shipping increment is the input that flatters bundles.** Set it to
-  zero and every bundle looks better than it is. A 4-pack crosses weight
-  breaks and needs a bigger box. Moving it from $1.50 to $5.00 takes several
-  points off every bundle's max discount.
+- **Your extra per order is the input that flatters bundles.** It defaults
+  to zero because a landed-and-delivered quote already covers freight. If
+  your quote does not, and you leave it at zero, every pack reads better than
+  it is.
 - **CPA is flat across the mix.** That holds when the ad sells the entry
   offer and the bundle is an on-site upsell. If you advertise the bundle
   itself, conversion falls and CPA rises, and the model will flatter you.
@@ -279,8 +305,8 @@ it works with no build step. The canonical, unit-tested statement of them is:
 
 - `app/lib/ecom/shopify-fees.ts` — the fee engine
 - `app/lib/ecom/tiers.ts` — the single-unit ladder, the floor, the scaling curve
-- `app/lib/ecom/bundles.ts` — the bundle rows, the discount solver, the blend
-- `app/lib/ecom/tiers.test.ts` and `bundles.test.ts` — 38 checks, run by `npm test`
+- `app/lib/ecom/bundles.ts` — the quote model, the price solver, the blend
+- `app/lib/ecom/tiers.test.ts` and `bundles.test.ts` — 43 checks, run by `npm test`
 
 If a formula changes in one place, change it in both.
 

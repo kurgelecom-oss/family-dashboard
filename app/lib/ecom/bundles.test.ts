@@ -1,183 +1,226 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {DEFAULT_FEES} from './shopify-fees.ts';
-import {rung, TIERS, type Costs} from './tiers.ts';
-import {bundle, bundleLadder, blend, normaliseMix, mixAtMultiShare, multiShareNeeded,
- cpaSlope, fixedCosts, DEFAULT_LADDER, DEFAULT_SHIP_PER_EXTRA, type BundleCosts} from './bundles.ts';
+import {DEFAULT_FEES, blended} from './shopify-fees.ts';
+import {TIERS} from './tiers.ts';
+import {costFor, costPerUnit, slope, cpaSlope, solvePrice, ladder, blend,
+ normaliseMix, mixAtMultiShare, multiShareNeeded, supplierVolumeDiscount, returnRate,
+ marginalCost, cpaFundedPrice, type SupplierCosts} from './bundles.ts';
 
 const near=(a:number,b:number,t=1e-6)=>assert.ok(Math.abs(a-b)<=t,`${a} !~ ${b}`);
 
-const COSTS:Costs = {cogs:12, ship:7, retPct:8, retLossPct:25, gstPct:10, fees:DEFAULT_FEES, keepPct:20};
-const BC:BundleCosts = {...COSTS, shipPerExtra:DEFAULT_SHIP_PER_EXTRA};
-const UNIT = rung(TIERS[0], COSTS).price;            // Excellent one-pack, $68.89
-const SINGLE_TARGET = rung(TIERS[0], COSTS).targetCpa;
+/* The real quote this model was built from: Doctea Joint & Muscle Support,
+   US, four pack sizes, Total already including freight. */
+const SC:SupplierCosts = {
+ totals:[7.40, 10.40, 13.90, 17.70],
+ extraPerOrder:0, retPct:8, retLossPct:25, gstPct:10, keepPct:20, fees:DEFAULT_FEES,
+};
+const EXC = TIERS[0].before;   // 0.65 before ads
 
-test('a one-pack through the bundle model matches the single-unit ladder',()=>{
- const b = bundle({unitPrice:UNIT, units:1, discPct:0}, BC, SINGLE_TARGET);
- const r = rung(TIERS[0], COSTS);
- near(b.price, r.price, 1e-9);
- near(b.targetCpa, r.targetCpa, 1e-9);
- near(b.before, r.before, 1e-9);
- // The bundle axis must not quietly change single-unit economics.
- near(b.headroomVsSingle, 1, 1e-9);
+test('the supplier total is used as quoted, not multiplied out',()=>{
+ const fixed = blended(SC.fees).fixed;
+ near(costFor(1,SC), 7.40+fixed);
+ near(costFor(2,SC), 10.40+fixed);
+ near(costFor(3,SC), 13.90+fixed);
+ near(costFor(4,SC), 17.70+fixed);
+ // The trap this model exists to avoid: two units are NOT twice one.
+ assert.ok(SC.totals[1] < SC.totals[0]*2, '$10.40 is well under $14.80');
+ assert.ok(SC.totals[3] < SC.totals[0]*4, '$17.70 is well under $29.60');
 });
 
-test('an extra unit multiplies product cost but not the order costs',()=>{
- const one = bundle({unitPrice:UNIT, units:1, discPct:0}, BC, SINGLE_TARGET);
- const two = bundle({unitPrice:UNIT, units:2, discPct:0}, BC, SINGLE_TARGET);
- near(two.cogs, one.cogs*2);                          // product scales
- near(two.ship, one.ship + DEFAULT_SHIP_PER_EXTRA);   // shipping does not
- // One order means one fixed transaction fee, not two.
- assert.ok(two.fee < one.fee*2, 'the flat per-transaction cent is paid once');
+test('a pack size the supplier did not quote falls back to the largest',()=>{
+ near(costFor(9,SC), costFor(4,SC));
+ near(costPerUnit(4,SC), 17.70/4);
 });
 
-test('the headline claim: ~80% of a bundle is the CPA you do not pay again',()=>{
- const four = bundle({unitPrice:UNIT, units:4, discPct:0}, BC, SINGLE_TARGET);
- const one  = bundle({unitPrice:UNIT, units:1, discPct:0}, BC, SINGLE_TARGET);
- /* Only what the bundle genuinely avoids: three parcel bases and three flat
-    transaction cents. The percentage fee is not a saving - four full-price
-    orders pay more of it only because they total more money. */
- const shipAndFeeSaved = (one.ship*4 - four.ship) + 0.30*3;
- const cpaSaved = SINGLE_TARGET*3;                    // three customers not re-bought
- assert.ok(cpaSaved > shipAndFeeSaved*3,
-   `CPA saving ${cpaSaved.toFixed(2)} should dominate ${shipAndFeeSaved.toFixed(2)}`);
- const share = cpaSaved/(cpaSaved+shipAndFeeSaved);
- assert.ok(share > 0.7 && share < 0.95, `acquisition share was ${(share*100).toFixed(0)}%`);
+test('the supplier hands over a volume discount before you discount anything',()=>{
+ near(costPerUnit(1,SC), 7.40);
+ near(costPerUnit(4,SC), 4.425);
+ const d = supplierVolumeDiscount(SC);
+ assert.ok(d>0.38 && d<0.42, `expected ~40% volume discount, got ${(d*100).toFixed(1)}%`);
+ // Per-unit cost must fall monotonically across a sane quote.
+ for(let u=2;u<=4;u++) assert.ok(costPerUnit(u,SC) < costPerUnit(u-1,SC));
 });
 
-test('discounting a bundle reduces its headroom monotonically',()=>{
- let last = Infinity;
- for(const d of [0,10,20,30,40]){
-  const b = bundle({unitPrice:UNIT, units:3, discPct:d}, BC, SINGLE_TARGET);
-  assert.ok(b.targetCpa < last, `discount ${d}% should not raise target CPA`);
-  last = b.targetCpa;
+test('extraPerOrder is additive and defaults to nothing, so freight is not double counted',()=>{
+ near(costFor(1,SC) + 2.5, costFor(1,{...SC,extraPerOrder:2.5}));
+ // With the default the only addition to the quote is the flat Shopify cent.
+ near(costFor(1,SC) - SC.totals[0], blended(SC.fees).fixed);
+});
+
+test('each pack price is solved to the same before-ads target',()=>{
+ const rows = ladder(EXC, SC);
+ for(const r of rows){
+  assert.ok(isFinite(r.price), `buy-${r.units} should be reachable`);
+  near(r.before/r.netRev, EXC, 1e-9);
+ }
+ // Solved prices rise with pack size but per-unit prices fall.
+ for(let i=1;i<rows.length;i++){
+  assert.ok(rows[i].price > rows[i-1].price);
+  assert.ok(rows[i].pricePerUnit < rows[i-1].pricePerUnit);
  }
 });
 
-test('maxDiscount is the exact point where a bundle stops beating the single',()=>{
- for(const u of [2,3,4]){
-  const probe = bundle({unitPrice:UNIT, units:u, discPct:0}, BC, SINGLE_TARGET);
-  const d = probe.maxDiscount;
-  assert.ok(isFinite(d) && d>0 && d<1, `buy-${u} maxDiscount looked wrong: ${d}`);
-  // At exactly that discount the bundle ties the one-pack.
-  const at = bundle({unitPrice:UNIT, units:u, discPct:d*100}, BC, SINGLE_TARGET);
-  near(at.targetCpa, SINGLE_TARGET, 1e-6);
-  // A hair deeper and it is worse than selling one.
-  const past = bundle({unitPrice:UNIT, units:u, discPct:d*100+1}, BC, SINGLE_TARGET);
-  assert.ok(past.targetCpa < SINGLE_TARGET);
+test('the discount is an output, derived from the solved price',()=>{
+ const rows = ladder(EXC, SC);
+ near(rows[0].impliedDisc, 0, 1e-9);            // the single is the baseline
+ for(let i=1;i<rows.length;i++){
+  const r = rows[i];
+  near(r.price, rows[0].price*r.units*(1-r.impliedDisc), 1e-9);
+  assert.ok(r.impliedDisc > 0, `buy-${r.units} should imply a real offer`);
+ }
+ // Deeper packs imply deeper offers, because the supplier total flattens.
+ assert.ok(rows[3].impliedDisc > rows[2].impliedDisc);
+ assert.ok(rows[2].impliedDisc > rows[1].impliedDisc);
+});
+
+test('target CPA rises with pack size even though per-unit price falls',()=>{
+ const rows = ladder(EXC, SC);
+ for(let i=1;i<rows.length;i++) assert.ok(rows[i].targetCpa > rows[i-1].targetCpa);
+ near(rows[0].headroom, 1, 1e-9);
+ assert.ok(rows[3].headroom > 2, `buy-4 headroom was ${rows[3].headroom}`);
+});
+
+test('break-even CPA is everything left before ads, and target keeps the margin',()=>{
+ const rows = ladder(EXC, SC);
+ for(const r of rows){
+  near(r.breakEvenCpa, r.before);
+  near(r.before, r.netRev - r.cost - r.fee - r.returns, 1e-9);
+  near(r.breakEvenCpa - r.targetCpa, SC.keepPct/100*r.netRev, 1e-9);
  }
 });
 
-test('bigger bundles can carry deeper discounts',()=>{
- const d2 = bundle({unitPrice:UNIT, units:2, discPct:0}, BC, SINGLE_TARGET).maxDiscount;
- const d3 = bundle({unitPrice:UNIT, units:3, discPct:0}, BC, SINGLE_TARGET).maxDiscount;
- const d4 = bundle({unitPrice:UNIT, units:4, discPct:0}, BC, SINGLE_TARGET).maxDiscount;
- assert.ok(d3 > d2 && d4 > d3, `expected rising room, got ${d2}, ${d3}, ${d4}`);
+test('maxDisc is the exact point a pack stops beating a single sale',()=>{
+ const rows = ladder(EXC, SC);
+ const single = rows[0];
+ for(const r of rows.slice(1)){
+  assert.ok(isFinite(r.maxDisc) && r.maxDisc>r.impliedDisc,
+    `buy-${r.units} should have room below its solved price`);
+  // Price it at exactly maxDisc off the single-unit list and it ties.
+  const list = single.price*r.units;
+  const tied = list*(1-r.maxDisc);
+  const net = tied/1.1;
+  const f = blended(SC.fees);
+  const t = net - r.cost - (tied*f.pct/100+f.fixed) - returnRate(SC)*net - SC.keepPct/100*net;
+  near(t, single.targetCpa, 1e-6);
+ }
 });
 
-test('the shipping increment is the input that flatters bundles, and it bites',()=>{
- const cheap = bundle({unitPrice:UNIT, units:4, discPct:25}, {...BC, shipPerExtra:1.5}, SINGLE_TARGET);
- const real  = bundle({unitPrice:UNIT, units:4, discPct:25}, {...BC, shipPerExtra:4.0}, SINGLE_TARGET);
- assert.ok(real.targetCpa < cheap.targetCpa);
- // Three extra units at $2.50 more each is $7.50 straight off the headroom.
- near(cheap.targetCpa - real.targetCpa, 2.5*3, 1e-6);
- assert.ok(real.maxDiscount < cheap.maxDiscount);
+test('the paid CPA decides which packs are usable, and the single often is not',()=>{
+ const rows = ladder(EXC, SC, 25);
+ assert.ok(!rows[0].fundsCpa, 'a single bottle cannot fund a $25 CPA here');
+ assert.ok(rows[3].fundsCpa, 'the four-pack can');
+ // With no CPA supplied there is nothing to judge.
+ assert.ok(ladder(EXC, SC, 0).every(r=>r.fundsCpa));
 });
 
-test('landed-cost share decides the discount, not what competitors advertise',()=>{
- // Low COGS share: a supplement-shaped product.
- const lowCosts:BundleCosts = {...BC, cogs:6};
- const lowUnit = rung(TIERS[0], {...COSTS, cogs:6}).price;
- const lowSingle = rung(TIERS[0], {...COSTS, cogs:6}).targetCpa;
- const low = bundle({unitPrice:lowUnit, units:3, discPct:30}, lowCosts, lowSingle);
+test('a tighter tier needs a higher price and leaves more per order',()=>{
+ const exc = ladder(TIERS[0].before, SC)[0];
+ const poor = ladder(TIERS[3].before, SC)[0];
+ assert.ok(exc.price > poor.price);
+ assert.ok(exc.targetCpa > poor.targetCpa);
+});
 
- // High COGS share: an electronics-shaped product priced on a thin margin.
- const highCosts:BundleCosts = {...BC, cogs:40};
- const highUnit = rung(TIERS[3], {...COSTS, cogs:40}).price;   // Poor tier, thin
- const highSingle = rung(TIERS[3], {...COSTS, cogs:40}).targetCpa;
- const high = bundle({unitPrice:highUnit, units:3, discPct:30}, highCosts, highSingle);
+test('an impossible cost base reports unreachable rather than a negative price',()=>{
+ const hopeless:SupplierCosts = {...SC, retPct:95, retLossPct:95};
+ assert.ok(slope(EXC, hopeless) <= 0);
+ assert.equal(solvePrice(EXC, 1, hopeless), Infinity);
+ const rows = ladder(EXC, hopeless);
+ assert.ok(rows.every(r=>r.unreachable));
+ assert.ok(rows.every(r=>!isFinite(r.price)));
+});
 
- // Same advertised offer - 3-pack, 30% off - opposite verdicts.
- assert.ok(low.targetCpa > lowSingle, 'low-COGS product gains from the offer');
- assert.ok(high.targetCpa < highSingle, 'high-COGS product loses from the same offer');
- assert.ok(low.maxDiscount > high.maxDiscount);
+test('a quote with fewer rows still produces a ladder',()=>{
+ const two:SupplierCosts = {...SC, totals:[7.40, 10.40]};
+ const rows = ladder(EXC, two);
+ assert.equal(rows.length, 2);
+ assert.ok(Number.isNaN(supplierVolumeDiscount({...SC, totals:[7.40]})));
 });
 
 /* ── the blend ─────────────────────────────────────────────────────────── */
 
-test('a mix is normalised, and an empty mix means all singles rather than a crash',()=>{
+test('a mix is normalised, and an empty mix means all singles',()=>{
  near(normaliseMix([60,25,10,5],4).reduce((a,b)=>a+b,0), 1);
  const empty = normaliseMix([0,0,0,0],4);
  near(empty[0],1); near(empty[1],0);
 });
 
 test('the blend is the take-rate-weighted average, per order',()=>{
- const rows = bundleLadder(UNIT, BC, DEFAULT_LADDER);
- const b = blend(rows, [60,25,10,5]);
+ const rows = ladder(EXC, SC);
+ const b = blend(rows,[60,25,10,5])!;
  const w = [0.60,0.25,0.10,0.05];
  near(b.unitsPerOrder, 1*w[0]+2*w[1]+3*w[2]+4*w[3]);
  near(b.aov, rows.reduce((a,r,i)=>a+w[i]*r.price,0), 1e-9);
  near(b.targetCpa, rows.reduce((a,r,i)=>a+w[i]*r.targetCpa,0), 1e-9);
+ near(b.costPerOrder, rows.reduce((a,r,i)=>a+w[i]*r.cost,0), 1e-9);
  near(b.multiShare, 0.40);
 });
 
-test('an all-singles mix is economically identical to having no bundles',()=>{
- const rows = bundleLadder(UNIT, BC, DEFAULT_LADDER);
- const b = blend(rows, [1,0,0,0]);
- near(b.targetCpa, SINGLE_TARGET, 1e-9);
+test('an all-singles mix is identical to having no bundles',()=>{
+ const rows = ladder(EXC, SC);
+ const b = blend(rows,[1,0,0,0])!;
+ near(b.targetCpa, rows[0].targetCpa, 1e-9);
  near(b.upliftVsSingle, 1, 1e-9);
  near(b.unitsPerOrder, 1);
 });
 
-test('take rate is what decides whether bundles matter at all',()=>{
- const rows = bundleLadder(UNIT, BC, DEFAULT_LADDER);
- const thin = blend(rows, mixAtMultiShare(rows, [60,25,10,5], 0.10));
- const fat  = blend(rows, mixAtMultiShare(rows, [60,25,10,5], 0.60));
+test('take rate is what decides whether bundles matter',()=>{
+ const rows = ladder(EXC, SC);
+ const thin = blend(rows, mixAtMultiShare(rows,[60,25,10,5],0.10))!;
+ const fat  = blend(rows, mixAtMultiShare(rows,[60,25,10,5],0.70))!;
  assert.ok(fat.targetCpa > thin.targetCpa);
  assert.ok(fat.unitsPerOrder > thin.unitsPerOrder);
  near(thin.multiShare, 0.10, 1e-9);
- near(fat.multiShare, 0.60, 1e-9);
+ near(fat.multiShare, 0.70, 1e-9);
 });
 
 test('mixAtMultiShare keeps the shape among the multi rows',()=>{
- const rows = bundleLadder(UNIT, BC, DEFAULT_LADDER);
- const m = mixAtMultiShare(rows, [60,25,10,5], 0.5);
- near(m[0], 0.5);
- near(m[1]+m[2]+m[3], 0.5, 1e-9);
- // 25:10:5 preserved inside the multi half.
+ const rows = ladder(EXC, SC);
+ const m = mixAtMultiShare(rows,[60,25,10,5],0.5);
+ near(m[0],0.5);
+ near(m[1]+m[2]+m[3],0.5,1e-9);
  near(m[1]/m[2], 25/10, 1e-9);
- near(m[2]/m[3], 10/5, 1e-9);
 });
 
-test('the take rate needed to fund a CPA is reported, or honestly refused',()=>{
- const rows = bundleLadder(UNIT, BC, DEFAULT_LADDER);
- const reachable = multiShareNeeded(rows, [60,25,10,5], SINGLE_TARGET*1.5);
- assert.ok(reachable!==null && reachable>0 && reachable<=1, `got ${reachable}`);
- near(blend(rows, mixAtMultiShare(rows,[60,25,10,5],reachable!)).targetCpa >= SINGLE_TARGET*1.5 ? 1:0, 1);
- // A CPA no mix can fund returns null, not a share above 100%.
- assert.equal(multiShareNeeded(rows, [60,25,10,5], 1e6), null);
+test('the blend can fund a CPA no single pack can, and refuses when none can',()=>{
+ const rows = ladder(EXC, SC, 25);
+ // A CPA the single misses but the mix can reach.
+ const need = multiShareNeeded(rows,[60,25,10,5],14);
+ assert.ok(need!==null && need>0, `a real take rate should be required, got ${need}`);
+ assert.ok(rows[0].targetCpa < 14, 'the single must be the one that falls short');
+ const at = blend(rows, mixAtMultiShare(rows,[60,25,10,5],need!))!;
+ assert.ok(at.targetCpa >= 14);
+ const below = blend(rows, mixAtMultiShare(rows,[60,25,10,5],Math.max(need!-0.02,0)))!;
+ assert.ok(below.targetCpa < 14);
+ /* $25 is beyond even an all-multi mix at this tier, and the honest answer is
+    null rather than a share above 100%. This is the real finding on a $7.40
+    product: a 65% margin tier prices it too low to buy traffic at $25. */
+ assert.equal(multiShareNeeded(rows,[60,25,10,5],25), null);
 });
 
-test('fundsCpa marks the rungs that cover the CPA actually paid',()=>{
- const rows = bundleLadder(UNIT, BC, DEFAULT_LADDER, 40);
- assert.ok(!rows[0].fundsCpa, 'the one-pack cannot fund $40 here');
- assert.ok(rows[3].fundsCpa, 'the four-pack can');
- // With no CPA supplied there is no judgement to make.
- assert.ok(bundleLadder(UNIT, BC, DEFAULT_LADDER, 0).every(r=>r.fundsCpa));
+test('the CPA-funded price is the other constraint, and it binds on cheap goods',()=>{
+ const rows = ladder(EXC, SC, 25);
+ // The tier price cannot carry the CPA, so the CPA-funded price sits above it.
+ assert.ok(rows[0].cpaFundedPrice > rows[0].price,
+   `tier price ${rows[0].price} should be under the CPA-funded ${rows[0].cpaFundedPrice}`);
+ // At that price the pack funds the CPA exactly and keeps the margin.
+ const A = cpaSlope(SC);
+ near(rows[0].cpaFundedPrice*A - costFor(1,SC), 25, 1e-6);
+ // No CPA to fund means no premium over cost.
+ near(cpaFundedPrice(1,SC,0)*A - costFor(1,SC), 0, 1e-6);
 });
 
-test('the slope and fixed-cost helpers agree with the full model',()=>{
- const A = cpaSlope(BC);
- for(const u of [1,2,3,4]){
-  const b = bundle({unitPrice:UNIT, units:u, discPct:12}, BC, SINGLE_TARGET);
-  near(b.targetCpa, b.price*A - fixedCosts(u,BC), 1e-9);
- }
+test('marginal cost is what each extra unit really adds',()=>{
+ near(marginalCost(2,SC), 10.40-7.40);
+ near(marginalCost(3,SC), 13.90-10.40);
+ near(marginalCost(4,SC), 17.70-13.90);
+ assert.ok(Number.isNaN(marginalCost(1,SC)));
+ // Every extra unit costs a fraction of the first, which is the whole case
+ // for bundling on a quote shaped like this.
+ for(let u=2;u<=4;u++) assert.ok(marginalCost(u,SC) < SC.totals[0]*0.6);
 });
 
-test('an impossible cost base yields no discount room rather than a fantasy',()=>{
- const hopeless:BundleCosts = {...BC, retPct:95, retLossPct:95};
- assert.ok(cpaSlope(hopeless) <= 0);
- const b = bundle({unitPrice:UNIT, units:3, discPct:0}, hopeless, SINGLE_TARGET);
- assert.ok(Number.isNaN(b.maxDiscount));
- assert.ok(b.targetCpa < 0);
+test('the slope and cost helpers agree with the full row maths',()=>{
+ const A = cpaSlope(SC);
+ const rows = ladder(EXC, SC);
+ for(const r of rows) near(r.targetCpa, r.price*A - costFor(r.units,SC), 1e-9);
 });
