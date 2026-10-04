@@ -273,6 +273,30 @@
   footer{margin-top:30px;padding:20px 22px;background:var(--surface);border-radius:var(--r-lg);box-shadow:var(--shadow-sm);font-size:12.5px;color:var(--ink-2);line-height:1.75}
   footer strong{color:var(--ink)}
   footer .src{display:block;margin-top:12px;padding-top:12px;border-top:1px solid var(--line-soft);font-size:11.5px;color:var(--ink-3);line-height:1.7}
+
+  /* ── bundle matrix ── */
+  .bmx{width:100%;border-collapse:collapse;font-size:12.5px}
+  .bmx th{text-align:right;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);padding:0 0 9px 10px;border-bottom:1px solid var(--line-soft);white-space:nowrap}
+  .bmx th:first-child{text-align:left;padding-left:0}
+  .bmx td{text-align:right;padding:11px 0 11px 10px;border-bottom:1px solid var(--line-soft);font-family:'Space Grotesk',sans-serif;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+  .bmx td:first-child{text-align:left;padding-left:0;font-family:'Inter',sans-serif;font-weight:600}
+  .bmx tr:last-child td{border-bottom:0}
+  .bmx tr.dim td{opacity:.5}
+  .bmx td.pos{color:var(--pos)}
+  .bmx td.neg{color:var(--neg)}
+  .bmx td.info{color:var(--info)}
+  .bname{display:flex;align-items:center;gap:8px}
+  .bdot{width:9px;height:9px;border-radius:3px;flex-shrink:0}
+  .bmx .head{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700}
+
+  .mixrow{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:4px}
+  .mixcell .mlab{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-3);margin-bottom:5px;text-align:center}
+  .mixbar{display:flex;height:26px;border-radius:7px;overflow:hidden;margin-top:11px;box-shadow:inset 0 1px 2px var(--glow)}
+  .mixseg{display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;color:var(--on-accent);transition:width .3s var(--ease);overflow:hidden;white-space:nowrap}
+
+  .blendgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:13px}
+  @media(max-width:900px){.blendgrid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:480px){.blendgrid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -329,7 +353,7 @@
   <!-- ───────── inputs ───────── -->
   <div>
     <div class="card feature">
-      <div class="chead"><h2>What the supplier charges</h2></div>
+      <div class="chead"><h2>The numbers only you know</h2></div>
 
       <div class="hero-in">
         <div class="hk">Landed cost per unit</div>
@@ -338,9 +362,22 @@
       </div>
 
       <div class="field">
-        <label><span class="name">Ship &amp; fulfil to customer</span><span class="hint">per order, net</span></label>
-        <div class="inputwrap"><span class="pre">$</span><input type="number" id="ship" step="0.5" min="0"></div>
+        <label><span class="name">CPA you actually pay</span><span class="hint">per order</span></label>
+        <div class="inputwrap"><span class="pre">$</span><input type="number" id="actualCpa" step="1" min="0"></div>
       </div>
+      <p class="subnote">Ad spend &divide; orders. One order costs one CPA whether it holds 1 unit or 4 &mdash; which is the entire reason bundles work.</p>
+
+      <div class="duo2">
+        <div class="field">
+          <label><span class="name">Ship 1 unit</span></label>
+          <div class="inputwrap"><span class="pre">$</span><input type="number" id="ship" step="0.5" min="0"></div>
+        </div>
+        <div class="field">
+          <label><span class="name">Each extra</span></label>
+          <div class="inputwrap"><span class="pre">$</span><input type="number" id="shipPerExtra" step="0.25" min="0"></div>
+        </div>
+      </div>
+      <p class="subnote">The second number is the one that flatters bundles. Set it to zero and every bundle looks better than it is &mdash; a 4-pack crosses weight breaks and needs a bigger box.</p>
 
       <div class="duo2">
         <div class="field">
@@ -355,93 +392,41 @@
     </div>
 
     <div class="card">
-      <div class="chead"><h2>Shopify &amp; tax</h2><span class="per" id="feeEcho">—</span></div>
-
+      <div class="chead"><h2>Shopify</h2><span class="per" id="feeEcho">&mdash;</span></div>
       <div class="field">
         <label><span class="name">Plan</span></label>
         <select id="plan">
-          <option value="basic">Basic — 1.75% + 30c</option>
-          <option value="grow">Grow — 1.6% + 30c</option>
-          <option value="advanced">Advanced — 1.4% + 30c</option>
+          <option value="basic">Basic &mdash; 1.75% + 30c</option>
+          <option value="grow">Grow &mdash; 1.6% + 30c</option>
+          <option value="advanced">Advanced &mdash; 1.4% + 30c</option>
         </select>
       </div>
-
-      <div class="field">
-        <label><span class="name">Card mix</span><span class="hint">domestic / amex / intl</span></label>
-        <div class="trio">
-          <div class="inputwrap"><input class="pct" type="number" id="mixDom" step="5" min="0"><span class="suf">%</span></div>
-          <div class="inputwrap"><input class="pct" type="number" id="mixAmex" step="1" min="0"><span class="suf">%</span></div>
-          <div class="inputwrap"><input class="pct" type="number" id="mixIntl" step="1" min="0"><span class="suf">%</span></div>
-        </div>
-      </div>
-
-      <div class="field">
-        <label><span class="name">Extra points</span><span class="hint">Afterpay, FX, chargebacks</span></label>
-        <div class="inputwrap"><input class="pct" type="number" id="extraPct" step="0.1" min="0"><span class="suf">%</span></div>
-      </div>
-
-      <div class="toggle">
-        <span class="name" style="font-size:13px">Third-party gateway</span>
-        <button class="switch" id="thirdParty" type="button" role="switch" aria-checked="false" aria-label="Third-party gateway"></button>
-      </div>
-
-      <div class="toggle" style="border-top:1px solid var(--line-soft)">
-        <span class="name" style="font-size:13px">GST registered</span>
-        <button class="switch on" id="gstOn" type="button" role="switch" aria-checked="true" aria-label="GST registered"></button>
-      </div>
-
-      <div class="field">
-        <label><span class="name">GST rate</span></label>
-        <div class="inputwrap"><input class="pct" type="number" id="gstPct" step="0.5" min="0"><span class="suf">%</span></div>
-      </div>
+      <p class="subnote">Australian online card rates. GST is on at 10%, card mix domestic-heavy, no third-party gateway. Those are baked in &mdash; edit <code>BAKED</code> in the page source to change them.</p>
     </div>
 
     <div class="card">
-      <div class="chead"><h2>Reality check</h2></div>
+      <div class="chead"><h2>Bundle offers</h2><span class="per" id="mixEcho">&mdash;</span></div>
 
       <div class="field">
-        <label><span class="name">Category</span><span class="hint">seeds the CPA</span></label>
-        <select id="category">
-          <option value="general">General / homewares</option>
-          <option value="apparel">Apparel &amp; footwear</option>
-          <option value="beauty">Beauty &amp; skincare</option>
-          <option value="supps">Health &amp; supplements</option>
-          <option value="food">Food &amp; beverage</option>
-          <option value="electronics">Electronics &amp; access</option>
-        </select>
-      </div>
-
-      <div class="field">
-        <label><span class="name">CPA you actually pay</span><span class="hint" id="cpaBench">—</span></label>
-        <div class="inputwrap"><span class="pre">$</span><input type="number" id="actualCpa" step="1" min="0"></div>
-      </div>
-
-      <div class="field">
-        <label><span class="name">What the market pays</span><span class="hint">0 = unknown</span></label>
-        <div class="inputwrap"><span class="pre">$</span><input type="number" id="marketPrice" step="1" min="0"></div>
-      </div>
-
-      <div class="field">
-        <label><span class="name">Margin to keep</span><span class="hint">after ads</span></label>
-        <div class="inputwrap"><input class="pct" type="number" id="keepPct" step="1" min="0"><span class="suf">%</span></div>
-      </div>
-
-      <div class="duo2">
-        <div class="field">
-          <label><span class="name">Fixed / day</span></label>
-          <div class="inputwrap"><span class="pre">$</span><input type="number" id="fixedPerDay" step="10" min="0"></div>
-        </div>
-        <div class="field">
-          <label><span class="name">Lead time</span></label>
-          <div class="inputwrap"><input class="pct" type="number" id="leadDays" step="5" min="0"><span class="suf">d</span></div>
+        <label><span class="name">Discount off list</span><span class="hint">buy 2 / 3 / 4</span></label>
+        <div class="trio">
+          <div class="inputwrap"><input class="pct" type="number" id="d2" step="1" min="0" max="90"><span class="suf">%</span></div>
+          <div class="inputwrap"><input class="pct" type="number" id="d3" step="1" min="0" max="90"><span class="suf">%</span></div>
+          <div class="inputwrap"><input class="pct" type="number" id="d4" step="1" min="0" max="90"><span class="suf">%</span></div>
         </div>
       </div>
 
       <div class="field">
-        <label><span class="name">CPA climb as you scale</span><span class="hint" id="elastEcho">—</span></label>
-        <input type="range" id="elasticity" min="0" max="35" step="1" value="15">
+        <label><span class="name">Take rate</span><span class="hint">share of orders</span></label>
+        <div class="mixrow">
+          <div class="mixcell"><div class="mlab">1</div><div class="inputwrap"><input class="pct" type="number" id="m1" step="5" min="0"><span class="suf">%</span></div></div>
+          <div class="mixcell"><div class="mlab">2</div><div class="inputwrap"><input class="pct" type="number" id="m2" step="5" min="0"><span class="suf">%</span></div></div>
+          <div class="mixcell"><div class="mlab">3</div><div class="inputwrap"><input class="pct" type="number" id="m3" step="5" min="0"><span class="suf">%</span></div></div>
+          <div class="mixcell"><div class="mlab">4</div><div class="inputwrap"><input class="pct" type="number" id="m4" step="5" min="0"><span class="suf">%</span></div></div>
+        </div>
+        <div class="mixbar" id="mixBar"></div>
       </div>
-      <p class="note" style="font-size:11px;color:var(--ink-3);line-height:1.45">How much CPA rises each time you double spend. No published constant exists, so this is your dial, never a prediction.</p>
+      <p class="subnote">Take rate is the number nobody has and everything depends on. At an all-singles mix, bundles change nothing at all.</p>
     </div>
   </div>
 
@@ -449,11 +434,32 @@
   <div>
 
     <div class="card feature">
-      <div class="chead"><h2>The price ladder</h2><span class="per" id="ladderTag">—</span></div>
+      <div class="chead"><h2>Single-unit prices</h2><span class="per" id="ladderTag">—</span></div>
       <p class="ctitle" id="ladderIntro">—</p>
       <div class="ladder" id="ladder"></div>
       <div class="caveat" id="ladderWarn" hidden><span id="ladderWarnTxt"></span></div>
-      <div class="caveat info"><span>Each price is <strong>what you would have to charge</strong>, not what the market will pay. A rung greys out when it is above the market price you entered, or when its target CPA cannot cover the CPA you actually pay.</span></div>
+      <div class="caveat info"><span>Each price is <strong>what you would have to charge</strong>, not what the market will pay. A rung greys out when its target CPA cannot cover the CPA you actually pay.</span></div>
+    </div>
+
+    <div class="card feature">
+      <div class="chead"><h2>The bundle ladder</h2><span class="per" id="bmxTag">&mdash;</span></div>
+      <p class="ctitle" id="bmxIntro">&mdash;</p>
+      <div class="scroller"><table class="bmx" id="bmx"></table></div>
+      <div class="caveat info"><span>A four-pack saves <span id="savedFF">&mdash;</span> of shipping and fixed fees against four separate orders. It also saves <strong><span id="savedCpa">&mdash;</span> of CPA</strong>, because you buy the customer once instead of four times. That ratio is why bundles work, and it is not a fulfilment story.</span></div>
+      <div class="caveat" id="discWarn" hidden><span id="discWarnTxt"></span></div>
+    </div>
+
+    <div class="card feature">
+      <div class="chead"><h2>What the mix actually blends to</h2><span class="per" id="blendTag">&mdash;</span></div>
+      <p class="ctitle">CPA is charged per order, and every order is one rung of the ladder. So the only CPA worth judging ads against is the take-rate-weighted one.</p>
+      <div class="blendgrid">
+        <div class="metric" id="mBlendCpa"><div class="mk">Blended target CPA</div><div class="mv" id="vBlendCpa">&mdash;</div><div class="mn" id="nBlendCpa"></div></div>
+        <div class="metric"><div class="mk">Units per order</div><div class="mv" id="vUnits">&mdash;</div><div class="mn" id="nUnits"></div></div>
+        <div class="metric"><div class="mk">Blended AOV</div><div class="mv" id="vAov">&mdash;</div><div class="mn" id="nAov"></div></div>
+        <div class="metric"><div class="mk">Uplift vs one-pack</div><div class="mv" id="vUplift">&mdash;</div><div class="mn" id="nUplift"></div></div>
+      </div>
+      <p class="ctitle" style="margin-top:22px">Blended target CPA against the share of orders taking more than one unit. The flat line is the CPA you actually pay &mdash; where the curve crosses it is the take rate this offer needs.</p>
+      <svg class="chart" id="mixChart" viewBox="0 0 720 260" role="img" aria-label="Blended target CPA against the share of orders taking more than one unit"></svg>
     </div>
 
     <div class="card">
@@ -543,13 +549,26 @@
 <script>
 /* ───────────────────────────────────────────────────────────────────────────
    This page ships as one static file, so it carries its own copy of the
-   formulas. The canonical, unit-tested statement of them lives at
-   app/lib/ecom/shopify-fees.ts and app/lib/ecom/tiers.ts. Keep the two in
-   step: if a formula changes here, change it there, and `npm test` covers it.
+   formulas. The canonical, unit-tested statement of them lives in
+   app/lib/ecom/{shopify-fees,tiers,bundles}.ts. Keep the two in step: if a
+   formula changes here, change it there, and `npm test` covers it.
    ─────────────────────────────────────────────────────────────────────────── */
 (function(){
   var $ = function(id){ return document.getElementById(id); };
   var clamp = function(v,lo,hi){ return Math.max(lo,Math.min(hi,v)); };
+
+  /* ── BAKED: set once, not worth a field on screen ────────────────────────
+     These were inputs and are now constants. Edit here to change them. */
+  var BAKED = {
+    gstPct:10,            // AU GST, inside the retail price
+    mixDom:85, mixAmex:5, mixIntl:10,   // card mix, percent of orders
+    extraPct:0,           // Afterpay / FX / chargeback uplift, points
+    thirdParty:false,     // true when payments bypass Shopify Payments
+    keepPct:20,           // contribution margin to keep after ads
+    fixedPerDay:50,       // ecom overhead per day
+    leadDays:45,          // supplier lead time, for the stock-cash figure
+    elasticity:15         // percent CPA rises per doubling of spend
+  };
 
   /* Shopify Payments AU, online card. Verified 4 Oct 2026. */
   var RATES = {
@@ -558,173 +577,222 @@
     advanced: {domestic:{pct:1.4, fixed:0.30}, amex:{pct:2.7,fixed:0.30}, international:{pct:3.3,fixed:0.30}, tp:0.6}
   };
 
-  /* Meta purchase-CPA bands by vertical, USD-sourced. Seeds the reality check. */
-  var CAT = {
-    general:     {label:"General / homewares",  cpa:[22,38]},
-    apparel:     {label:"Apparel & footwear",   cpa:[18,30]},
-    beauty:      {label:"Beauty & skincare",    cpa:[22,40]},
-    supps:       {label:"Health & supplements", cpa:[22,38]},
-    food:        {label:"Food & beverage",      cpa:[16,28]},
-    electronics: {label:"Electronics & access", cpa:[35,60]}
-  };
-
   var TIERS = [
-    {key:"excellent", label:"Excellent", before:0.65, blurb:"Outbid almost anyone and still keep a top-decile margin."},
-    {key:"good",      label:"Good",      before:0.55, blurb:"Funds a competitive CPA and holds 20%+."},
-    {key:"average",   label:"Average",   before:0.45, blurb:"Works at a disciplined CPA. No room for a bad week."},
-    {key:"poor",      label:"Poor",      before:0.35, blurb:"Only survives on cheap traffic."}
+    {key:"excellent", label:"Excellent", before:0.65},
+    {key:"good",      label:"Good",      before:0.55},
+    {key:"average",   label:"Average",   before:0.45},
+    {key:"poor",      label:"Poor",      before:0.35}
   ];
   var TIER_VAR = {excellent:"--pos", good:"--info", average:"--warn", poor:"--muted"};
+  var BUNDLE_VAR = ["--muted","--info","--accent","--pos"];
 
   var S = {
-    cogs:12, ship:7, retPct:8, retLossPct:25,
-    plan:"basic", mixDom:85, mixAmex:5, mixIntl:10, extraPct:0, thirdParty:false,
-    gstOn:true, gstPct:10,
-    category:"general", actualCpa:25, marketPrice:0, keepPct:20,
-    fixedPerDay:50, leadDays:45, elasticity:15,
+    cogs:12, ship:7, shipPerExtra:1.5, retPct:8, retLossPct:25,
+    plan:"basic", actualCpa:25,
+    disc:[0,10,20,25],          // buy 1..4, percent off list
+    mix:[60,25,10,5],           // take rate per rung, any scale
     spend:700, pick:"excellent"
   };
-  var cpaTouched = false;   // once typed, the category stops overwriting it
 
-  /* ── money + maths ── */
+  /* ── money ── */
   function money(n){ return !isFinite(n)?"—":(n<0?"−$":"$")+Math.abs(n).toLocaleString("en-AU",{minimumFractionDigits:0,maximumFractionDigits:0}); }
   function money2(n){ return !isFinite(n)?"—":(n<0?"−$":"$")+Math.abs(n).toLocaleString("en-AU",{minimumFractionDigits:2,maximumFractionDigits:2}); }
   function pct1(n){ return isFinite(n)?n.toFixed(1)+"%":"—"; }
+  function pct0(n){ return isFinite(n)?Math.round(n)+"%":"—"; }
   function raw(id){ var v=parseFloat($(id).value); return isFinite(v)?v:0; }
-  function cssv(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  function cssv(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 
-  function gst(){ return S.gstOn ? clamp(S.gstPct,0,100)/100 : 0; }
+  /* ── fee engine ── */
   function mix(){
-    var t = S.mixDom + S.mixAmex + S.mixIntl;
+    var t=BAKED.mixDom+BAKED.mixAmex+BAKED.mixIntl;
     if(!(t>0)) return {d:0.85,a:0.05,i:0.10};
-    return {d:S.mixDom/t, a:S.mixAmex/t, i:S.mixIntl/t};
+    return {d:BAKED.mixDom/t, a:BAKED.mixAmex/t, i:BAKED.mixIntl/t};
   }
-  function blended(){
-    var r = RATES[S.plan] || RATES.basic, m = mix();
+  function blendedFee(){
+    var r=RATES[S.plan]||RATES.basic, m=mix();
     return {
       pct: r.domestic.pct*m.d + r.amex.pct*m.a + r.international.pct*m.i
-           + (S.thirdParty ? r.tp : 0) + Math.max(S.extraPct,0),
+           + (BAKED.thirdParty ? r.tp : 0) + Math.max(BAKED.extraPct,0),
       fixed: r.domestic.fixed*m.d + r.amex.fixed*m.a + r.international.fixed*m.i
     };
   }
-  function feeOn(gross){ var b=blended(); return gross>0 ? gross*b.pct/100 + b.fixed : 0; }
-  function effPct(gross){ return gross>0 ? feeOn(gross)/gross*100 : NaN; }
-  function retRate(){ return (clamp(S.retPct,0,100)/100) * (clamp(S.retLossPct,0,100)/100); }
+  function feeOn(g){ var b=blendedFee(); return g>0 ? g*b.pct/100 + b.fixed : 0; }
+  function effPct(g){ return g>0 ? feeOn(g)/g*100 : NaN; }
 
-  /* Price that yields a contribution-before-ads margin of `target`.
-     P * [ (1-k-target)/(1+g) - r ] = cogs + ship + fixed   */
+  var gst = function(){ return clamp(BAKED.gstPct,0,100)/100; };
+  var retRate = function(){ return (clamp(S.retPct,0,100)/100)*(clamp(S.retLossPct,0,100)/100); };
+  var keep = function(){ return clamp(BAKED.keepPct,0,100)/100; };
+
+  /* How much of each retail dollar survives GST, fees, returns and the margin
+     kept. Shared by the price solve, the bundle model and the discount solver
+     so they cannot drift apart. */
+  function cpaSlope(){ return (1-retRate()-keep())/(1+gst()) - blendedFee().pct/100; }
+  function fixedCosts(units){
+    var u=Math.max(Math.round(units),1);
+    return S.cogs*u + S.ship + S.shipPerExtra*(u-1) + blendedFee().fixed;
+  }
+
+  /* ── single-unit quality ladder ── */
   function priceFor(target){
-    var b=blended(), bracket=(1-retRate()-target)/(1+gst()) - b.pct/100;
+    var b=blendedFee(), bracket=(1-retRate()-target)/(1+gst()) - b.pct/100;
     if(bracket<=0) return Infinity;
     return (S.cogs + S.ship + b.fixed)/bracket;
   }
-
   function rung(tier){
-    var g=gst(), price=priceFor(tier.before), keep=clamp(S.keepPct,0,100)/100;
-    if(!isFinite(price)){
-      return {tier:tier, price:Infinity, unreachable:true, aboveMarket:false,
-              cpaShort:true, viable:false, netRev:NaN, before:NaN, targetCpa:NaN};
-    }
-    var netRev = price/(1+g), gstAmt = price-netRev;
-    var fee = feeOn(price), returns = retRate()*netRev;
-    var before = netRev - S.cogs - S.ship - fee - returns;
-    var targetCpa = before - keep*netRev;
-    var unreachable = targetCpa<=0;
-    var aboveMarket = S.marketPrice>0 && price>S.marketPrice;
-    var cpaShort = S.actualCpa>0 && targetCpa<S.actualCpa;
+    var price=priceFor(tier.before);
+    if(!isFinite(price)) return {tier:tier,price:Infinity,unreachable:true,cpaShort:true,viable:false,netRev:NaN,before:NaN,targetCpa:NaN};
+    var netRev=price/(1+gst()), gstAmt=price-netRev;
+    var fee=feeOn(price), returns=retRate()*netRev;
+    var before=netRev-S.cogs-S.ship-fee-returns;
+    var targetCpa=before-keep()*netRev;
+    var unreachable=targetCpa<=0, cpaShort=S.actualCpa>0 && targetCpa<S.actualCpa;
     return {
       tier:tier, price:price, netRev:netRev, gst:gstAmt, fee:fee, returns:returns,
-      before:before, breakEvenCpa:before, targetCpa:targetCpa,
-      kept:keep*netRev,
-      multiple: S.cogs>0 ? price/S.cogs : Infinity,
-      gmPct: (netRev-S.cogs)/netRev*100,
-      beRoas: targetCpa>0 ? price/targetCpa : Infinity,
-      unreachable:unreachable, aboveMarket:aboveMarket, cpaShort:cpaShort,
-      cpaHeadroom: S.actualCpa>0 ? targetCpa-S.actualCpa : NaN,
-      viable: !unreachable && !aboveMarket && !cpaShort
+      before:before, breakEvenCpa:before, targetCpa:targetCpa, kept:keep()*netRev,
+      multiple:S.cogs>0?price/S.cogs:Infinity,
+      gmPct:(netRev-S.cogs)/netRev*100,
+      beRoas:targetCpa>0?price/targetCpa:Infinity,
+      unreachable:unreachable, cpaShort:cpaShort,
+      cpaHeadroom:S.actualCpa>0?targetCpa-S.actualCpa:NaN,
+      viable:!unreachable && !cpaShort
     };
   }
   function ladder(){ return TIERS.map(rung); }
-
-  /* Lowest price at which `cpa` is affordable while keeping keepPct. */
   function minViablePrice(cpa){
-    var b=blended();
-    var bracket=(1-retRate()-clamp(S.keepPct,0,100)/100)/(1+gst()) - b.pct/100;
-    if(bracket<=0) return Infinity;
-    return (S.cogs + S.ship + b.fixed + Math.max(cpa,0))/bracket;
+    var b=blendedFee(), A=cpaSlope();
+    if(A<=0) return Infinity;
+    return (S.cogs + S.ship + b.fixed + Math.max(cpa,0))/A;
   }
 
-  var BASE_SPEND = 100;   // the spend the entered CPA is assumed to describe
-  function cpaAt(spend){
-    var e=S.elasticity/100;
-    if(!(spend>0) || e<=0) return S.actualCpa;
-    return S.actualCpa * Math.pow(spend/BASE_SPEND, e);
-  }
-  function point(r, spend){
-    var cpa=cpaAt(spend), orders=cpa>0?spend/cpa:0;
-    var revenue=orders*r.price, contribution=orders*(r.before-cpa);
+  /* ── bundles ──────────────────────────────────────────────────────────────
+     A bundle multiplies product cost but not the order-level costs: one
+     parcel base, one flat transaction cent, and above all ONE CPA. That last
+     one is most of the advantage. */
+  function bundleRow(unitPrice, units, discPct, singleTarget){
+    var u=Math.max(Math.round(units),1);
+    var list=unitPrice*u;
+    var price=list*(1-clamp(discPct,0,100)/100);
+    var netRev=price/(1+gst());
+    var fee=feeOn(price), cogs=S.cogs*u, ship=S.ship+S.shipPerExtra*(u-1);
+    var returns=retRate()*netRev;
+    var before=netRev-cogs-ship-fee-returns;
+    var targetCpa=before-keep()*netRev;
+    /* targetCpa = P*A - C, so the price that ties the one-pack is
+       P=(T+C)/A and the deepest discount is 1 - P/list. */
+    var A=cpaSlope(), C=fixedCosts(u), maxDisc=NaN;
+    if(A>0 && list>0) maxDisc=1-(singleTarget+C)/(A*list);
     return {
-      spend:spend, cpa:cpa, orders:orders, revenue:revenue, contribution:contribution,
-      profit:contribution - S.fixedPerDay,
-      roas: spend>0 ? revenue/spend : Infinity,
-      stockCash: orders * S.cogs * Math.max(S.leadDays,0)
+      units:u, discPct:discPct, price:price, pricePerUnit:price/u,
+      netRev:netRev, gst:price-netRev, fee:fee, cogs:cogs, ship:ship, returns:returns,
+      before:before, breakEvenCpa:before, targetCpa:targetCpa,
+      headroom:singleTarget>0?targetCpa/singleTarget:NaN,
+      maxDisc:maxDisc,
+      fundsCpa:S.actualCpa<=0 ? true : targetCpa>=S.actualCpa
     };
   }
-  function peak(r){
+  function bundleLadder(unitPrice){
+    if(!isFinite(unitPrice)) return [];
+    var single=bundleRow(unitPrice,1,0,1);
+    var t=single.targetCpa;
+    return [1,2,3,4].map(function(u,i){ return bundleRow(unitPrice,u,S.disc[i],t); });
+  }
+
+  function normMix(){
+    var m=S.mix.map(function(v){ return Math.max(v,0); });
+    var t=m.reduce(function(a,b){return a+b;},0);
+    if(!(t>0)) return [1,0,0,0];
+    return m.map(function(v){ return v/t; });
+  }
+  function blend(rows, w){
+    w = w || normMix();
+    if(!rows.length) return null;
+    var sum=function(f){ return rows.reduce(function(a,r,i){ return a+w[i]*f(r); },0); };
+    var single=rows[0];
+    var targetCpa=sum(function(r){return r.targetCpa;});
+    return {
+      weights:w,
+      unitsPerOrder:sum(function(r){return r.units;}),
+      aov:sum(function(r){return r.price;}),
+      cogsPerOrder:sum(function(r){return r.cogs;}),
+      breakEvenCpa:sum(function(r){return r.before;}),
+      targetCpa:targetCpa,
+      uplift:single.targetCpa>0?targetCpa/single.targetCpa:NaN,
+      multiShare:rows.reduce(function(a,r,i){ return a+(r.units>1?w[i]:0); },0)
+    };
+  }
+  /* Re-weight so a given share of orders takes more than one unit, keeping
+     the relative shape among the multi rows. Drives the sensitivity curve. */
+  function mixAtMultiShare(rows, share){
+    var s=clamp(share,0,1);
+    var shape=S.mix.map(function(v){ return Math.max(v,0); });
+    var tot=rows.reduce(function(a,r,i){ return a+(r.units>1?shape[i]:0); },0);
+    return rows.map(function(r,i){
+      if(r.units<=1) return 1-s;
+      if(!(tot>0)) return s/3;
+      return s*shape[i]/tot;
+    });
+  }
+
+  /* ── scaling ── */
+  var BASE_SPEND=100;
+  function cpaAt(spend){
+    var e=BAKED.elasticity/100;
+    if(!(spend>0)||e<=0) return S.actualCpa;
+    return S.actualCpa*Math.pow(spend/BASE_SPEND,e);
+  }
+  function point(bl, spend){
+    var cpa=cpaAt(spend), orders=cpa>0?spend/cpa:0;
+    var revenue=orders*bl.aov, contribution=orders*(bl.breakEvenCpa-cpa);
+    return {
+      spend:spend, cpa:cpa, orders:orders, units:orders*bl.unitsPerOrder,
+      revenue:revenue, contribution:contribution,
+      profit:contribution-BAKED.fixedPerDay,
+      roas:spend>0?revenue/spend:Infinity,
+      stockCash:orders*bl.unitsPerOrder*S.cogs*Math.max(BAKED.leadDays,0)
+    };
+  }
+  function peak(bl){
     var best={spend:0,profit:-Infinity};
     for(var i=1;i<=240;i++){
-      var sp=5000*i/240, p=point(r,sp);
-      if(p.profit>best.profit) best={spend:sp,profit:p.profit};
+      var sp=5000*i/240, pt=point(bl,sp);
+      if(pt.profit>best.profit) best={spend:sp,profit:pt.profit};
     }
     return best;
   }
 
-  /* slider 0..1000 maps logarithmically onto $20..$5,000 */
   var SP_MIN=20, SP_MAX=5000;
   function sliderToSpend(v){ return SP_MIN*Math.pow(SP_MAX/SP_MIN, clamp(v,0,1000)/1000); }
   function spendToSlider(s){ return 1000*Math.log(clamp(s,SP_MIN,SP_MAX)/SP_MIN)/Math.log(SP_MAX/SP_MIN); }
 
-  /* ── tiny SVG chart helpers. No libraries: the page stays one file. ── */
-  function el(tag, attrs, text){
+  /* ── svg helpers ── */
+  function el(tag,attrs,text){
     var n=document.createElementNS("http://www.w3.org/2000/svg",tag);
-    for(var k in attrs) n.setAttribute(k, attrs[k]);
+    for(var k in attrs) n.setAttribute(k,attrs[k]);
     if(text!=null) n.textContent=text;
     return n;
   }
-  function axis(svg, box, opts){
-    // horizontal gridlines + labels, and an x-axis baseline
-    for(var i=0;i<=opts.yTicks;i++){
-      var val=opts.yMin+(opts.yMax-opts.yMin)*i/opts.yTicks;
-      var y=box.y+box.h-(val-opts.yMin)/(opts.yMax-opts.yMin)*box.h;
+  function axis(svg,box,o){
+    for(var i=0;i<=o.yTicks;i++){
+      var val=o.yMin+(o.yMax-o.yMin)*i/o.yTicks;
+      var y=box.y+box.h-(val-o.yMin)/(o.yMax-o.yMin)*box.h;
       svg.appendChild(el("line",{x1:box.x,y1:y,x2:box.x+box.w,y2:y,
-        stroke:cssv("--grid"),"stroke-width":1,opacity:val===0?0.9:0.45}));
-      svg.appendChild(el("text",{x:box.x-9,y:y+4,"text-anchor":"end",
-        "font-size":10.5,"font-family":"Space Grotesk, sans-serif",fill:cssv("--ink-3")},
-        opts.yFmt(val)));
+        stroke:cssv("--grid"),"stroke-width":1,opacity:Math.abs(val)<1e-9?0.9:0.45}));
+      svg.appendChild(el("text",{x:box.x-9,y:y+4,"text-anchor":"end","font-size":10.5,
+        "font-family":"Space Grotesk, sans-serif",fill:cssv("--ink-3")},o.yFmt(val)));
     }
-    (opts.xTicks||[]).forEach(function(t){
-      svg.appendChild(el("text",{x:opts.xPos(t),y:box.y+box.h+19,"text-anchor":"middle",
-        "font-size":10.5,"font-family":"Space Grotesk, sans-serif",fill:cssv("--ink-3")},
-        opts.xFmt(t)));
+    (o.xTicks||[]).forEach(function(t){
+      svg.appendChild(el("text",{x:o.xPos(t),y:box.y+box.h+19,"text-anchor":"middle","font-size":10.5,
+        "font-family":"Space Grotesk, sans-serif",fill:cssv("--ink-3")},o.xFmt(t)));
     });
   }
 
   /* ── render ── */
   function syncInputs(){
-    $("cogs").value=S.cogs; $("ship").value=S.ship;
+    $("cogs").value=S.cogs; $("ship").value=S.ship; $("shipPerExtra").value=S.shipPerExtra;
     $("retPct").value=S.retPct; $("retLossPct").value=S.retLossPct;
-    $("plan").value=S.plan;
-    $("mixDom").value=S.mixDom; $("mixAmex").value=S.mixAmex; $("mixIntl").value=S.mixIntl;
-    $("extraPct").value=S.extraPct; $("gstPct").value=S.gstPct;
-    $("category").value=S.category; $("actualCpa").value=S.actualCpa;
-    $("marketPrice").value=S.marketPrice; $("keepPct").value=S.keepPct;
-    $("fixedPerDay").value=S.fixedPerDay; $("leadDays").value=S.leadDays;
-    $("elasticity").value=S.elasticity;
-    $("thirdParty").classList.toggle("on",S.thirdParty);
-    $("thirdParty").setAttribute("aria-checked",String(S.thirdParty));
-    $("gstOn").classList.toggle("on",S.gstOn);
-    $("gstOn").setAttribute("aria-checked",String(S.gstOn));
-    $("gstPct").disabled=!S.gstOn;
+    $("plan").value=S.plan; $("actualCpa").value=S.actualCpa;
+    $("d2").value=S.disc[1]; $("d3").value=S.disc[2]; $("d4").value=S.disc[3];
+    $("m1").value=S.mix[0]; $("m2").value=S.mix[1]; $("m3").value=S.mix[2]; $("m4").value=S.mix[3];
   }
 
   function renderLadder(L){
@@ -732,394 +800,418 @@
     L.forEach(function(r){
       var d=document.createElement("div");
       d.className="rung "+r.tier.key+(r.viable?"":" dead")+(S.pick===r.tier.key?" pick":"");
-      var chip = r.unreachable ? '<span class="rchip bad">Impossible</span>'
-        : r.aboveMarket ? '<span class="rchip bad">Above market</span>'
-        : r.cpaShort ? '<span class="rchip warn">CPA short</span>'
-        : '<span class="rchip ok">Viable</span>';
-      var rows = r.unreachable ? '<div class="rrow"><span class="rk">No price reaches this tier at this cost base.</span></div>'
-        : '<div class="rrow"><span class="rk">Target CPA</span><span class="rv '+(r.cpaShort?"neg":"pos")+'">'+money2(r.targetCpa)+'</span></div>'
-        + '<div class="rrow"><span class="rk">Break-even CPA</span><span class="rv">'+money2(r.breakEvenCpa)+'</span></div>'
-        + '<div class="rrow"><span class="rk">Gross margin</span><span class="rv">'+pct1(r.gmPct)+'</span></div>'
-        + '<div class="rrow"><span class="rk">Break-even ROAS</span><span class="rv">'+(isFinite(r.beRoas)?r.beRoas.toFixed(2)+"×":"—")+'</span></div>'
-        + '<div class="rrow"><span class="rk">Shopify takes</span><span class="rv">'+money2(r.fee)+' · '+pct1(r.fee/r.price*100)+'</span></div>';
-      d.innerHTML =
-        '<div class="rtop"><span class="rname">'+r.tier.label+'</span>'+chip+'</div>'
-        + '<div class="rprice">'+(isFinite(r.price)?money2(r.price):"—")+'</div>'
-        + '<div class="rsub">'+(isFinite(r.multiple)?r.multiple.toFixed(2)+"× landed cost":"&nbsp;")+'</div>'
-        + '<div class="rrows">'+rows+'</div>'
-        + '<button class="rbtn" type="button" data-pick="'+r.tier.key+'">'
-        + (S.pick===r.tier.key?"Scaling this":"Scale this")+'</button>';
+      var chip=r.unreachable?'<span class="rchip bad">Impossible</span>'
+        :r.cpaShort?'<span class="rchip warn">CPA short</span>'
+        :'<span class="rchip ok">Viable</span>';
+      var rows=r.unreachable?'<div class="rrow"><span class="rk">No price reaches this tier at this cost base.</span></div>'
+        :'<div class="rrow"><span class="rk">Target CPA</span><span class="rv '+(r.cpaShort?"neg":"pos")+'">'+money2(r.targetCpa)+'</span></div>'
+        +'<div class="rrow"><span class="rk">Break-even CPA</span><span class="rv">'+money2(r.breakEvenCpa)+'</span></div>'
+        +'<div class="rrow"><span class="rk">Gross margin</span><span class="rv">'+pct1(r.gmPct)+'</span></div>'
+        +'<div class="rrow"><span class="rk">Break-even ROAS</span><span class="rv">'+(isFinite(r.beRoas)?r.beRoas.toFixed(2)+"×":"—")+'</span></div>'
+        +'<div class="rrow"><span class="rk">Shopify takes</span><span class="rv">'+money2(r.fee)+' · '+pct1(r.fee/r.price*100)+'</span></div>';
+      d.innerHTML='<div class="rtop"><span class="rname">'+r.tier.label+'</span>'+chip+'</div>'
+        +'<div class="rprice">'+(isFinite(r.price)?money2(r.price):"—")+'</div>'
+        +'<div class="rsub">'+(isFinite(r.multiple)?r.multiple.toFixed(2)+"× landed cost":"&nbsp;")+'</div>'
+        +'<div class="rrows">'+rows+'</div>'
+        +'<button class="rbtn" type="button" data-pick="'+r.tier.key+'">'
+        +(S.pick===r.tier.key?"Bundling this":"Bundle this")+'</button>';
       host.appendChild(d);
     });
-    Array.prototype.forEach.call(host.querySelectorAll("[data-pick]"), function(b){
-      b.addEventListener("click", function(){ S.pick=b.getAttribute("data-pick"); render(); });
+    Array.prototype.forEach.call(host.querySelectorAll("[data-pick]"),function(b){
+      b.addEventListener("click",function(){ S.pick=b.getAttribute("data-pick"); render(); });
     });
   }
 
   function renderStacks(L){
     var host=$("stacks"); host.innerHTML="";
-    var maxPrice=0;
-    L.forEach(function(r){ if(isFinite(r.price)) maxPrice=Math.max(maxPrice,r.price); });
-    if(maxPrice<=0) maxPrice=1;
+    var maxP=0; L.forEach(function(r){ if(isFinite(r.price)) maxP=Math.max(maxP,r.price); });
+    if(maxP<=0) maxP=1;
     L.forEach(function(r){
       var row=document.createElement("div"); row.className="stackrow";
       var lab=document.createElement("div"); lab.className="stacklab"; lab.textContent=r.tier.label;
       var bar=document.createElement("div"); bar.className="stackbar";
-      if(!isFinite(r.price)){
-        bar.style.background="var(--sunk)";
-        row.appendChild(lab); row.appendChild(bar); host.appendChild(row); return;
-      }
-      // Bars are scaled against the dearest rung so widths compare across rows.
-      bar.style.width=(r.price/maxPrice*100)+"%";
-      var adBudget=Math.max(r.targetCpa,0);
-      var parts=[
-        ["--c-cogs", S.cogs,     "Landed COGS"],
-        ["--c-ship", S.ship,     "Ship & fulfil"],
-        ["--c-fee",  r.fee,      "Shopify fee"],
-        ["--c-gst",  r.gst,      "GST"],
-        ["--c-ret",  r.returns,  "Returns"],
-        ["--c-ads",  adBudget,   "Ad budget"],
-        ["--c-keep", Math.max(r.price-S.cogs-S.ship-r.fee-r.gst-r.returns-adBudget,0), "Kept"]
-      ];
-      parts.forEach(function(p){
-        if(p[1]<=0) return;
-        var s=document.createElement("div"); s.className="seg";
-        s.style.width=(p[1]/r.price*100)+"%";
-        s.style.background="var("+p[0]+")";
-        s.title=p[2]+": "+money2(p[1]);
-        bar.appendChild(s);
+      if(!isFinite(r.price)){ bar.style.background="var(--sunk)"; row.appendChild(lab); row.appendChild(bar); host.appendChild(row); return; }
+      bar.style.width=(r.price/maxP*100)+"%";
+      var ad=Math.max(r.targetCpa,0);
+      [["--c-cogs",S.cogs,"Landed COGS"],["--c-ship",S.ship,"Ship & fulfil"],
+       ["--c-fee",r.fee,"Shopify fee"],["--c-gst",r.gst,"GST"],["--c-ret",r.returns,"Returns"],
+       ["--c-ads",ad,"Ad budget"],
+       ["--c-keep",Math.max(r.price-S.cogs-S.ship-r.fee-r.gst-r.returns-ad,0),"Kept"]
+      ].forEach(function(pp){
+        if(pp[1]<=0) return;
+        var sg=document.createElement("div"); sg.className="seg";
+        sg.style.width=(pp[1]/r.price*100)+"%"; sg.style.background="var("+pp[0]+")";
+        sg.title=pp[2]+": "+money2(pp[1]); bar.appendChild(sg);
       });
       row.appendChild(lab); row.appendChild(bar); host.appendChild(row);
     });
   }
 
+  function renderBundles(rows, picked){
+    var t=$("bmx");
+    if(!rows.length){ t.innerHTML=""; $("bmxTag").textContent="—"; $("bmxIntro").textContent="No reachable price for this rung."; return; }
+    $("bmxTag").textContent=picked.tier.label+" · "+money2(picked.price)+" a unit";
+    $("bmxIntro").innerHTML="One order costs one CPA whether it holds 1 unit or 4. These are the same "
+      +"product at four order sizes, and <strong>max discount</strong> is how deep each one can be cut "
+      +"before it stops beating a single sale.";
+    t.innerHTML="<thead><tr><th>Offer</th><th>Price</th><th>Per unit</th><th>Discount</th>"
+      +"<th>Break-even CPA</th><th>Target CPA</th><th>Headroom</th><th>Max discount</th></tr></thead><tbody>"
+      + rows.map(function(b,i){
+          var over=isFinite(b.maxDisc) && b.discPct > b.maxDisc*100;
+          return "<tr"+(b.fundsCpa?"":" class='dim'")+">"
+            +"<td><span class='bname'><span class='bdot' style='background:var("+BUNDLE_VAR[i]+")'></span>Buy "+b.units+"</span></td>"
+            +"<td>"+money2(b.price)+"</td>"
+            +"<td class='info'>"+money2(b.pricePerUnit)+"</td>"
+            +"<td>"+pct0(b.discPct)+"</td>"
+            +"<td>"+money2(b.breakEvenCpa)+"</td>"
+            +"<td class='"+(b.fundsCpa?"pos":"neg")+"'>"+money2(b.targetCpa)+"</td>"
+            +"<td>"+(isFinite(b.headroom)?b.headroom.toFixed(2)+"×":"—")+"</td>"
+            +"<td class='"+(over?"neg":"")+"'>"+(isFinite(b.maxDisc)?pct0(b.maxDisc*100):"—")+"</td>"
+            +"</tr>";
+        }).join("")
+      +"</tbody>";
+
+    // What a four-pack really saves against four separate orders, counting
+    // only costs it genuinely avoids: three parcel bases and three flat
+    // transaction cents. The percentage fee is not a saving - four full-price
+    // orders pay more of it only because they total more money.
+    var one=rows[0], four=rows[3];
+    var ff=(one.ship*4-four.ship)+blendedFee().fixed*3;
+    $("savedFF").textContent=money2(ff);
+    $("savedCpa").textContent=money2(one.targetCpa*3);
+
+    var over=rows.filter(function(b){ return isFinite(b.maxDisc) && b.discPct>b.maxDisc*100; });
+    var under=rows.filter(function(b){ return b.units>1 && isFinite(b.maxDisc) && b.maxDisc*100-b.discPct>10; });
+    var w=$("discWarn");
+    if(over.length){
+      w.hidden=false; w.className="caveat";
+      $("discWarnTxt").innerHTML=over.map(function(b){
+        return "<strong>Buy "+b.units+" is cut too deep.</strong> At "+pct0(b.discPct)
+          +" off it earns less per order than selling one unit. The limit is "+pct0(b.maxDisc*100)+".";
+      }).join(" ");
+    } else if(under.length){
+      w.hidden=false; w.className="caveat info";
+      $("discWarnTxt").innerHTML="You have discount room you are not using: "
+        + under.map(function(b){ return "buy "+b.units+" could go to "+pct0(b.maxDisc*100)
+            +" instead of "+pct0(b.discPct); }).join(", ")
+        + " and still beat a single sale. Deeper discounts buy take rate, which is what the blend below runs on.";
+    } else { w.hidden=true; }
+  }
+
+  function renderBlend(bl, rows){
+    if(!bl){ return; }
+    var m=$("mBlendCpa");
+    var funds=S.actualCpa<=0 || bl.targetCpa>=S.actualCpa;
+    m.className="metric "+(funds?"good":"bad");
+    $("vBlendCpa").textContent=money2(bl.targetCpa);
+    $("nBlendCpa").textContent=funds
+      ? "Covers the "+money2(S.actualCpa)+" you pay, with "+money2(bl.targetCpa-S.actualCpa)+" to spare."
+      : "Short of the "+money2(S.actualCpa)+" you pay by "+money2(S.actualCpa-bl.targetCpa)+".";
+    $("vUnits").textContent=bl.unitsPerOrder.toFixed(2);
+    $("nUnits").textContent=pct0(bl.multiShare*100)+" of orders take more than one unit.";
+    $("vAov").textContent=money2(bl.aov);
+    $("nAov").textContent="Against "+money2(rows[0].price)+" for a single. Same CPA either way.";
+    $("vUplift").textContent=(isFinite(bl.uplift)?bl.uplift.toFixed(2)+"×":"—");
+    $("nUplift").textContent="What the ladder adds to what you can pay for a customer.";
+    $("blendTag").textContent=bl.unitsPerOrder.toFixed(2)+" units/order · AOV "+money2(bl.aov);
+
+    // the take-rate mix bar on the left
+    var bar=$("mixBar"); bar.innerHTML="";
+    bl.weights.forEach(function(w,i){
+      if(w<=0) return;
+      var sg=document.createElement("div"); sg.className="mixseg";
+      sg.style.width=(w*100)+"%"; sg.style.background="var("+BUNDLE_VAR[i]+")";
+      sg.textContent=w>=0.12?("×"+(i+1)):"";
+      sg.title="Buy "+(i+1)+": "+pct0(w*100)+" of orders";
+      bar.appendChild(sg);
+    });
+    $("mixEcho").textContent=pct0(bl.multiShare*100)+" multi-unit";
+  }
+
+  function renderMixChart(rows){
+    var svg=$("mixChart"); svg.innerHTML="";
+    if(!rows.length) return;
+    var box={x:58,y:16,w:636,h:190};
+    var pts=[];
+    for(var i=0;i<=100;i++){
+      var s=i/100;
+      pts.push({s:s, y:blend(rows, mixAtMultiShare(rows,s)).targetCpa});
+    }
+    var vals=pts.map(function(q){return q.y;}).filter(isFinite).concat([S.actualCpa]);
+    var yMax=Math.max.apply(null,vals), yMin=Math.min.apply(null,vals);
+    var pad=(yMax-yMin)*0.15||5; yMax+=pad; yMin=Math.max(0,yMin-pad);
+    var X=function(s){ return box.x+s*box.w; };
+    var Y=function(v){ return box.y+box.h-(clamp(v,yMin,yMax)-yMin)/(yMax-yMin)*box.h; };
+
+    axis(svg,box,{yMin:yMin,yMax:yMax,yTicks:4,yFmt:function(v){return money(v);},
+      xTicks:[0,.25,.5,.75,1],xPos:X,xFmt:function(v){return Math.round(v*100)+"%";}});
+
+    var d=pts.map(function(q,i){ return (i?"L":"M")+X(q.s).toFixed(1)+" "+Y(q.y).toFixed(1); }).join(" ");
+    svg.appendChild(el("path",{d:d,fill:"none",stroke:cssv("--accent"),"stroke-width":3,"stroke-linecap":"round"}));
+
+    // the CPA you actually pay
+    if(S.actualCpa>0 && S.actualCpa>=yMin && S.actualCpa<=yMax){
+      svg.appendChild(el("line",{x1:box.x,y1:Y(S.actualCpa),x2:box.x+box.w,y2:Y(S.actualCpa),
+        stroke:cssv("--warn"),"stroke-width":2,"stroke-dasharray":"5 4"}));
+      svg.appendChild(el("text",{x:box.x+box.w,y:Y(S.actualCpa)-7,"text-anchor":"end","font-size":10.5,
+        "font-weight":700,"font-family":"Inter, sans-serif",fill:cssv("--warn")},
+        "CPA you pay "+money2(S.actualCpa)));
+    }
+
+    // where you are now
+    var cur=blend(rows);
+    svg.appendChild(el("line",{x1:X(cur.multiShare),y1:box.y,x2:X(cur.multiShare),y2:box.y+box.h,
+      stroke:cssv("--ink-3"),"stroke-width":1.5,opacity:.5}));
+    svg.appendChild(el("circle",{cx:X(cur.multiShare),cy:Y(cur.targetCpa),r:5.5,
+      fill:cssv("--accent"),stroke:cssv("--surface"),"stroke-width":1.5}));
+    svg.appendChild(el("text",{x:X(cur.multiShare),y:box.y+box.h+34,"text-anchor":"middle","font-size":10.5,
+      "font-weight":700,"font-family":"Inter, sans-serif",fill:cssv("--ink-2")},"you are here"));
+    svg.appendChild(el("text",{x:box.x,y:box.y+box.h+34,"font-size":10.5,
+      "font-family":"Inter, sans-serif",fill:cssv("--ink-3")},"Share of orders taking 2+ units"));
+  }
+
   function renderFeeChart(L){
     var svg=$("feeChart"); svg.innerHTML="";
     var box={x:46,y:28,w:650,h:176};
-    var lo=10, hi=Math.max(60, L[0] && isFinite(L[0].price) ? L[0].price*1.6 : 160);
+    var lo=10, hi=Math.max(60, L[0]&&isFinite(L[0].price)?L[0].price*1.6:160);
     var pts=[];
-    for(var i=0;i<=120;i++){
-      var p=lo+(hi-lo)*i/120;
-      pts.push({p:p, f:effPct(p)});
-    }
-    var fMax=Math.max.apply(null,pts.map(function(d){return d.f;}))*1.1;
-    var fMin=0;
-    var X=function(p){ return box.x+(p-lo)/(hi-lo)*box.w; };
+    for(var i=0;i<=120;i++){ var pr=lo+(hi-lo)*i/120; pts.push({p:pr,f:effPct(pr)}); }
+    var fMax=Math.max.apply(null,pts.map(function(d){return d.f;}))*1.1, fMin=0;
+    var X=function(pr){ return box.x+(pr-lo)/(hi-lo)*box.w; };
     var Y=function(f){ return box.y+box.h-(f-fMin)/(fMax-fMin)*box.h; };
-
     axis(svg,box,{yMin:fMin,yMax:fMax,yTicks:4,yFmt:function(v){return v.toFixed(1)+"%";},
       xTicks:[lo,hi*0.25,hi*0.5,hi*0.75,hi],xPos:X,xFmt:function(v){return "$"+Math.round(v);}});
-
     var d=pts.map(function(q,i){ return (i?"L":"M")+X(q.p).toFixed(1)+" "+Y(q.f).toFixed(1); }).join(" ");
     svg.appendChild(el("path",{d:d,fill:"none",stroke:cssv("--c-fee"),"stroke-width":2.5,"stroke-linecap":"round"}));
-
-    // Labels alternate between two heights: four rung prices can sit close
-    // enough together that a single baseline overprints them.
     L.forEach(function(r,i){
-      if(!isFinite(r.price) || r.price<lo || r.price>hi) return;
-      var x=X(r.price), y=Y(effPct(r.price));
-      var labY = box.y - 3 - (i%2 ? 12 : 0);
+      if(!isFinite(r.price)||r.price<lo||r.price>hi) return;
+      var x=X(r.price), y=Y(effPct(r.price)), labY=box.y-3-(i%2?12:0);
       svg.appendChild(el("line",{x1:x,y1:box.y,x2:x,y2:box.y+box.h,
         stroke:cssv(TIER_VAR[r.tier.key]),"stroke-width":1.5,"stroke-dasharray":"3 3",opacity:.6}));
       svg.appendChild(el("circle",{cx:x,cy:y,r:4.5,fill:cssv(TIER_VAR[r.tier.key]),
         stroke:cssv("--surface"),"stroke-width":1.5}));
-      svg.appendChild(el("text",{x:x,y:labY,"text-anchor":"middle","font-size":9.5,
-        "font-weight":700,"font-family":"Inter, sans-serif",fill:cssv(TIER_VAR[r.tier.key])},
-        r.tier.label.toUpperCase()));
+      svg.appendChild(el("text",{x:x,y:labY,"text-anchor":"middle","font-size":9.5,"font-weight":700,
+        "font-family":"Inter, sans-serif",fill:cssv(TIER_VAR[r.tier.key])},r.tier.label.toUpperCase()));
     });
     svg.appendChild(el("text",{x:box.x,y:box.y+box.h+34,"font-size":10.5,
       "font-family":"Inter, sans-serif",fill:cssv("--ink-3")},"Retail price charged"));
-    $("feeCurveTag").textContent = blended().pct.toFixed(2)+"% + "+money2(blended().fixed);
+    $("feeCurveTag").textContent=blendedFee().pct.toFixed(2)+"% + "+money2(blendedFee().fixed);
   }
 
-  function renderScaleChart(L){
+  function renderScaleChart(L, blends){
     var svg=$("scaleChart"); svg.innerHTML="";
     var box={x:54,y:14,w:640,h:230};
-    var X=function(s){ return box.x + spendToSlider(s)/1000*box.w; };
-
-    var series=L.map(function(r){
-      if(!isFinite(r.price)) return {r:r, pts:[]};
+    var X=function(s){ return box.x+spendToSlider(s)/1000*box.w; };
+    var series=L.map(function(r,i){
+      var bl=blends[i];
+      if(!bl) return {r:r, pts:[]};
       var pts=[];
-      for(var i=0;i<=120;i++){
-        var s=sliderToSpend(1000*i/120);
-        pts.push({s:s, y:point(r,s).profit});
-      }
-      return {r:r, pts:pts, peak:peak(r)};
+      for(var k=0;k<=120;k++){ var sp=sliderToSpend(1000*k/120); pts.push({s:sp,y:point(bl,sp).profit}); }
+      return {r:r, pts:pts, peak:peak(bl)};
     });
-
-    /* Scale to the PICKED rung, not to all four. A failing rung dives to
-       several thousand a day in losses, and letting that set the axis squashes
-       the rung you are actually considering into a flat line at the top. The
-       other curves still draw, clipped at the plot edge. */
     var focus=series.filter(function(se){ return se.r.tier.key===S.pick && se.pts.length; })[0]
       || series.filter(function(se){ return se.pts.length; })[0];
-    var all=(focus?focus.pts:[]).map(function(q){ return q.y; }).filter(isFinite);
+    var all=(focus?focus.pts:[]).map(function(q){return q.y;}).filter(isFinite);
     if(!all.length) all=[0,1];
     var yMax=Math.max.apply(null,all), yMin=Math.min.apply(null,all);
-    if(yMax<0) yMax=0;              // always show the zero line
-    if(yMin>0) yMin=0;
-    var pad=(yMax-yMin)*0.15 || 10;
-    yMax+=pad; yMin-=pad;
-    /* Snap the range so zero falls exactly on a gridline. Otherwise the zero
-       line and the nearest tick sit a few pixels apart and the chart reads as
-       if it were mislabelled. */
-    if(yMin<0 && yMax>0){
-      var k=clamp(Math.round(-yMin/(yMax-yMin)*4),1,3);
-      var R=yMax*4/(4-k);
-      yMin=-k*R/4; yMax=R-(-yMin);
-    }
+    if(yMax<0) yMax=0; if(yMin>0) yMin=0;
+    var pad=(yMax-yMin)*0.15||10; yMax+=pad; yMin-=pad;
+    if(yMin<0&&yMax>0){ var k2=clamp(Math.round(-yMin/(yMax-yMin)*4),1,3); var R=yMax*4/(4-k2); yMin=-k2*R/4; yMax=R-(-yMin); }
     var Y=function(v){ return box.y+box.h-(clamp(v,yMin,yMax)-yMin)/(yMax-yMin)*box.h; };
 
-    var clipId="scaleClip";
-    var defs=el("defs",{});
-    var cp=el("clipPath",{id:clipId});
+    var defs=el("defs",{}), cp=el("clipPath",{id:"scaleClip"});
     cp.appendChild(el("rect",{x:box.x,y:box.y,width:box.w,height:box.h}));
     defs.appendChild(cp); svg.appendChild(defs);
 
     axis(svg,box,{yMin:yMin,yMax:yMax,yTicks:4,yFmt:function(v){return money(v);},
       xTicks:[20,50,150,500,1500,5000],xPos:X,xFmt:function(v){return v>=1000?"$"+(v/1000)+"k":"$"+v;}});
-
-    // zero line, drawn hard because it is the only line that matters
-    svg.appendChild(el("line",{x1:box.x,y1:Y(0),x2:box.x+box.w,y2:Y(0),
-      stroke:cssv("--ink-3"),"stroke-width":1.5,opacity:.85}));
-
-    // the spend the operator is looking at
-    svg.appendChild(el("line",{x1:X(S.spend),y1:box.y,x2:X(S.spend),y2:box.y+box.h,
-      stroke:cssv("--accent"),"stroke-width":2,opacity:.3}));
+    svg.appendChild(el("line",{x1:box.x,y1:Y(0),x2:box.x+box.w,y2:Y(0),stroke:cssv("--ink-3"),"stroke-width":1.5,opacity:.85}));
+    svg.appendChild(el("line",{x1:X(S.spend),y1:box.y,x2:X(S.spend),y2:box.y+box.h,stroke:cssv("--accent"),"stroke-width":2,opacity:.3}));
 
     series.forEach(function(se){
       if(!se.pts.length) return;
-      var dimmed = S.pick!==se.r.tier.key;
+      var dim=S.pick!==se.r.tier.key;
       var d=se.pts.map(function(q,i){ return (i?"L":"M")+X(q.s).toFixed(1)+" "+Y(q.y).toFixed(1); }).join(" ");
       svg.appendChild(el("path",{d:d,fill:"none",stroke:cssv(TIER_VAR[se.r.tier.key]),
-        "stroke-width":dimmed?1.8:3.2,"stroke-linecap":"round",opacity:dimmed?.42:1,
-        "clip-path":"url(#"+clipId+")"}));
-      if(se.peak && se.peak.profit>yMin && se.peak.profit<yMax){
-        svg.appendChild(el("circle",{cx:X(se.peak.spend),cy:Y(se.peak.profit),
-          r:dimmed?3:5.5,fill:cssv(TIER_VAR[se.r.tier.key]),opacity:dimmed?.5:1,
-          stroke:cssv("--surface"),"stroke-width":dimmed?0:1.5}));
+        "stroke-width":dim?1.8:3.2,"stroke-linecap":"round",opacity:dim?.42:1,"clip-path":"url(#scaleClip)"}));
+      if(se.peak&&se.peak.profit>yMin&&se.peak.profit<yMax){
+        svg.appendChild(el("circle",{cx:X(se.peak.spend),cy:Y(se.peak.profit),r:dim?3:5.5,
+          fill:cssv(TIER_VAR[se.r.tier.key]),opacity:dim?.5:1,stroke:cssv("--surface"),"stroke-width":dim?0:1.5}));
       }
     });
-
     svg.appendChild(el("text",{x:box.x,y:box.y+box.h+34,"font-size":10.5,
       "font-family":"Inter, sans-serif",fill:cssv("--ink-3")},"Ad spend per day (log scale)"));
 
     var lg=$("scaleLegend"); lg.innerHTML="";
-    L.forEach(function(r){
-      var s=document.createElement("span"); s.className="lg ln";
-      s.innerHTML='<span class="sw" style="background:var('+TIER_VAR[r.tier.key]+')"></span>'
-        + r.tier.label + (isFinite(r.price)?" · "+money2(r.price):"");
-      lg.appendChild(s);
+    L.forEach(function(r,i){
+      var sp=document.createElement("span"); sp.className="lg ln";
+      sp.innerHTML='<span class="sw" style="background:var('+TIER_VAR[r.tier.key]+')"></span>'
+        + r.tier.label + (blends[i]?" · AOV "+money2(blends[i].aov):"");
+      lg.appendChild(sp);
     });
   }
 
-  function renderScenario(L){
-    var r=L.filter(function(x){return x.tier.key===S.pick;})[0] || L[1];
-    $("pickTag").textContent = r.tier.label+" rung"+(isFinite(r.price)?" · "+money2(r.price):"");
-    $("spendVal").textContent = money(S.spend);
-    Array.prototype.forEach.call(document.querySelectorAll(".jbtn"), function(b){
-      b.classList.toggle("on", Math.abs(Number(b.getAttribute("data-s"))-S.spend)<1);
+  function renderScenario(bl, picked){
+    $("pickTag").textContent = picked.tier.label+" ladder"+(bl?" · AOV "+money2(bl.aov):"");
+    $("spendVal").textContent=money(S.spend);
+    Array.prototype.forEach.call(document.querySelectorAll(".jbtn"),function(b){
+      b.classList.toggle("on",Math.abs(Number(b.getAttribute("data-s"))-S.spend)<1);
     });
-
-    if(!isFinite(r.price)){
+    if(!bl){
       ["vProfit","vCpa","vRoas","vCash"].forEach(function(id){ $(id).textContent="—"; });
       ["nProfit","nCpa","nRoas","nCash"].forEach(function(id){ $(id).textContent=""; });
-      $("cmpTable").innerHTML="";
-      return;
+      $("cmpTable").innerHTML=""; return;
     }
-
-    var p=point(r,S.spend);
+    var pt=point(bl,S.spend);
     var mp=$("mProfit");
-    mp.className="metric "+(p.profit>0?"good":p.profit>-S.fixedPerDay?"warn":"bad");
-    $("vProfit").textContent=money(p.profit);
-    $("nProfit").textContent=p.orders.toFixed(1)+" orders · "+money(p.revenue)+" revenue · "
-      +money(p.contribution)+" contribution before "+money(S.fixedPerDay)+" fixed.";
-
+    mp.className="metric "+(pt.profit>0?"good":pt.profit>-BAKED.fixedPerDay?"warn":"bad");
+    $("vProfit").textContent=money(pt.profit);
+    $("nProfit").textContent=pt.orders.toFixed(1)+" orders · "+pt.units.toFixed(1)+" units · "
+      +money(pt.revenue)+" revenue · "+money(pt.contribution)+" before "+money(BAKED.fixedPerDay)+" fixed.";
     var mc=$("mCpa");
-    mc.className="metric "+(p.cpa<=r.targetCpa?"good":p.cpa<r.breakEvenCpa?"warn":"bad");
-    $("vCpa").textContent=money2(p.cpa);
-    $("nCpa").textContent="Target "+money2(r.targetCpa)+", break-even "+money2(r.breakEvenCpa)+". "
-      + (p.cpa>r.breakEvenCpa ? "Every order loses money at this spend."
-        : p.cpa>r.targetCpa ? "Above target, still above water."
-        : "Inside target.");
-
+    mc.className="metric "+(pt.cpa<=bl.targetCpa?"good":pt.cpa<bl.breakEvenCpa?"warn":"bad");
+    $("vCpa").textContent=money2(pt.cpa);
+    $("nCpa").textContent="Blended target "+money2(bl.targetCpa)+", break-even "+money2(bl.breakEvenCpa)+". "
+      +(pt.cpa>bl.breakEvenCpa?"Every order loses money at this spend."
+        :pt.cpa>bl.targetCpa?"Above target, still above water.":"Inside target.");
+    var beRoas=bl.targetCpa>0?bl.aov/bl.targetCpa:Infinity;
     var mr=$("mRoas");
-    mr.className="metric "+(p.roas>=r.beRoas?"good":"bad");
-    $("vRoas").textContent=isFinite(p.roas)?p.roas.toFixed(2)+"×":"—";
-    $("nRoas").textContent="Break-even is "+(isFinite(r.beRoas)?r.beRoas.toFixed(2)+"×":"—")
-      +" at the target margin.";
+    mr.className="metric "+(pt.roas>=beRoas?"good":"bad");
+    $("vRoas").textContent=isFinite(pt.roas)?pt.roas.toFixed(2)+"×":"—";
+    $("nRoas").textContent="Break-even is "+(isFinite(beRoas)?beRoas.toFixed(2)+"×":"—")+" on the blended AOV.";
+    var mk=$("mCash");
+    mk.className="metric "+(pt.stockCash>pt.profit*60?"warn":"");
+    $("vCash").textContent=money(pt.stockCash);
+    $("nCash").textContent=BAKED.leadDays+" days of stock at "+pt.units.toFixed(1)
+      +" units a day. Bundles multiply this — "+bl.unitsPerOrder.toFixed(2)+" units per order.";
 
-    var mcash=$("mCash");
-    mcash.className="metric "+(p.stockCash>p.profit*60?"warn":"");
-    $("vCash").textContent=money(p.stockCash);
-    $("nCash").textContent=S.leadDays+" days of stock at "+p.orders.toFixed(1)
-      +" orders a day. Paid before the revenue lands.";
-
-    // $50 vs $5,000 table
-    var rows=[50,250,500,1000,2500,5000].map(function(s){ return point(r,s); });
-    var t=$("cmpTable");
-    t.innerHTML=
-      "<thead><tr><th>Per day</th><th>CPA</th><th>Orders</th><th>Revenue</th>"
-      +"<th>Contribution</th><th>Profit</th><th>ROAS</th><th>Stock cash</th></tr></thead><tbody>"
+    var rows=[50,250,500,1000,2500,5000].map(function(s){ return point(bl,s); });
+    $("cmpTable").innerHTML="<thead><tr><th>Per day</th><th>CPA</th><th>Orders</th><th>Units</th>"
+      +"<th>Revenue</th><th>Contribution</th><th>Profit</th><th>ROAS</th><th>Stock cash</th></tr></thead><tbody>"
       + rows.map(function(q){
-          return "<tr><td>"+money(q.spend)+"</td>"
-            +"<td>"+money2(q.cpa)+"</td>"
-            +"<td>"+q.orders.toFixed(1)+"</td>"
-            +"<td>"+money(q.revenue)+"</td>"
+          return "<tr><td>"+money(q.spend)+"</td><td>"+money2(q.cpa)+"</td><td>"+q.orders.toFixed(1)+"</td>"
+            +"<td>"+q.units.toFixed(1)+"</td><td>"+money(q.revenue)+"</td>"
             +"<td class='"+(q.contribution>0?"pos":"neg")+"'>"+money(q.contribution)+"</td>"
             +"<td class='"+(q.profit>0?"pos":"neg")+"'>"+money(q.profit)+"</td>"
             +"<td>"+(isFinite(q.roas)?q.roas.toFixed(2)+"×":"—")+"</td>"
             +"<td>"+money(q.stockCash)+"</td></tr>";
-        }).join("")
-      + "</tbody>";
+        }).join("")+"</tbody>";
 
-    var big=rows[rows.length-1], small=rows[0];
-    var cw=$("cashWarn");
-    if(big.profit>0 && big.stockCash > big.profit*90){
+    var big=rows[rows.length-1], small=rows[0], cw=$("cashWarn");
+    if(big.profit>0 && big.stockCash>big.profit*90){
       cw.hidden=false; cw.className="caveat";
-      $("cashWarnTxt").innerHTML="At "+money(big.spend)+" a day this rung earns "+money(big.profit)
-        +" of profit but needs <strong>"+money(big.stockCash)+"</strong> of stock paid for up front. "
-        +"That is "+Math.round(big.stockCash/big.profit)+" days of profit tied up in inventory. "
-        +"Growth at this rate is a funding decision before it is a marketing one.";
+      $("cashWarnTxt").innerHTML="At "+money(big.spend)+" a day this ladder earns "+money(big.profit)
+        +" of profit but needs <strong>"+money(big.stockCash)+"</strong> of stock paid up front — "
+        +Math.round(big.stockCash/big.profit)+" days of profit in inventory. Bundles made the profit better "
+        +"and the cash worse at the same time.";
     } else if(big.profit<=0 && small.profit>0){
       cw.hidden=false; cw.className="caveat";
-      $("cashWarnTxt").innerHTML="This rung makes money at "+money(small.spend)+" a day and loses it at "
+      $("cashWarnTxt").innerHTML="This ladder makes money at "+money(small.spend)+" a day and loses it at "
         +money(big.spend)+". The ceiling is the CPA climb, not the budget.";
-    } else { cw.hidden=true; }
+    } else cw.hidden=true;
 
-    var pk=peak(r);
-    $("cmpTag").textContent = pk.profit>0
-      ? "Best at "+money(pk.spend)+"/day"
-      : "No profitable spend";
+    /* A bundle ladder can push the profit peak past the top of the range. Say
+       so rather than reporting the edge of the chart as the optimum. */
+    var pk=peak(bl);
+    $("cmpTag").textContent = pk.profit<=0 ? "No profitable spend"
+      : pk.spend>=4900 ? "Still climbing past $5k/day"
+      : "Best at "+money(pk.spend)+"/day";
   }
 
-  function renderFloor(L){
+  function renderFloor(L, bl){
     var floor=minViablePrice(S.actualCpa);
-    var mf=$("mFloor");
     var viable=L.filter(function(r){ return r.viable; });
+    var mf=$("mFloor");
     mf.className="metric "+(viable.length?"good":"bad");
     $("vFloor").textContent=isFinite(floor)?money2(floor):"none";
     $("nFloor").textContent=isFinite(floor)
-      ? "To pay "+money2(S.actualCpa)+" per customer and still keep "+S.keepPct+"%."
-      : "Your variable rates plus the margin you want already exceed the whole order.";
-
+      ? "Single unit, to pay "+money2(S.actualCpa)+" and keep "+BAKED.keepPct+"%."
+      : "Variable rates plus the margin wanted already exceed the order.";
     var cheapest=viable.length?viable[viable.length-1]:null;
-    $("vBest").textContent=cheapest?cheapest.tier.label:"none";
+    $("vBest").textContent=cheapest?cheapest.tier.label:(bl&&bl.targetCpa>=S.actualCpa?"via bundles":"none");
     $("nBest").textContent=cheapest
       ? "At "+money2(cheapest.price)+", leaving "+money2(cheapest.cpaHeadroom||0)+" of CPA headroom."
-      : "No rung both clears the market and funds your CPA. Fix landed cost, fulfilment or price.";
-
+      : (bl&&bl.targetCpa>=S.actualCpa
+          ? "No single unit funds your CPA, but the blended ladder does at "+money2(bl.targetCpa)+"."
+          : "Nothing funds your CPA. Fix landed cost, fulfilment, price or the bundle mix.");
     $("vMult").textContent=(S.cogs>0&&isFinite(floor))?(floor/S.cogs).toFixed(2)+"×":"—";
     $("nMult").textContent=(S.cogs>0&&isFinite(floor))
       ? "Keystone is 2×, triple keystone 4×. Above 4× the supplier price is the problem."
       : "Enter a landed cost.";
-
-    var atFloor = isFinite(floor) ? floor/Math.max(S.actualCpa,0.01) : NaN;
-    $("vBeRoas").textContent=isFinite(atFloor)?atFloor.toFixed(2)+"×":"—";
-    $("nBeRoas").textContent=isFinite(atFloor)
-      ? "What the ads must return at the floor price to hold the margin."
-      : "";
+    var at=isFinite(floor)?floor/Math.max(S.actualCpa,0.01):NaN;
+    $("vBeRoas").textContent=isFinite(at)?at.toFixed(2)+"×":"—";
+    $("nBeRoas").textContent=isFinite(at)?"What the ads must return at the floor price to hold the margin.":"";
   }
 
   function render(){
     var L=ladder();
-    var c=CAT[S.category]||CAT.general;
-
-    $("feeEcho").textContent=blended().pct.toFixed(2)+"% + "+money2(blended().fixed);
-    $("cpaBench").textContent="benchmark $"+c.cpa[0]+"–"+c.cpa[1]+" USD";
-    $("elastEcho").textContent=S.elasticity===0?"off"
-      :"+"+S.elasticity+"% per doubling";
-    $("ladderTag").textContent="landed "+money2(S.cogs)+" · "+c.label;
-    $("ladderIntro").innerHTML="At "+money2(S.cogs)+" landed, these are the four prices. "
-      +"<strong>"+money2(S.actualCpa)+"</strong> is the CPA you said you pay, so a rung whose target CPA "
-      +"sits under that cannot fund its own traffic.";
+    $("feeEcho").textContent=blendedFee().pct.toFixed(2)+"% + "+money2(blendedFee().fixed);
+    $("ladderTag").textContent="landed "+money2(S.cogs)+" · CPA "+money2(S.actualCpa);
+    $("ladderIntro").innerHTML="At "+money2(S.cogs)+" landed, these are the four single-unit prices. "
+      +"<strong>"+money2(S.actualCpa)+"</strong> is the CPA you pay, so a rung whose target CPA sits under "
+      +"that cannot fund its own traffic on single sales alone — which is what the bundle ladder below fixes.";
 
     var dead=L.filter(function(r){ return !r.viable; });
     var lw=$("ladderWarn");
     if(dead.length===L.length){
       lw.hidden=false; lw.className="caveat bad";
-      var floor=minViablePrice(S.actualCpa);
-      $("ladderWarnTxt").innerHTML="<strong>No rung works at this cost base.</strong> "
-        + (isFinite(floor)
-            ? "To pay "+money2(S.actualCpa)+" a customer and keep "+S.keepPct+"%, you would have to charge "
-              +"<strong>"+money2(floor)+"</strong> — "+(S.cogs>0?(floor/S.cogs).toFixed(2)+"× the landed cost":"")+". "
-              +"Either the supplier price comes down, the fulfilment cost comes down, or the CPA does."
-            : "The variable rates alone exceed the order. Nothing can be priced out of this.");
+      var fl=minViablePrice(S.actualCpa);
+      $("ladderWarnTxt").innerHTML="<strong>No single-unit rung works at this cost base.</strong> "
+        +(isFinite(fl)?("A single would have to sell for <strong>"+money2(fl)+"</strong>"
+          +(S.cogs>0?" — "+(fl/S.cogs).toFixed(2)+"× the landed cost":"")
+          +". Check the bundle ladder before writing the product off: a multi-unit mix can fund a CPA a single cannot.")
+          :"The variable rates alone exceed the order. Nothing can be priced out of this.");
     } else if(dead.length){
       lw.hidden=false; lw.className="caveat";
-      $("ladderWarnTxt").innerHTML=dead.length+" of 4 rungs are out: "
-        + dead.map(function(r){
-            return r.tier.label+" ("+(r.unreachable?"impossible":r.aboveMarket?"above market":"CPA short")+")";
-          }).join(", ")+".";
-    } else { lw.hidden=true; }
+      $("ladderWarnTxt").innerHTML=dead.length+" of 4 single-unit rungs are out: "
+        + dead.map(function(r){ return r.tier.label+" ("+(r.unreachable?"impossible":"CPA short")+")"; }).join(", ")+".";
+    } else lw.hidden=true;
 
-    // keep the picked rung on something that exists
     if(!L.some(function(r){ return r.tier.key===S.pick && isFinite(r.price); })){
       var first=L.filter(function(r){ return isFinite(r.price); })[0];
       if(first) S.pick=first.tier.key;
     }
+    var picked=L.filter(function(r){ return r.tier.key===S.pick; })[0]||L[0];
+    var blends=L.map(function(r){ var rows=bundleLadder(r.price); return rows.length?blend(rows):null; });
+    var rows=bundleLadder(picked.price);
+    var bl=rows.length?blend(rows):null;
 
     renderLadder(L);
+    renderBundles(rows, picked);
+    renderBlend(bl, rows);
+    renderMixChart(rows);
     renderStacks(L);
     renderFeeChart(L);
-    renderScaleChart(L);
-    renderScenario(L);
-    renderFloor(L);
+    renderScaleChart(L, blends);
+    renderScenario(bl, picked);
+    renderFloor(L, bl);
   }
 
   /* ── wiring ── */
-  var NUMS=["cogs","ship","retPct","retLossPct","mixDom","mixAmex","mixIntl","extraPct",
-            "gstPct","actualCpa","marketPrice","keepPct","fixedPerDay","leadDays"];
-  NUMS.forEach(function(k){
-    $(k).addEventListener("input", function(){
-      S[k]=raw(k);
-      if(k==="actualCpa") cpaTouched=true;
-      render();
-    });
+  ["cogs","ship","shipPerExtra","retPct","retLossPct","actualCpa"].forEach(function(k){
+    $(k).addEventListener("input",function(){ S[k]=raw(k); render(); });
   });
-
-  $("plan").addEventListener("change", function(){ S.plan=$("plan").value; render(); });
-  $("category").addEventListener("change", function(){
-    S.category=$("category").value;
-    if(!cpaTouched){
-      var c=CAT[S.category];
-      S.actualCpa=Math.round((c.cpa[0]+c.cpa[1])/2);
-      $("actualCpa").value=S.actualCpa;
-    }
-    render();
+  [["d2",1],["d3",2],["d4",3]].forEach(function(pair){
+    $(pair[0]).addEventListener("input",function(){ S.disc[pair[1]]=raw(pair[0]); render(); });
   });
-
-  $("thirdParty").addEventListener("click", function(){
-    S.thirdParty=!S.thirdParty; syncInputs(); render();
+  [["m1",0],["m2",1],["m3",2],["m4",3]].forEach(function(pair){
+    $(pair[0]).addEventListener("input",function(){ S.mix[pair[1]]=raw(pair[0]); render(); });
   });
-  $("gstOn").addEventListener("click", function(){
-    S.gstOn=!S.gstOn; syncInputs(); render();
-  });
-
-  $("elasticity").addEventListener("input", function(){
-    S.elasticity=raw("elasticity"); render();
-  });
-  $("spend").addEventListener("input", function(){
-    S.spend=Math.round(sliderToSpend(raw("spend"))); render();
-  });
-  Array.prototype.forEach.call(document.querySelectorAll(".jbtn"), function(b){
-    b.addEventListener("click", function(){
+  $("plan").addEventListener("change",function(){ S.plan=$("plan").value; render(); });
+  $("spend").addEventListener("input",function(){ S.spend=Math.round(sliderToSpend(raw("spend"))); render(); });
+  Array.prototype.forEach.call(document.querySelectorAll(".jbtn"),function(b){
+    b.addEventListener("click",function(){
       S.spend=Number(b.getAttribute("data-s"));
-      $("spend").value=Math.round(spendToSlider(S.spend));
-      render();
+      $("spend").value=Math.round(spendToSlider(S.spend)); render();
     });
   });
-
-  $("themeBtn").addEventListener("click", function(){
+  $("themeBtn").addEventListener("click",function(){
     var e=document.documentElement;
     e.setAttribute("data-theme", e.getAttribute("data-theme")==="dark"?"light":"dark");
     try{ localStorage.setItem("offerTheme", e.getAttribute("data-theme")); }catch(err){}
-    render();   // charts read theme colours at paint time
+    render();
   });
-  try{
-    var saved=localStorage.getItem("offerTheme");
-    if(saved) document.documentElement.setAttribute("data-theme",saved);
-  }catch(err){}
+  try{ var saved=localStorage.getItem("offerTheme"); if(saved) document.documentElement.setAttribute("data-theme",saved); }catch(err){}
 
   S.spend=Math.round(sliderToSpend(Number($("spend").value)));
   syncInputs();

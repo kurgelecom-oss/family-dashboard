@@ -5,10 +5,15 @@ landed. Everything else is solved.
 
 ---
 
-## The one input
+## The two inputs
 
 **Landed cost per unit.** Not the invoice price. The invoice *plus* freight,
 duty, brokerage and inbound handling, ex-GST.
+
+**The CPA you actually pay.** Ad spend divided by orders. One order costs one
+CPA whether it holds one unit or four, which is the entire reason bundles
+work and the reason this number sits next to landed cost rather than buried
+in a settings panel.
 
 This matters more than any other field on the page. In global trade the
 product itself is about 45% of the total landed cost — freight 25%, duties
@@ -16,7 +21,30 @@ product itself is about 45% of the total landed cost — freight 25%, duties
 understate their cost base by 20–40%, which is more than most of them make.
 
 Everything else on the left is either a cost you already know (fulfilment,
-returns) or a rate you can look up (Shopify, GST).
+returns, the shipping increment per extra unit) or an offer you are designing
+(the bundle discounts and the take-rate mix).
+
+### What became a constant
+
+These were fields and are now baked in, because they are set once per store
+rather than per product. They live in the `BAKED` object at the top of the
+page's script, and editing them there is a one-line change:
+
+| Baked value | Default |
+|---|---|
+| GST rate | 10%, always on |
+| Card mix | 85% domestic / 5% Amex / 10% international |
+| Extra fee points (Afterpay, FX, chargebacks) | 0 |
+| Third-party gateway | off |
+| Margin to keep after ads | 20% |
+| Ecom overhead per day | $50 |
+| Supplier lead time | 45 days |
+| CPA climb per doubling of spend | 15% |
+
+One capability went with them: there is no market-price field any more, so no
+rung is flagged **Above market**. The page can tell you a price is
+unaffordable at your CPA; it can no longer tell you customers will not pay
+it. That judgement is now yours.
 
 ---
 
@@ -125,6 +153,89 @@ point more than a domestic one.
 
 ---
 
+## Bundles: buy 1, 2, 3, 4
+
+Bundle size is a **second axis**, not three more rungs on the quality ladder.
+The quality tier sets the single-unit price. The bundle axis multiplies it.
+
+### Why bundles work, precisely
+
+A four-pack against four separate orders saves about **$17** of shipping and
+flat transaction fees. It also saves **three CPAs — about $85**.
+
+So roughly **83% of a bundle's advantage is simply not buying the customer
+again.** Bundles are an acquisition-cost play. Almost everyone sells them as
+a fulfilment-efficiency play, which is the small half.
+
+Three costs do not multiply with units: the parcel base, the flat 30c, and
+the CPA. Everything else does.
+
+### Max discount
+
+The column that matters. For each bundle it solves the deepest discount that
+still beats selling a single unit:
+
+```
+targetCpa = P x A - C
+
+  A = (1 - returnRate - keep) / (1 + gst) - feeRate      (price slope)
+  C = cogs x units + ship + shipPerExtra x (units-1) + feeFixed
+
+so the price that ties the one-pack is P = (singleTarget + C) / A
+and the deepest discount is 1 - P / (units x unitPrice)
+```
+
+Bigger bundles carry deeper discounts, because `C` grows slower than the list
+price. On a typical set-up the room is roughly **36% on a 2-pack, 48% on a
+3-pack, 54% on a 4-pack** — far deeper than the 10/20/25% usually advertised.
+The page says so when you are leaving room unused, and warns when a discount
+is cut past the line and the bundle now earns less than a single sale.
+
+### The take-rate mix
+
+**This is the number nobody has and everything depends on.** CPA is charged
+per order, and every order is one rung of the ladder, so the only CPA worth
+judging ads against is the take-rate-weighted one.
+
+At an all-singles mix the blended target CPA equals the one-pack's exactly,
+and bundles change nothing at all. At 40% multi-unit it rises about 1.45x. At
+a heavy 80% multi mix it roughly doubles.
+
+The sensitivity chart plots blended target CPA against the share of orders
+taking two or more units, with a flat line at the CPA you actually pay. Where
+the curve crosses that line is the take rate this offer needs to work.
+
+### The trap
+
+**Bundles make the profit problem better and the cash problem worse, at the
+same time and for the same reason.** Four units per order is four times the
+stock. The scale panel and the stock-cash figure both run on blended units
+per order, so you can see the two moving together: a heavy multi mix can lift
+daily profit and simultaneously push required inventory cash past anything
+the business can fund.
+
+### Honest limits on the bundle model
+
+- **Same SKU only.** Buy-2/3/4 are multi-buys of one product. A mixed bundle
+  of different products needs a per-component landed cost and is not
+  modelled.
+- **The shipping increment is the input that flatters bundles.** Set it to
+  zero and every bundle looks better than it is. A 4-pack crosses weight
+  breaks and needs a bigger box. Moving it from $1.50 to $5.00 takes several
+  points off every bundle's max discount.
+- **CPA is flat across the mix.** That holds when the ad sells the entry
+  offer and the bundle is an on-site upsell. If you advertise the bundle
+  itself, conversion falls and CPA rises, and the model will flatter you.
+- **Partial returns are not modelled.** A customer keeping two of four is
+  common and the loss-per-return figure cannot express it.
+- **The discount that clears is set by your landed-cost share, not by what
+  competitors advertise.** On a low-COGS product a 3-pack at 30% off still
+  gains. On a high-COGS product the identical offer can push per-unit
+  contribution below the single. There is a test for exactly this in
+  `bundles.test.ts`.
+
+---
+
 ## The scaling panel
 
 Spend buys orders, but not at a flat price. The **CPA climb** slider is the
@@ -167,8 +278,9 @@ The page is a single static file and carries its own copy of the formulas so
 it works with no build step. The canonical, unit-tested statement of them is:
 
 - `app/lib/ecom/shopify-fees.ts` — the fee engine
-- `app/lib/ecom/tiers.ts` — the ladder, the floor, the scaling curve
-- `app/lib/ecom/tiers.test.ts` — 21 checks, run by `npm test`
+- `app/lib/ecom/tiers.ts` — the single-unit ladder, the floor, the scaling curve
+- `app/lib/ecom/bundles.ts` — the bundle rows, the discount solver, the blend
+- `app/lib/ecom/tiers.test.ts` and `bundles.test.ts` — 38 checks, run by `npm test`
 
 If a formula changes in one place, change it in both.
 
