@@ -3,6 +3,26 @@
 Live at `/offer.html`. You paste in your supplier's quote. Everything else on
 the page is solved from it.
 
+## Current Compare view
+
+Enter a delivered total for each 1–4-unit pack. Blank optional pack sizes are
+unavailable until a quote is entered. Select a pack, then compare its four
+margin tiers. The light/dark preference is saved in the browser.
+
+There is no separate shipping charge or manual bundle-discount calculator.
+If supplier freight stops at a warehouse, enter outbound postage under
+**Cost settings → Other order costs**, along with any uncovered fulfilment
+costs. Zero extras assumes the quote covers delivery to the customer.
+
+The browser uses generated modules in `public/offer-math/`. Both `npm test`
+and `npm run build` regenerate them from the canonical
+`app/lib/ecom/{shopify-fees,tiers,bundles}.ts` via
+`scripts/build-offer-model.mjs`. Edit those TypeScript sources, never the
+generated files. `public/offer-model.mjs` only adapts their results for display.
+
+The remaining sections document the underlying model, including blend and
+scale analyses that are not displayed in the simplified Compare view.
+
 ---
 
 ## The input: your supplier's quote
@@ -38,8 +58,10 @@ which is why it sits beside the quote rather than in a settings panel.
 
 ### What became a constant
 
-Set once per store, not per product. They live in the `BAKED` object at the
-top of the page's script; editing them there is a one-line change.
+Set once per store, not per product. The Compare view takes GST, return
+assumptions and retained margin from `DEFAULT_COSTS` in `tiers.ts`, and
+card mix from `DEFAULT_FEES` in `shopify-fees.ts`. The full model also
+supports the scaling assumptions below. There is no page-local `BAKED` copy.
 
 | Baked value | Default |
 |---|---|

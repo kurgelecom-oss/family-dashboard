@@ -4,11 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "sh scripts/clean-icloud-dupes.sh",
+    "prebuild": "sh scripts/clean-icloud-dupes.sh && node scripts/build-offer-model.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test app/components/spend-tier.test.ts app/lib/sunday/model.test.ts app/lib/sunday/surface-log.test.ts app/lib/os-activity-model.test.ts app/lib/family-db.test.ts app/lib/daily/model.test.ts app/lib/ecom/unit-economics.test.ts app/lib/ecom/tiers.test.ts app/lib/ecom/bundles.test.ts tests/offer-model.test.mjs"
+    "test": "node --test app/components/spend-tier.test.ts app/lib/sunday/model.test.ts app/lib/sunday/surface-log.test.ts app/lib/os-activity-model.test.ts app/lib/family-db.test.ts app/lib/daily/model.test.ts app/lib/ecom/unit-economics.test.ts app/lib/ecom/tiers.test.ts app/lib/ecom/bundles.test.ts tests/offer-model.test.mjs",
+    "pretest": "node scripts/build-offer-model.mjs"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",

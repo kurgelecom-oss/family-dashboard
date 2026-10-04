@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated from the linted canonical TypeScript before tests/builds.
+    "public/offer-math/**",
   ]),
 ]);
 

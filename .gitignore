@@ -60,3 +60,6 @@ deno.lock
 !/scripts/prepare-os-activity.mjs
 !/scripts/check-os-report.mjs
 !/scripts/prepare-daily-ticks.mjs
+
+# Compile canonical offer maths for the static page; contains no credentials.
+!/scripts/build-offer-model.mjs
