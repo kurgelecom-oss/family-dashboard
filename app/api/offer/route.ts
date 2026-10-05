@@ -128,7 +128,9 @@ export async function GET(request: NextRequest) {
       )
     : null;
 
-  const link = new URL("/offer.html", request.nextUrl.origin);
+  // Not request.nextUrl.origin: on Netlify that is the per-deploy hostname, which
+  // would pin the link to one build and to that build's own saved figures.
+  const link = new URL("https://kurgel-dashboard.netlify.app/offer.html");
   link.searchParams.set("costs", (costs as number[]).join(","));
   if (prices.length) link.searchParams.set("prices", prices.map((p) => p ?? "").join(","));
 
