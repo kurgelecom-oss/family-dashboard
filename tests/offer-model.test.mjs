@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {existsSync,readFileSync} from 'node:fs';
-import {calculateOffers,offerAtPrice,TIERS,ASSUMPTIONS} from '../public/offer-model.mjs';
+import {calculateOffers,offerAtPrice,mixForTake,blendOffers,takeNeeded,TIERS,ASSUMPTIONS} from '../public/offer-model.mjs';
 import {row,solvePrice} from '../app/lib/ecom/bundles.ts';
 import {DEFAULT_FEES} from '../app/lib/ecom/shopify-fees.ts';
 const close=(actual,expected)=>{
@@ -93,4 +93,21 @@ test('the Omega X ladder reads the way the rulebook says it should',()=>{
  // Launchpad row, 5 Oct 2026: landed 9.40 / 12.40 / 15.90, prices 49.95 / 79.95 / 99.95.
  const v=[[9.4,49.95],[12.4,79.95],[15.9,99.95]].map(([cost,price])=>offerAtPrice({cost,price}).verdict);
  assert.deepEqual(v,['bad','good','good']); // the single cannot buy a customer; the bundles can
+});
+test('the offer as a whole is the take-weighted order, and the take it names is the take it needs',()=>{
+ const units=[1,2,3],offers=[[8.9,39.99],[11.9,69.99],[15.4,89.99]].map(([cost,price])=>offerAtPrice({cost,price}));
+ assert.deepEqual(mixForTake([1],0.5),[1]);
+ assert.deepEqual(mixForTake(units,0),[1,0,0]);
+ close(mixForTake(units,0.55).reduce((a,b)=>a+b,0),1);
+ close(mixForTake(units,0.55)[1],0.4);close(mixForTake(units,0.55)[2],0.15); // CLEO's expected mix
+ const alone=blendOffers(offers,mixForTake(units,0));
+ close(alone.breakEvenCpa,offers[0].breakEvenCpa);assert.equal(alone.verdict,'bad'); // a $39.99 single cannot buy a $45 customer
+ for(const key of ['breakEvenCpa','targetCpa']){
+  const need=takeNeeded(units,offers,key);
+  assert.ok(need>0&&need<1);
+  close(blendOffers(offers,mixForTake(units,need))[key],CAP); // at that take the blend lands exactly on the planning CPA
+ }
+ assert.equal(blendOffers(offers,mixForTake(units,1)).verdict,'good');
+ assert.equal(takeNeeded([1,2],[offerAtPrice({cost:8.9,price:19.99}),offerAtPrice({cost:11.9,price:29.99})],'breakEvenCpa'),null);
+ assert.equal(takeNeeded([1],[offers[0]],'breakEvenCpa'),null);
 });

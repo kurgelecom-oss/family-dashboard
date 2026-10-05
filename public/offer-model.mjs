@@ -42,3 +42,43 @@ export function offerAtPrice({price,...opts}) {
   const ctx=setup(opts);
   return build(ctx,{key:'custom',label:'Your price'},marginAt(price,1,ctx.sc));
 }
+
+/* ── The offer as a whole ────────────────────────────────────────────────────
+   One order costs one CPA whichever pack it holds, so an offer is judged on the
+   take-weighted average order, not pack by pack. A cheap single is allowed to
+   be unable to buy a customer alone; the bundles beside it are what pay. */
+
+// Relative pull of the 2-, 3- and 4-packs among buyers who take a bundle.
+// 40:15 is CLEO's expected mix; the 4-pack's 10 extends it and is a guess.
+const BUNDLE_SHAPE=[0,40,15,10];
+
+/** Share of orders per pack. `units` lists the pack sizes on sale; `take` is
+    the share of buyers (0 to 1) who pick any bundle over the single. */
+export function mixForTake(units,take){
+  const pull=units.map(u=>u>1?BUNDLE_SHAPE[u-1]:0),total=pull.reduce((a,b)=>a+b,0);
+  if(!total)return units.map(()=>1/units.length);
+  const s=units.includes(1)?Math.max(0,Math.min(1,take)):1;
+  return units.map((u,i)=>u===1?1-s:s*pull[i]/total);
+}
+
+/** Blend priced packs (offerAtPrice results) by their share of orders. */
+export function blendOffers(offers,weights,cpa=TRAFFIC_FLOOR_CPA){
+  const sum=k=>offers.reduce((a,o,i)=>a+weights[i]*o[k],0);
+  const aov=sum('price'),net=sum('net'),targetCpa=sum('targetCpa'),breakEvenCpa=sum('breakEvenCpa');
+  const profit=breakEvenCpa-cpa;
+  return {aov,net,cost:sum('cost'),fee:sum('fee'),targetCpa,breakEvenCpa,profit,margin:profit/net,
+    verdict:targetCpa>=cpa?'good':breakEvenCpa>=cpa?'tight':'bad'};
+}
+
+/** Bundle take (0 to 1) at which the blended `key` ('targetCpa' or
+    'breakEvenCpa') reaches `cpa`. 0 = the single already gets there; null =
+    not reachable even if every buyer takes a bundle, or no single/bundle to mix. */
+export function takeNeeded(units,offers,key,cpa=TRAFFIC_FLOOR_CPA){
+  const i1=units.indexOf(1);
+  if(i1<0||units.length<2)return null;
+  const single=offers[i1][key],w=mixForTake(units,1);
+  const bundles=offers.reduce((a,o,i)=>a+w[i]*o[key],0);
+  if(single>=cpa)return 0;
+  if(bundles<cpa)return null;
+  return (cpa-single)/(bundles-single);
+}

@@ -30,6 +30,19 @@ current price (`maxCostAt`), the first bigger pack that passes at the same
 margin, and the real CPA needed. The last line is the lowest price that
 passes both tests, graded with `marginAt`.
 
+### The offer as a whole
+
+The top section judges everything on sale together. One ad buys one customer
+and the customer picks a pack, so the offer is graded on the take-weighted
+average order (`blendOffers`), not pack by pack. You type a price per pack
+(the same prices as each pack's Your price row) and set **Buyers who take a
+bundle**; `mixForTake` spreads that share across the bundles 40:15:10. The
+scale shows what a customer may cost before the offer stops keeping 20% and
+before it loses money, with the planning CPA marked. `takeNeeded` gives the
+bundle take at which the blend reaches the planning CPA. A single priced more
+than 30% under its own floor is treated as an entry price: the page points at
+this section instead of telling you to raise it.
+
 ### Your price row
 
 The four margin rows solve the price. The fifth row runs the same maths the
