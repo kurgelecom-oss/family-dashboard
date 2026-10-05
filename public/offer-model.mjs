@@ -2,7 +2,7 @@
 // TypeScript before tests and production builds; financial formulas live there.
 import {DEFAULT_FEES} from './offer-math/shopify-fees.mjs';
 import {TIERS,DEFAULT_COSTS,TRAFFIC_FLOOR_CPA} from './offer-math/tiers.mjs';
-import {ladder,cpaFundedPrice} from './offer-math/bundles.mjs';
+import {ladder,cpaFundedPrice,maxCostAt,marginAt} from './offer-math/bundles.mjs';
 export {TIERS};
 export const ASSUMPTIONS={gstPct:DEFAULT_COSTS.gstPct,keepPct:DEFAULT_COSTS.keepPct,
   retPct:DEFAULT_COSTS.retPct,retLossPct:DEFAULT_COSTS.retLossPct,floorCpa:TRAFFIC_FLOOR_CPA};
@@ -16,7 +16,7 @@ export function calculateOffers({cost,cpa=TRAFFIC_FLOOR_CPA,plan=DEFAULT_FEES.pl
   // never be multiplied by its unit count, or charged delivery a second time.
   const sc={totals:[cost],extraPerOrder,retPct,retLossPct,
     gstPct:DEFAULT_COSTS.gstPct,keepPct:DEFAULT_COSTS.keepPct,fees:{...DEFAULT_FEES,plan}};
-  const floor=cpaFundedPrice(1,sc,cpa);
+  const floor=cpaFundedPrice(1,sc,cpa),floorMargin=marginAt(floor,1,sc);
   return TIERS.map(tier=>{
     const r=ladder(tier.before,sc,cpa)[0];
     const profit=r.before-cpa;
@@ -24,6 +24,10 @@ export function calculateOffers({cost,cpa=TRAFFIC_FLOOR_CPA,plan=DEFAULT_FEES.pl
     return {...tier,...r,net:r.netRev,floor,profit,margin:profit/r.netRev,
       headroom:r.targetCpa-cpa,kept,keptMargin:kept/r.netRev,
       roasNeeded:r.targetCpa>0?r.price/r.targetCpa:Infinity,
-      fundsCpa:!r.unreachable&&r.targetCpa>=cpa};
+      fundsCpa:!r.unreachable&&r.targetCpa>=cpa,
+      tierPct:Math.round(tier.before*100),floorMargin,maxCost:maxCostAt(r.price,sc,cpa),
+      // good: funds the CPA and keeps the margin. tight: still profitable at
+      // that CPA but keeps less. bad: every order loses money at that CPA.
+      verdict:r.unreachable?'bad':r.targetCpa>=cpa?'good':r.breakEvenCpa>=cpa?'tight':'bad'};
   });
 }

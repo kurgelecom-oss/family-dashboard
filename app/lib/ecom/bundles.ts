@@ -113,6 +113,22 @@ export function cpaFundedPrice(units:number, sc:SupplierCosts, cpa:number){
  return (costFor(units, sc) + Math.max(cpa,0))/A;
 }
 
+/** Highest landed pack total at which `price` still funds `cpa` and keeps the
+    margin. Zero or below means no supplier price rescues that retail price:
+    even free stock leaves it short. */
+export function maxCostAt(price:number, sc:SupplierCosts, cpa:number){
+ return price*cpaSlope(sc) - Math.max(cpa,0) - Math.max(sc.extraPerOrder,0) - blendedFee(sc.fees).fixed;
+}
+
+/** Before-ads margin a pack earns at ANY retail price, as a share of net
+    revenue. The tiers solve price from margin; this is the reverse, for
+    grading a price that came from somewhere else (the traffic floor). */
+export function marginAt(price:number, units:number, sc:SupplierCosts){
+ const net = price/(1 + clamp(sc.gstPct,0,100)/100);
+ if(!(net > 0)) return NaN;
+ return (price*slope(0, sc) - costFor(units, sc))/net;
+}
+
 export type Row = {
  units:number;
  /** Solved retail price for this pack, GST inclusive. */

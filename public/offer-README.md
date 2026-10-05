@@ -14,6 +14,22 @@ bundle-discount calculator. Enter the fully delivered total for each pack.
 The page uses the canonical defaults for Shopify Basic, return assumptions,
 GST, and retained margin; additional per-order costs default to zero.
 
+### The verdict and the fix panel
+
+Every row is graded on dollars against `TRAFFIC_FLOOR_CPA`, not on its
+margin percentage:
+
+- **Green · works** — target CPA covers the floor, so it keeps 20% or more.
+- **Amber · tight** — break-even CPA covers the floor but target CPA does
+  not: profitable, keeps under 20%.
+- **Red · loses money** — break-even CPA is under the floor.
+
+**How to move the figures** solves the fixes for the selected row: the retail
+price that passes (`cpaFundedPrice`), the landed cost that passes at the
+current price (`maxCostAt`), the first bigger pack that passes at the same
+margin, and the real CPA needed. The last line is the lowest price that
+passes both tests, graded with `marginAt`, and warns above 4x cost.
+
 The browser uses generated modules in `public/offer-math/`. Both `npm test`
 and `npm run build` regenerate them from the canonical
 `app/lib/ecom/{shopify-fees,tiers,bundles}.ts` via

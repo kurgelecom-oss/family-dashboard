@@ -58,3 +58,15 @@ test('CPA is solved from landed cost alone and judged against the traffic floor'
  assert.equal(calculateOffers({cost:17.7})[0].fundsCpa,true);
  assert.ok(poor.targetCpa<3);
 });
+test('verdict grades each offer on dollars, and the fixes it names really fix it',()=>{
+ const rows=calculateOffers({cost:13.9});
+ assert.deepEqual(rows.map(r=>r.verdict),['good','bad','bad','bad']);
+ assert.deepEqual(calculateOffers({cost:12}).map(r=>r.verdict),['tight','bad','bad','bad']);
+ for(const r of rows){
+  // The floor price funds exactly the $20 CPA while keeping 20%.
+  close(calculateOffers({cost:13.9,cpa:20})[0].floor,r.floor);
+  close(r.floorMargin,0.2+20/r.floor);
+  // At maxCost the same retail price funds exactly the $20 CPA.
+  if(r.maxCost>0){const fixed=calculateOffers({cost:r.maxCost}).find(x=>Math.abs(x.floor-r.price)<1e-6);assert.ok(fixed,'price equals the floor at maxCost');}
+ }
+});

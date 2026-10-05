@@ -40,6 +40,15 @@ export function cpaFundedPrice(units, sc, cpa) {
         return Infinity;
     return (costFor(units, sc) + Math.max(cpa, 0)) / A;
 }
+export function maxCostAt(price, sc, cpa) {
+    return price * cpaSlope(sc) - Math.max(cpa, 0) - Math.max(sc.extraPerOrder, 0) - blendedFee(sc.fees).fixed;
+}
+export function marginAt(price, units, sc) {
+    const net = price / (1 + clamp(sc.gstPct, 0, 100) / 100);
+    if (!(net > 0))
+        return NaN;
+    return (price * slope(0, sc) - costFor(units, sc)) / net;
+}
 export function row(target, units, sc, singlePrice, singleTarget, actualCpa = 0) {
     const u = Math.max(Math.round(units), 1);
     const g = clamp(sc.gstPct, 0, 100) / 100;
