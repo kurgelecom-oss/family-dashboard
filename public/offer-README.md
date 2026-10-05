@@ -93,7 +93,8 @@ checked against one store-level constant, `TRAFFIC_FLOOR_CPA` in `tiers.ts`:
 $45, the rulebook's planning CPA (`gates.json` → `direct_path.planning_cpa_usd`).
 The rulebook is the authority; a test fails on tk's Mac if the two drift.
 
-Everything is USD, and the payment fee is the Launchpad's flat 2.9% + 30c.
+Everything is USD, and the payment fee is the Launchpad's flat 2.9% + 30c. No refund
+allowance and no GST are deducted (tk, 5 Oct 2026).
 
 **For agents:** `GET /api/offer?costs=9.4,12.4,15.9&prices=49.95,79.95,99.95`
 returns the same grading as JSON, the three take mixes, and a link that opens

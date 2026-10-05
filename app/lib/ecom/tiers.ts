@@ -51,7 +51,9 @@ export type Costs = {
 
 export const DEFAULT_COSTS: Costs = {
  // gstPct 0: the store operates without GST (tk, 5 Oct 2026).
- cogs:12, ship:7, retPct:8, retLossPct:25, gstPct:0, fees:DEFAULT_FEES, keepPct:20,
+ // retPct 0: no refund allowance is deducted (tk, 5 Oct 2026). The model still
+ // supports one; it is simply off by default.
+ cogs:12, ship:7, retPct:0, retLossPct:25, gstPct:0, fees:DEFAULT_FEES, keepPct:20,
 };
 
 /* What a cold Meta purchase is planned to cost, in USD, whatever the product.

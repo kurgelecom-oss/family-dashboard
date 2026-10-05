@@ -63,16 +63,16 @@ test('CPA is solved from landed cost alone and judged against the planning CPA',
  assert.ok(excellent.breakEvenCpa>excellent.targetCpa);
  close(excellent.roasNeeded,excellent.price/excellent.targetCpa);
  assert.equal(excellent.fundsCpa,false); // a $7.40 pack cannot buy a $45 customer at any margin row
- assert.equal(calculateOffers({cost:30})[0].fundsCpa,true);
+ assert.equal(calculateOffers({cost:33})[0].fundsCpa,true);
  assert.ok(poor.targetCpa<3);
 });
 test('verdict grades each offer on dollars, and the fixes it names really fix it',()=>{
- const rows=calculateOffers({cost:30});
+ const rows=calculateOffers({cost:33});
  assert.deepEqual(rows.map(r=>r.verdict),['good','bad','bad','bad']);
  assert.deepEqual(calculateOffers({cost:25}).map(r=>r.verdict),['tight','bad','bad','bad']);
  for(const r of rows){
   // The floor price funds exactly the planning CPA while keeping 20%.
-  close(calculateOffers({cost:30,cpa:CAP})[0].floor,r.floor);
+  close(calculateOffers({cost:33,cpa:CAP})[0].floor,r.floor);
   close(r.floorMargin,0.2+CAP/r.floor);
   // At maxCost the same retail price funds exactly the planning CPA.
   if(r.maxCost>0){const fixed=calculateOffers({cost:r.maxCost}).find(x=>Math.abs(x.floor-r.price)<1e-6);assert.ok(fixed,'price equals the floor at maxCost');}

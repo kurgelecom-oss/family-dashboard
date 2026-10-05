@@ -142,7 +142,7 @@ export async function GET(request: NextRequest) {
         planning_cpa: cap,
         planning_cpa_source: "mission-control-web/src/lib/radar/gates.json direct_path.planning_cpa_usd",
         keep_pct_after_ads: ASSUMPTIONS.keepPct,
-        returns: `${ASSUMPTIONS.retPct}% of orders, each costing ${ASSUMPTIONS.retLossPct}% of its value`,
+        returns: "none deducted",
         payment_fee: "2.9% + $0.30",
         gst: "none",
       },
