@@ -16,6 +16,20 @@ async function json<T>(url:string,headers?:HeadersInit):Promise<T> {
  const r=await fetch(url,{cache:'no-store',headers,signal:AbortSignal.timeout(12000)});
  if(!r.ok)throw new Error('Source unavailable'); return r.json();
 }
+// Quran OS answers each snapshot with about five pooled database queries, and the always-on screen
+// asked for one every minute: ~130 MB a day of Supabase egress against a 5 GB monthly cap (tk 5 Oct
+// 2026). Held for 10 minutes per warm function instance, so a cold start still asks once. A failed
+// read is never held.
+type QuranSnapshot={members:{id:string;sessions:QuranSession[]}[]};
+let quranHeld:{at:number;value:Promise<QuranSnapshot>}|undefined;
+function quranSnapshot(){
+ if(!quranHeld||Date.now()-quranHeld.at>600_000){
+  const held={at:Date.now(),value:json<QuranSnapshot>(`${QURAN}/api/snapshot?days=30`,{'x-qos-token':process.env.QURAN_OS_TOKEN||''})};
+  held.value.catch(()=>{if(quranHeld===held)quranHeld=undefined;});
+  quranHeld=held;
+ }
+ return quranHeld.value;
+}
 type Prop={date?:{start?:string}|null;select?:{name?:string}|null;title?:{plain_text:string}[];rich_text?:{plain_text:string}[];number?:number;checkbox?:boolean;people?:{name?:string}[]};
 function prop(row:NotionPage,k:string):Prop {return (row.properties?.[k]??{}) as Prop;}
 function label(row:NotionPage,k:string){const p=prop(row,k);return p.select?.name??(p.title??p.rich_text??[]).map(x=>x.plain_text).join('');}
@@ -43,7 +57,7 @@ async function completions(start:string,through:string) {
 export async function buildWeeklyReport(day=civilDay()):Promise<WeeklyReport> {
  const today=civilDay(),week=weekFor(day),through=week.end<today?week.end:today,db=familyDb();
  const jobs=await Promise.allSettled([
-  json<{members:{id:string;sessions:QuranSession[]}[]}>(`${QURAN}/api/snapshot?days=30`,{'x-qos-token':process.env.QURAN_OS_TOKEN||''}),
+  quranSnapshot(),
   fetchSource(PRODUCT_SURFACE_SOURCE,'Nihal product surface log'),
   fetchSource('3a3a6e65-2cb3-40ba-810a-b19406e8b085','Origins'),
   fetchSource('3f93b40d-6cdc-44dc-9197-779758f9150c','Homeschool work log'),
@@ -95,7 +109,7 @@ export async function buildWeeklyReport(day=civilDay()):Promise<WeeklyReport> {
   }if(perfect===5)points+=3;schoolScore=Math.round(points/WEEKLY_MAX*100);
  }
  addSource('habits','Ansar OS score',schoolScore!==null,'Canonical weekday score out of 55, including the perfect-week bonus. Weekend stretch points are excluded.', 'https://ansar-habits-tracker.netlify.app');
- addSource('quran','Quran OS',q.status==='fulfilled','Finished sessions only; daily attendance is counted once per person. Refreshes every minute.',QURAN);
+ addSource('quran','Quran OS',q.status==='fulfilled','Finished sessions only; daily attendance is counted once per person. Refreshes every 10 minutes.',QURAN);
  addSource('ads','custm Meta ads',ad.status==='fulfilled','Account leads and spend for these exact dates. Leads are enquiries, not confirmed customers; today is still updating.',`${CREATIVE}/mission-control`);
  function metric(member:MemberId,key:MetricKey,labelText:string,auto:number|null,detail:string,href?:string,unit?:string):Metric {
   const m=manual.find(r=>r.member===member&&r.metric===key);const manualValue=m?.value??null;
