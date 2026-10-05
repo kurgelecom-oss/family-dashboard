@@ -28,7 +28,7 @@ margin percentage:
 price that passes (`cpaFundedPrice`), the landed cost that passes at the
 current price (`maxCostAt`), the first bigger pack that passes at the same
 margin, and the real CPA needed. The last line is the lowest price that
-passes both tests, graded with `marginAt`, and warns above 4x cost.
+passes both tests, graded with `marginAt`.
 
 ### Your price row
 
@@ -89,9 +89,16 @@ pick-and-pack, insert cards.
 and tier you select: **Target CPA** (the cost cap to give Meta, keeps 20%) and
 **Break-even CPA** (the kill line). Landed cost decides what you can *afford*
 to pay for a customer; it cannot decide what Meta *charges*. So every row is
-checked against one store-level constant, `TRAFFIC_FLOOR_CPA` in `tiers.ts`
-($20, matching Launchpad's test target CPA). Replace that constant with the
-observed CPA once a test has about 30 orders.
+checked against one store-level constant, `TRAFFIC_FLOOR_CPA` in `tiers.ts`:
+$45, the rulebook's planning CPA (`gates.json` → `direct_path.planning_cpa_usd`).
+The rulebook is the authority; a test fails on tk's Mac if the two drift.
+
+Everything is USD, and the payment fee is the Launchpad's flat 2.9% + 30c.
+
+**For agents:** `GET /api/offer?costs=9.4,12.4,15.9&prices=49.95,79.95,99.95`
+returns the same grading as JSON, the three take mixes, and a link that opens
+this page on those figures (`/offer.html?costs=…&prices=…`). Who uses it and
+when: `mission-control/docs/OFFER-ENGINE.md`.
 
 ### What became a constant
 

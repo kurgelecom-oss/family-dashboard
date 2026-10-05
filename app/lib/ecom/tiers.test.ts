@@ -35,17 +35,21 @@ test('card mix is normalised, so UI drift cannot scale the fee',()=>{
  assert.ok(isFinite(blended({...DEFAULT_FEES, mix:{domestic:0,amex:0,international:0}}).pct));
 });
 
+/* The default is a flat rate; these two exercise the AU rate card under it. */
+const CARD: FeeConfig = {...DEFAULT_FEES, flat:undefined};
+
 test('an international-heavy mix and a third-party gateway both cost more',()=>{
- const base = blended(DEFAULT_FEES).pct;
- const intl = blended({...DEFAULT_FEES, mix:{domestic:0.2,amex:0.05,international:0.75}}).pct;
- const gw: FeeConfig = {...DEFAULT_FEES, thirdParty:true};
+ const base = blended(CARD).pct;
+ const intl = blended({...CARD, mix:{domestic:0.2,amex:0.05,international:0.75}}).pct;
+ const gw: FeeConfig = {...CARD, thirdParty:true};
  assert.ok(intl > base);
  near(blended(gw).pct - base, AU_RATES.basic.thirdPartySurchargePct);
 });
 
 test('a better plan is cheaper at the same order value',()=>{
- const basic = feeOn(80,{...DEFAULT_FEES,plan:'basic'});
- const adv   = feeOn(80,{...DEFAULT_FEES,plan:'advanced'});
+ const basic = feeOn(80,{...CARD,plan:'basic'});
+ const adv   = feeOn(80,{...CARD,plan:'advanced'});
+ near(feeOn(80, DEFAULT_FEES), 80*0.029 + 0.30); // the default: the Launchpad's flat rate
  assert.ok(adv < basic);
 });
 

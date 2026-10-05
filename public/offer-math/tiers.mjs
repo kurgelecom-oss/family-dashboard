@@ -9,7 +9,7 @@ export const TIERS = [
 export const DEFAULT_COSTS = {
     cogs: 12, ship: 7, retPct: 8, retLossPct: 25, gstPct: 0, fees: DEFAULT_FEES, keepPct: 20,
 };
-export const TRAFFIC_FLOOR_CPA = 20;
+export const TRAFFIC_FLOOR_CPA = 45;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 export const returnRate = (c) => (clamp(c.retPct, 0, 100) / 100) * (clamp(c.retLossPct, 0, 100) / 100);
 export function priceFor(target, c = DEFAULT_COSTS) {

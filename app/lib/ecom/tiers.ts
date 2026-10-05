@@ -54,13 +54,14 @@ export const DEFAULT_COSTS: Costs = {
  cogs:12, ship:7, retPct:8, retLossPct:25, gstPct:0, fees:DEFAULT_FEES, keepPct:20,
 };
 
-/* What a cold Meta purchase costs in dollars, whatever the product. Landed
-   cost sets the CPA an offer can AFFORD; it cannot set the CPA the auction
-   CHARGES, so the affordable figure needs one outside number to be judged
-   against. A store-level constant, matched to Launchpad's test target CPA.
-   Known limit: it is a placeholder until a test has ~30 orders - replace it
-   with the observed CPA then. */
-export const TRAFFIC_FLOOR_CPA = 20;
+/* What a cold Meta purchase is planned to cost, in USD, whatever the product.
+   Landed cost sets the CPA an offer can AFFORD; it cannot set the CPA the
+   auction CHARGES, so the affordable figure needs one outside number to be
+   judged against. That number is the rulebook's planning CPA:
+   mission-control-web/src/lib/radar/gates.json -> direct_path.planning_cpa_usd.
+   The rulebook is the authority. If it changes, change this to match;
+   tests/offer-model.test.mjs fails when the two drift on this Mac. */
+export const TRAFFIC_FLOOR_CPA = 45;
 
 const clamp = (v:number,lo:number,hi:number)=>Math.max(lo,Math.min(hi,v));
 

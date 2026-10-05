@@ -51,13 +51,13 @@ body[data-explain=on] [data-x]{cursor:help;outline:1px dashed color-mix(in srgb,
 
 <div class="compare-workspace"><section aria-label="Price comparison"><div class="pack-selector" role="group" aria-label="Pack size to compare"><button type="button" data-pack="1" aria-pressed="true">1 unit</button><button type="button" data-pack="2" aria-pressed="false">2 units</button><button type="button" data-pack="3" aria-pressed="false">3 units</button><button type="button" data-pack="4" aria-pressed="false">4 units</button></div><div class="table-heading"><h2 id="tableHeading">Single-unit pricing</h2></div><div class="table-scroll" tabindex="0" role="region" aria-label="Compare margin tiers"><table class="price-table"><thead><tr><th scope="col">Margin</th><th scope="col">COGS</th><th scope="col">Retail price</th><th scope="col">Target CPA</th><th scope="col">Break-even CPA</th><th scope="col">Verdict</th></tr></thead><tbody><tr data-row="0" data-selected="true"><td><button class="tier-selector" data-tier="0" aria-pressed="true"><span class="radio" aria-hidden="true"></span><span class="tier-pct">65%</span><span class="tier-word">Excellent</span></button></td><td class="target-cell" data-cell="cogs">—</td><td class="price-cell" data-cell="price">—</td><td class="target-cell" data-cell="target">—</td><td class="target-cell muted" data-cell="breakeven">—</td><td><span class="table-state" data-cell="state">—</span></td></tr><tr data-row="1" data-selected="false"><td><button class="tier-selector" data-tier="1" aria-pressed="false"><span class="radio" aria-hidden="true"></span><span class="tier-pct">55%</span><span class="tier-word">Good</span></button></td><td class="target-cell" data-cell="cogs">—</td><td class="price-cell" data-cell="price">—</td><td class="target-cell" data-cell="target">—</td><td class="target-cell muted" data-cell="breakeven">—</td><td><span class="table-state" data-cell="state">—</span></td></tr><tr data-row="2" data-selected="false"><td><button class="tier-selector" data-tier="2" aria-pressed="false"><span class="radio" aria-hidden="true"></span><span class="tier-pct">45%</span><span class="tier-word">Average</span></button></td><td class="target-cell" data-cell="cogs">—</td><td class="price-cell" data-cell="price">—</td><td class="target-cell" data-cell="target">—</td><td class="target-cell muted" data-cell="breakeven">—</td><td><span class="table-state" data-cell="state">—</span></td></tr><tr data-row="3" data-selected="false"><td><button class="tier-selector" data-tier="3" aria-pressed="false"><span class="radio" aria-hidden="true"></span><span class="tier-pct">35%</span><span class="tier-word">Poor</span></button></td><td class="target-cell" data-cell="cogs">—</td><td class="price-cell" data-cell="price">—</td><td class="target-cell" data-cell="target">—</td><td class="target-cell muted" data-cell="breakeven">—</td><td><span class="table-state" data-cell="state">—</span></td></tr><tr data-row="4" data-selected="false"><td><button class="tier-selector" data-tier="4" aria-pressed="false"><span class="radio" aria-hidden="true"></span><span class="tier-pct">—</span><span class="tier-word">Your price</span></button></td><td class="target-cell" data-cell="cogs">—</td><td class="price-cell" data-cell="price"><label class="sr-only" for="customPrice">Your retail price for this pack</label><div class="money-input price-input"><span aria-hidden="true">$</span><input id="customPrice" type="number" min="0" max="100000" step="0.01" inputmode="decimal" placeholder="Try a price"></div></td><td class="target-cell" data-cell="target">—</td><td class="target-cell muted" data-cell="breakeven">—</td><td><span class="table-state" data-cell="state">—</span></td></tr></tbody></table></div><ul class="legend" id="legend"><li data-state="good"><b>Green · works.</b> <span></span></li><li data-state="tight"><b>Amber · tight.</b> <span></span></li><li data-state="bad"><b>Red · loses money.</b> <span></span></li></ul><p class="table-note" id="targetNote"></p><section class="fix-panel" id="fixPanel" aria-labelledby="fixTitle" data-state="good"><p class="fix-kicker">How to move the figures</p><h2 id="fixTitle">—</h2><p id="fixLead">—</p><ol id="fixList"></ol><p class="fix-right" id="rightPrice">—</p></section></section>
 <aside class="selection-aside" aria-label="Selected offer"><p class="aside-label" id="selectedLabel">Selected offer / 1 unit</p><div class="selection-title"><h2 id="tierName">Excellent</h2></div><div class="selection-price num" id="selectedPrice">—</div><p class="price-caption" id="unitPrice">Retail price per unit</p><span class="badge" id="offerState" data-state="good">—</span><dl class="data-list"><div><dt>COGS · landed pack cost</dt><dd id="cogs">—</dd></div><div><dt>Target CPA · your cost cap</dt><dd id="targetCpa">—</dd></div><div><dt>Break-even CPA · kill above</dt><dd id="breakEven">—</dd></div><div><dt>ROAS needed</dt><dd id="roas">—</dd></div><div><dt id="profitLabel">Kept per order</dt><dd id="profit">—</dd></div></dl><details class="price-breakdown"><summary>Price breakdown</summary><div class="details-body"><dl class="data-list"><div><dt>COGS · landed pack cost</dt><dd id="landedTotal">—</dd></div><div><dt>Shopify fees</dt><dd id="fees">—</dd></div><div><dt>Expected returns</dt><dd id="returns">—</dd></div><div><dt>Advertising at target CPA</dt><dd id="adTotal">—</dd></div><div class="total"><dt>Kept</dt><dd id="profitTotal">—</dd></div></dl></div></details><p class="mini-note">A modelled price, ready to validate with your market.</p></aside></div></main>
-<footer class="page-footer"><span>Offer Engine</span><span>AUD · Costs include delivery</span></footer><p class="sr-only" id="status" role="status" aria-live="polite" aria-atomic="true"></p>
+<footer class="page-footer"><span>Offer Engine</span><span>USD · Costs include delivery</span></footer><p class="sr-only" id="status" role="status" aria-live="polite" aria-atomic="true"></p>
 <div class="xspot" id="xspot" hidden aria-hidden="true"></div>
 <aside class="xp" id="xp" hidden aria-live="polite" aria-label="Number explainer"><button class="xp-close" id="xpClose" type="button" aria-label="Close explainer">×</button><p class="xp-kicker">Explainer</p><h3 id="xpTitle"></h3><div class="xp-value num" id="xpValue"></div><dl><dt>What it is</dt><dd id="xpWhat"></dd><dt>Why it matters</dt><dd id="xpWhy"></dd><dt>If it were higher</dt><dd id="xpHigher"></dd><dt>If it were lower</dt><dd id="xpLower"></dd></dl><div class="xp-action" id="xpAction" data-state="good"><b id="xpDo"></b><span id="xpDoText"></span></div></aside>
 <script type="module">
 import {calculateOffers,offerAtPrice,ASSUMPTIONS} from './offer-model.mjs';
 const $=id=>document.getElementById(id), all=s=>[...document.querySelectorAll(s)];
-const format=new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'});
+const format=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'});
 const money=n=>Number.isFinite(n)?format.format(n):'—';
 // prices: the retail price typed for each pack size, kept as typed.
 const state={pack:1,tier:0,prices:['','','','']};
@@ -127,8 +127,8 @@ function render(announce=false){
   fixes.push('**Or get your real CPA to '+money(r.targetCpa)+' or less** with better ads and a better page.'+(r.verdict==='bad'?' Under '+money(r.breakEvenCpa)+' it at least stops losing money.':''));
  }
  $('fixList').replaceChildren(...fixes.map(t=>rich(document.createElement('li'),t)));$('fixList').hidden=!fixes.length;
- const multiple=r.floor/cost,warn=multiple>4;$('rightPrice').dataset.warn=String(warn);
- if(Number.isFinite(r.floor)&&cost>0){rich($('rightPrice'),'Lowest price that passes both tests for '+packName+': **'+money(r.floor)+'** · '+Math.round(r.floorMargin*100)+'% margin · '+multiple.toFixed(1)+'× cost.');if(warn){const em=document.createElement('em');em.textContent=' Above 4× cost, check customers will actually pay it.';$('rightPrice').append(em);}}
+ const multiple=r.floor/cost;
+ if(Number.isFinite(r.floor)&&cost>0){rich($('rightPrice'),'Lowest price that passes both tests for '+packName+': **'+money(r.floor)+'** · '+Math.round(r.floorMargin*100)+'% margin · '+multiple.toFixed(1)+'× cost.');}
  else $('rightPrice').textContent='Enter a landed cost to see the lowest price that passes both tests.';
  if(xCur)showX(xCur);
  if(announce){clearTimeout(announcementTimer);announcementTimer=setTimeout(()=>{$('status').textContent=packName+'. '+r.tierPct+'% margin. Retail price '+money(r.price)+'. Target CPA '+money(r.targetCpa)+'. '+$('offerState').textContent+'.';},300);}
@@ -168,9 +168,9 @@ function explain(key,el){
   price:{title:'Retail price',value:money(r.price),
    what:r.key==='custom'?'The price you typed for '+packName+'. The margin beside it is worked out from this price.':'What the customer pays for '+packName+'. It is solved so that exactly '+m+' is left before ads.',
    why:'Price decides how many dollars each order brings in. Meta charges dollars per customer, not a percentage.',
-   higher:'More dollars per order for ads and profit, but fewer people buy. Past about 4× your cost, check what competitors charge.',
+   higher:'More dollars per order for ads and profit, but fewer people buy. Check what competitors charge.',
    lower:'Easier to sell, but past a point an order cannot pay for its own ad.',
-   act:ok?['good','Leave it',r.price-r.floor>=0.01?'It passes. You could drop as low as '+money(r.floor)+' and still pass.':'It passes with nothing to spare.']:[tone,'Raise it',raisePrice+' That is '+(r.floor/cost).toFixed(1)+'× your cost'+(r.floor/cost>4?', which is high: check customers will pay it.':'.')+useBest]},
+   act:ok?['good','Leave it',r.price-r.floor>=0.01?'It passes. You could drop as low as '+money(r.floor)+' and still pass.':'It passes with nothing to spare.']:[tone,'Raise it',raisePrice+' That is '+(r.floor/cost).toFixed(1)+'× your cost. Check competitors sell near it.'+useBest]},
   target:{title:'Target CPA',value:money(r.targetCpa),
    what:'The most you can pay Meta for one customer and still keep '+keep+'% of the sale. Use it as your cost cap in Meta.',
    why:'It is your ad budget per order. If a customer really costs more than this, you keep less than '+keep+'%.',
@@ -224,13 +224,13 @@ function explain(key,el){
    why:'Below it you cannot afford to advertise. At or above it, both tests pass.',
    higher:'A higher landed cost or a higher customer cost pushes it up.',
    lower:'A cheaper supplier or cheaper customers bring it down.',
-   act:r.floor/cost>4?['tight','Price at or above it, then check the market','It is '+(r.floor/cost).toFixed(1)+'× your cost. If competitors sell far below it, a bigger pack is the better route.']:['good','Price at or above it','It is '+(r.floor/cost).toFixed(1)+'× your cost, which is a normal multiple.']},
+   act:['good','Price at or above it, then check the market','It is '+(r.floor/cost).toFixed(1)+'× your cost. If competitors sell this pack far below it, lead with a bigger pack instead.']},
   cap:{title:'Customer cost on Meta',value:C,
    what:'What one customer is assumed to cost in ads. Every colour on this page is judged against it.',
    why:'Landed cost tells you what you can afford. It cannot tell you what Meta will charge. This number stands in for that.',
    higher:'If customers really cost more, fewer rows pass and prices must go up.',
    lower:'If customers really cost less, more rows pass.',
-   act:['tight','Change it when you have data','It is a placeholder. Once a test has about 30 orders, replace it with real ad spend divided by orders.']},
+   act:['tight','Check it against real results','It is the planning CPA from the team rulebook, the same number TARA and CLEO plan on. GARY reports what customers really cost. If that is consistently different, change the rulebook and this page follows.']},
  };
  X.cogs={...X.cost,title:'COGS · '+packName,what:'Your landed cost for this pack: what the supplier charges, delivered. It is the figure you typed at the top.'};
  return X[key]||null;
@@ -292,5 +292,11 @@ l[0].textContent='Pays for a '+cap+' customer and still keeps '+keep+'% or more.
 l[1].textContent='Still makes money at a '+cap+' customer, but keeps less than '+keep+'%.';
 l[2].textContent='Every order costs more to get than it brings in.';
 $('targetNote').textContent='The top four prices are worked out for you. The bottom row is yours: type any retail price and it is graded the same way. Margin is the share of the retail price left after cost, fees and returns. Target CPA is the most you can pay for a customer and keep '+keep+'%. Break-even CPA is where you keep nothing. The '+cap+' is what a customer is assumed to cost on Meta.';}
-syncTheme();restore();render();
+// A seat's link (?costs=9.4,12.4,15.9&prices=49.95,79.95,99.95) opens the page on that product's figures.
+function fromLink(){const q=new URLSearchParams(location.search),ok=v=>/^\d+(\.\d+)?$/.test(v);if(!q.has('costs'))return;
+ const costs=q.get('costs').split(',').map(v=>v.trim()),prices=(q.get('prices')||'').split(',').map(v=>v.trim());
+ if(!costs.length||costs.length>4||!costs.every(ok))return;
+ [0,1,2,3].forEach(i=>{$('c'+(i+1)).value=costs[i]??'';state.prices[i]=ok(prices[i]??'')?prices[i]:'';});
+ state.pack=1;state.tier=state.prices[0]?4:0;save();}
+syncTheme();restore();fromLink();render();
 </script></body></html>

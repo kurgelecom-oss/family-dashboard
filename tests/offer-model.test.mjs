@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {calculateOffers,offerAtPrice,TIERS} from '../public/offer-model.mjs';
+import {existsSync,readFileSync} from 'node:fs';
+import {calculateOffers,offerAtPrice,TIERS,ASSUMPTIONS} from '../public/offer-model.mjs';
 import {row,solvePrice} from '../app/lib/ecom/bundles.ts';
 import {DEFAULT_FEES} from '../app/lib/ecom/shopify-fees.ts';
 const close=(actual,expected)=>{
@@ -48,25 +49,32 @@ test('every quoted price accounts for all deductions and the retained amount',()
   close(offer.price,cost+2+offer.gst+offer.fee+offer.returns+12+offer.profit);
  }
 });
-test('CPA is solved from landed cost alone and judged against the traffic floor',()=>{
+const CAP=ASSUMPTIONS.floorCpa;
+test('the customer cost is the rulebook planning CPA',()=>{
+ // Only checkable where the rulebook is on disk (tk's Mac); the deploy build has no copy.
+ const gates=process.env.HOME+'/Projects/mission-control-web/src/lib/radar/gates.json';
+ if(!existsSync(gates))return;
+ assert.equal(CAP,JSON.parse(readFileSync(gates,'utf8')).direct_path.planning_cpa_usd);
+});
+test('CPA is solved from landed cost alone and judged against the planning CPA',()=>{
  const [excellent,,,poor]=calculateOffers({cost:7.4});
  close(excellent.kept,0.2*excellent.net);
  close(excellent.gst,0);close(excellent.net,excellent.price); // no GST: the retail price is the revenue
  assert.ok(excellent.breakEvenCpa>excellent.targetCpa);
  close(excellent.roasNeeded,excellent.price/excellent.targetCpa);
- assert.equal(excellent.fundsCpa,false); // $11.24 target cannot buy a $20 customer
- assert.equal(calculateOffers({cost:17.7})[0].fundsCpa,true);
+ assert.equal(excellent.fundsCpa,false); // a $7.40 pack cannot buy a $45 customer at any margin row
+ assert.equal(calculateOffers({cost:30})[0].fundsCpa,true);
  assert.ok(poor.targetCpa<3);
 });
 test('verdict grades each offer on dollars, and the fixes it names really fix it',()=>{
- const rows=calculateOffers({cost:13.9});
+ const rows=calculateOffers({cost:30});
  assert.deepEqual(rows.map(r=>r.verdict),['good','bad','bad','bad']);
- assert.deepEqual(calculateOffers({cost:12}).map(r=>r.verdict),['tight','bad','bad','bad']);
+ assert.deepEqual(calculateOffers({cost:25}).map(r=>r.verdict),['tight','bad','bad','bad']);
  for(const r of rows){
-  // The floor price funds exactly the $20 CPA while keeping 20%.
-  close(calculateOffers({cost:13.9,cpa:20})[0].floor,r.floor);
-  close(r.floorMargin,0.2+20/r.floor);
-  // At maxCost the same retail price funds exactly the $20 CPA.
+  // The floor price funds exactly the planning CPA while keeping 20%.
+  close(calculateOffers({cost:30,cpa:CAP})[0].floor,r.floor);
+  close(r.floorMargin,0.2+CAP/r.floor);
+  // At maxCost the same retail price funds exactly the planning CPA.
   if(r.maxCost>0){const fixed=calculateOffers({cost:r.maxCost}).find(x=>Math.abs(x.floor-r.price)<1e-6);assert.ok(fixed,'price equals the floor at maxCost');}
  }
 });
@@ -76,8 +84,13 @@ test('a typed price is graded by the same maths as a solved one',()=>{
   for(const k of ['price','targetCpa','breakEvenCpa','profit','fee','returns','floor'])close(typed[k],tier[k]);
   assert.equal(typed.verdict,tier.verdict);assert.equal(typed.tierPct,tier.tierPct);
  }
- const cheap=offerAtPrice({cost:13.9,price:19.95}),dear=offerAtPrice({cost:13.9,price:49.95});
- close(cheap.price,19.95);close(dear.price,49.95);
+ const cheap=offerAtPrice({cost:13.9,price:19.95}),dear=offerAtPrice({cost:13.9,price:99.95});
+ close(cheap.price,19.95);close(dear.price,99.95);
  assert.equal(cheap.verdict,'bad');assert.equal(dear.verdict,'good');
  assert.ok(offerAtPrice({cost:13.9,price:10}).tierPct<0); // below cost: a negative margin, not a crash
+});
+test('the Omega X ladder reads the way the rulebook says it should',()=>{
+ // Launchpad row, 5 Oct 2026: landed 9.40 / 12.40 / 15.90, prices 49.95 / 79.95 / 99.95.
+ const v=[[9.4,49.95],[12.4,79.95],[15.9,99.95]].map(([cost,price])=>offerAtPrice({cost,price}).verdict);
+ assert.deepEqual(v,['bad','good','good']); // the single cannot buy a customer; the bundles can
 });

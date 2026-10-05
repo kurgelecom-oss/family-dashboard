@@ -42,9 +42,15 @@ export type FeeConfig = {
  thirdParty: boolean;
  /** Extra points added to every transaction: Afterpay/Klarna uplift, FX, chargebacks. */
  extraPct: number;
+ /** One flat rate that replaces the plan and card-mix blend when set. */
+ flat?: {pct:number; fixed:number};
 };
 
-export const DEFAULT_FEES: FeeConfig = {plan:'basic', mix:DEFAULT_MIX, thirdParty:false, extraPct:0};
+/* The stores sell to the US in USD, and the Launchpad test row carries the fee
+   every agent already uses: fee_pct 0.029, fee_fixed 0.30. The default is that
+   flat rate so the Offer Engine and the Launchpad price an order the same way.
+   The AU rate card above still drives any config that leaves `flat` unset. */
+export const DEFAULT_FEES: FeeConfig = {plan:'basic', mix:DEFAULT_MIX, thirdParty:false, extraPct:0, flat:{pct:2.9, fixed:0.30}};
 
 /** Mix weights normalised to sum to 1. Guards against a UI that lets the three
     boxes drift, which would otherwise silently scale the whole fee. */
@@ -56,6 +62,7 @@ export function normalise(mix:CardMix): CardMix {
 
 /** Blended percentage and blended fixed component for a card mix. */
 export function blended(cfg:FeeConfig){
+ if(cfg.flat) return {pct:cfg.flat.pct + Math.max(cfg.extraPct, 0), fixed:cfg.flat.fixed};
  const r = AU_RATES[cfg.plan];
  const m = normalise(cfg.mix);
  const pct = r.domestic.pct*m.domestic + r.amex.pct*m.amex + r.international.pct*m.international

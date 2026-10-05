@@ -5,7 +5,7 @@ export const AU_RATES = {
     advanced: { domestic: { pct: 1.4, fixed: 0.30 }, amex: { pct: 2.7, fixed: 0.30 }, international: { pct: 3.3, fixed: 0.30 }, thirdPartySurchargePct: 0.6 },
 };
 export const DEFAULT_MIX = { domestic: 0.85, amex: 0.05, international: 0.10 };
-export const DEFAULT_FEES = { plan: 'basic', mix: DEFAULT_MIX, thirdParty: false, extraPct: 0 };
+export const DEFAULT_FEES = { plan: 'basic', mix: DEFAULT_MIX, thirdParty: false, extraPct: 0, flat: { pct: 2.9, fixed: 0.30 } };
 export function normalise(mix) {
     const t = mix.domestic + mix.amex + mix.international;
     if (!(t > 0))
@@ -13,6 +13,8 @@ export function normalise(mix) {
     return { domestic: mix.domestic / t, amex: mix.amex / t, international: mix.international / t };
 }
 export function blended(cfg) {
+    if (cfg.flat)
+        return { pct: cfg.flat.pct + Math.max(cfg.extraPct, 0), fixed: cfg.flat.fixed };
     const r = AU_RATES[cfg.plan];
     const m = normalise(cfg.mix);
     const pct = r.domestic.pct * m.domestic + r.amex.pct * m.amex + r.international.pct * m.international
