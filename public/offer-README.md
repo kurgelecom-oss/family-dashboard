@@ -35,8 +35,8 @@ passes both tests, graded with `marginAt`, and warns above 4x cost.
 The **Explain** button in the header turns on a guide over every key number.
 Hover or click a number (tap on a phone, Tab on a keyboard) and a card says
 what it is, why it matters, what higher and lower would mean, and whether to
-raise it, lower it or leave it for the figures on screen. Esc or a click
-elsewhere closes the card; the button turns the mode off. The wording lives in
+raise it, lower it or leave it for the figures on screen. With a mouse the card disappears as soon as the
+pointer leaves the number. Esc or a click elsewhere also closes it; the button turns the mode off. The wording lives in
 `explain()` in `offer.html`; every dollar in it comes from `calculateOffers`.
 
 The browser uses generated modules in `public/offer-math/`. Both `npm test`

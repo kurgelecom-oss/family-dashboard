@@ -30,7 +30,7 @@ html[data-theme=light]{color-scheme:light}
 body[data-explain=on] [data-x]{cursor:help;outline:1px dashed color-mix(in srgb,var(--focus) 60%,transparent);outline-offset:3px;border-radius:5px;scroll-margin-top:84px}body[data-explain=on] td[data-x]{outline-offset:-7px}body[data-explain=on] .tier-pct[data-x]{outline-offset:5px}
 .xspot{position:fixed;z-index:50;pointer-events:none;border-radius:10px;box-shadow:0 0 0 2px var(--lime),0 0 26px 6px rgba(171,244,63,.42),0 0 0 9999px rgba(12,14,10,.55);transition:left .16s ease,top .16s ease,width .16s ease,height .16s ease}
 .xp{position:fixed;z-index:51;width:372px;max-width:calc(100vw - 24px);max-height:calc(100vh - 24px);overflow:auto;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:21px 23px 20px;box-shadow:0 20px 56px rgba(0,0,0,.3)}.xp-kicker{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}.xp h3{font-family:var(--display);font-size:19px;letter-spacing:-.5px;padding-right:28px}.xp-value{font-size:27px;font-weight:500;margin:4px 0 12px}.xp dl{margin:0}.xp dt{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:12px}.xp dd{margin:3px 0 0;font-size:13px;line-height:1.55}.xp-action{margin-top:16px;padding:13px 15px;border-radius:9px;background:var(--tone-bg);font-size:13px;line-height:1.55}.xp-action b{display:block;color:var(--tone);font-weight:600;margin-bottom:2px}.xp-close{position:absolute;top:10px;right:10px;width:36px;height:36px;border-radius:8px;font-size:20px;color:var(--muted)}
-@media(hover:hover) and (pointer:fine){.xp-close:hover{background:var(--soft);color:var(--ink)}}
+@media(hover:hover) and (pointer:fine){.xp{pointer-events:none}.xp-close{display:none}}
 @media(max-width:600px){.xp{left:8px!important;right:8px;top:auto!important;bottom:8px;width:auto;max-height:58vh}.explain-toggle{padding:8px 10px}}
 @media(prefers-reduced-motion:reduce){.xspot{transition:none}}
 .auto-cpa{display:block;font-size:24px;font-weight:500;line-height:44px;min-height:44px;white-space:nowrap}.cost-caption{font-size:11px;color:var(--muted);margin:-23px 0 39px 2px}.cost-caption strong{font-weight:500;color:var(--ink)}
@@ -255,14 +255,17 @@ function setExplain(on){
  document.body.dataset.explain=on?'on':'off';$('explainBtn').setAttribute('aria-pressed',String(on));$('explainLabel').textContent=on?'Explain: on':'Explain';
  // Plain text is not focusable, so keyboard users get a tab stop only while the mode is on.
  all('[data-x]').forEach(e=>{if(e.querySelector('input,button')||e.closest('button'))return;if(on)e.tabIndex=0;else e.removeAttribute('tabindex');});
- if(on)showX(document.querySelector('[data-row="'+state.tier+'"] [data-cell=state]'));else hideX();
+ if(on&&!matchMedia('(hover:hover) and (pointer:fine)').matches)showX(document.querySelector('[data-row="'+state.tier+'"] [data-cell=state]'));else hideX();
 }
 tagX();
 $('explainBtn').addEventListener('click',()=>setExplain(!explainOn()));
 $('xpClose').addEventListener('click',hideX);
 document.addEventListener('click',e=>{if(!explainOn()||e.target.closest('#explainBtn,#xp'))return;const el=e.target.closest('[data-x]');if(el)showX(el);else hideX();});
 document.addEventListener('focusin',e=>{if(!explainOn())return;const el=e.target.closest('[data-x]');if(el)showX(el);});
-if(matchMedia('(hover:hover) and (pointer:fine)').matches)document.addEventListener('mouseover',e=>{if(!explainOn())return;const el=e.target.closest('[data-x]');if(el&&el!==xCur)showX(el);});
+const hoverable=matchMedia('(hover:hover) and (pointer:fine)').matches;
+if(hoverable){document.addEventListener('mouseover',e=>{if(!explainOn())return;const el=e.target.closest('[data-x]');if(el&&el!==xCur)showX(el);});
+ // The card follows the pointer: it goes the moment the pointer leaves the number.
+ document.addEventListener('mouseout',e=>{if(xCur&&!xCur.contains(e.relatedTarget))hideX();});}
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&xCur)hideX();});
 addEventListener('scroll',()=>requestAnimationFrame(placeX),{passive:true});addEventListener('resize',placeX);
 all('input').forEach(e=>e.addEventListener('input',()=>{render(true);if(read())save();}));
