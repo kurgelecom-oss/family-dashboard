@@ -30,6 +30,15 @@ current price (`maxCostAt`), the first bigger pack that passes at the same
 margin, and the real CPA needed. The last line is the lowest price that
 passes both tests, graded with `marginAt`, and warns above 4x cost.
 
+### Explain mode
+
+The **Explain** button in the header turns on a guide over every key number.
+Hover or click a number (tap on a phone, Tab on a keyboard) and a card says
+what it is, why it matters, what higher and lower would mean, and whether to
+raise it, lower it or leave it for the figures on screen. Esc or a click
+elsewhere closes the card; the button turns the mode off. The wording lives in
+`explain()` in `offer.html`; every dollar in it comes from `calculateOffers`.
+
 The browser uses generated modules in `public/offer-math/`. Both `npm test`
 and `npm run build` regenerate them from the canonical
 `app/lib/ecom/{shopify-fees,tiers,bundles}.ts` via
