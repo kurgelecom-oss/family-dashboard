@@ -48,3 +48,12 @@ test('every quoted price accounts for all deductions and the retained amount',()
   close(offer.price,cost+2+offer.gst+offer.fee+offer.returns+12+offer.profit);
  }
 });
+test('CPA is solved from landed cost alone and judged against the traffic floor',()=>{
+ const [excellent,,,poor]=calculateOffers({cost:7.4});
+ close(excellent.kept,0.2*excellent.net);
+ assert.ok(excellent.breakEvenCpa>excellent.targetCpa);
+ close(excellent.roasNeeded,excellent.price/excellent.targetCpa);
+ assert.equal(excellent.fundsCpa,false); // $11.24 target cannot buy a $20 customer
+ assert.equal(calculateOffers({cost:17.7})[0].fundsCpa,true);
+ assert.ok(poor.targetCpa<3);
+});

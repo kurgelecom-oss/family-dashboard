@@ -53,6 +53,14 @@ export const DEFAULT_COSTS: Costs = {
  cogs:12, ship:7, retPct:8, retLossPct:25, gstPct:10, fees:DEFAULT_FEES, keepPct:20,
 };
 
+/* What a cold Meta purchase costs in dollars, whatever the product. Landed
+   cost sets the CPA an offer can AFFORD; it cannot set the CPA the auction
+   CHARGES, so the affordable figure needs one outside number to be judged
+   against. A store-level constant, matched to Launchpad's test target CPA.
+   Known limit: it is a placeholder until a test has ~30 orders - replace it
+   with the observed CPA then. */
+export const TRAFFIC_FLOOR_CPA = 20;
+
 const clamp = (v:number,lo:number,hi:number)=>Math.max(lo,Math.min(hi,v));
 
 /** Fraction of net revenue lost to expected returns. */

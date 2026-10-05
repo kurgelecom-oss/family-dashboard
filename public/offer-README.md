@@ -52,9 +52,13 @@ count freight twice. That is why **Your extra per order** defaults to zero
 and means only what the quote does *not* cover: your own packaging,
 pick-and-pack, insert cards.
 
-The only other number you enter is **the CPA you actually pay** — ad spend
-divided by orders. One order costs one CPA whether it holds one unit or four,
-which is why it sits beside the quote rather than in a settings panel.
+**You no longer enter a CPA.** It is solved from the landed cost of the pack
+and tier you select: **Target CPA** (the cost cap to give Meta, keeps 20%) and
+**Break-even CPA** (the kill line). Landed cost decides what you can *afford*
+to pay for a customer; it cannot decide what Meta *charges*. So every row is
+checked against one store-level constant, `TRAFFIC_FLOOR_CPA` in `tiers.ts`
+($20, matching Launchpad's test target CPA). Replace that constant with the
+observed CPA once a test has about 30 orders.
 
 ### What became a constant
 

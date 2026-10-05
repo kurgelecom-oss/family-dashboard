@@ -1,13 +1,16 @@
 // Presentation adapter only. Browser modules are generated from the canonical
 // TypeScript before tests and production builds; financial formulas live there.
 import {DEFAULT_FEES} from './offer-math/shopify-fees.mjs';
-import {TIERS,DEFAULT_COSTS} from './offer-math/tiers.mjs';
+import {TIERS,DEFAULT_COSTS,TRAFFIC_FLOOR_CPA} from './offer-math/tiers.mjs';
 import {ladder,cpaFundedPrice} from './offer-math/bundles.mjs';
 export {TIERS};
 export const ASSUMPTIONS={gstPct:DEFAULT_COSTS.gstPct,keepPct:DEFAULT_COSTS.keepPct,
-  retPct:DEFAULT_COSTS.retPct,retLossPct:DEFAULT_COSTS.retLossPct};
+  retPct:DEFAULT_COSTS.retPct,retLossPct:DEFAULT_COSTS.retLossPct,floorCpa:TRAFFIC_FLOOR_CPA};
 
-export function calculateOffers({cost,cpa,plan=DEFAULT_FEES.plan,
+// `cpa` is the CPA each offer is judged against. Nobody types it any more:
+// the CPA an offer can pay (targetCpa, breakEvenCpa) is solved from landed cost,
+// and the yardstick defaults to the store-level traffic floor.
+export function calculateOffers({cost,cpa=TRAFFIC_FLOOR_CPA,plan=DEFAULT_FEES.plan,
   retPct=DEFAULT_COSTS.retPct,retLossPct=DEFAULT_COSTS.retLossPct,extraPerOrder=0}) {
   // The selected supplier total already represents the entire pack. It must
   // never be multiplied by its unit count, or charged delivery a second time.
@@ -17,7 +20,10 @@ export function calculateOffers({cost,cpa,plan=DEFAULT_FEES.plan,
   return TIERS.map(tier=>{
     const r=ladder(tier.before,sc,cpa)[0];
     const profit=r.before-cpa;
+    const kept=r.before-r.targetCpa;
     return {...tier,...r,net:r.netRev,floor,profit,margin:profit/r.netRev,
-      headroom:r.targetCpa-cpa};
+      headroom:r.targetCpa-cpa,kept,keptMargin:kept/r.netRev,
+      roasNeeded:r.targetCpa>0?r.price/r.targetCpa:Infinity,
+      fundsCpa:!r.unreachable&&r.targetCpa>=cpa};
   });
 }
