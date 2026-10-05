@@ -44,6 +44,10 @@ const format=new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'});
 const money=n=>Number.isFinite(n)?format.format(n):'—';
 const state={pack:1,tier:0};
 let announcementTimer;
+// Last figures entered, kept in this browser only (localStorage does not sync across devices).
+const SAVE_KEY='offerFigures';
+function save(){try{localStorage.setItem(SAVE_KEY,JSON.stringify({costs:[1,2,3,4].map(i=>$('c'+i).value),...state}));}catch{}}
+function restore(){try{const d=JSON.parse(localStorage.getItem(SAVE_KEY));if(!d)return;d.costs.forEach((v,i)=>{if(typeof v==='string')$('c'+(i+1)).value=v;});if([1,2,3,4].includes(d.pack))state.pack=d.pack;if([0,1,2,3].includes(d.tier))state.tier=d.tier;}catch{}}
 function read(){
  const fields=all('input[type=number]');
  const invalid=fields.find(e=>(e.required&&e.value==='')||(e.value!==''&&(!Number.isFinite(e.valueAsNumber)||e.valueAsNumber<Number(e.min)||e.valueAsNumber>Number(e.max))));
@@ -73,11 +77,11 @@ function render(announce=false){
  Object.entries({landedTotal:cost,gst:r.gst,fees:r.fee,returns:r.returns,adTotal:r.targetCpa,profitTotal:r.kept}).forEach(([id,v])=>$(id).textContent=money(v));
  if(announce){clearTimeout(announcementTimer);announcementTimer=setTimeout(()=>{$('status').textContent=packName+'. '+r.label+' price '+money(r.price)+'. '+'Target CPA '+money(r.targetCpa)+'. '+$('offerState').textContent+'.';},300);}
 }
-all('input').forEach(e=>e.addEventListener('input',()=>render(true)));
-all('[data-tier]').forEach(b=>b.addEventListener('click',()=>{state.tier=Number(b.dataset.tier);render(true);}));
-all('[data-pack]').forEach(b=>b.addEventListener('click',()=>{state.pack=Number(b.dataset.pack);render(true);}));
+all('input').forEach(e=>e.addEventListener('input',()=>{render(true);if(read())save();}));
+all('[data-tier]').forEach(b=>b.addEventListener('click',()=>{state.tier=Number(b.dataset.tier);render(true);save();}));
+all('[data-pack]').forEach(b=>b.addEventListener('click',()=>{state.pack=Number(b.dataset.pack);render(true);save();}));
 function syncTheme(){const dark=document.documentElement.dataset.theme==='dark';$('themeLabel').textContent=dark?'Light':'Dark';$('themeBtn').setAttribute('aria-label','Switch to '+(dark?'light':'dark')+' mode');$('themeBtn').title=$('themeBtn').getAttribute('aria-label');}
 $('themeBtn').addEventListener('click',()=>{const theme=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=theme;try{localStorage.setItem('offerTheme',theme);}catch{}syncTheme();});
 $('targetNote').textContent='Target CPA is solved from your landed cost: the most you can pay for an order and still keep '+ASSUMPTIONS.keepPct+'% of revenue after GST. Set it as your cost cap. Break-even CPA is the kill line. Each row is checked against a '+money(ASSUMPTIONS.floorCpa).replace('.00','')+' floor, because what Meta charges for a customer does not fall with your cost.';
-syncTheme();render();
+syncTheme();restore();render();
 </script></body></html>
