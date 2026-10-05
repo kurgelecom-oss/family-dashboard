@@ -70,7 +70,7 @@ test('better tiers cost more and leave more for traffic',()=>{
 });
 
 test('GST is removed from revenue, not treated as income',()=>{
- const withGst = rung(TIERS[1], DEFAULT_COSTS);
+ const withGst = rung(TIERS[1], {...DEFAULT_COSTS, gstPct:10});
  const noGst   = rung(TIERS[1], {...DEFAULT_COSTS, gstPct:0});
  // Same target margin, but a GST-registered seller must charge more to reach it.
  assert.ok(withGst.price > noGst.price);

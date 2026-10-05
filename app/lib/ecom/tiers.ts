@@ -50,7 +50,8 @@ export type Costs = {
 };
 
 export const DEFAULT_COSTS: Costs = {
- cogs:12, ship:7, retPct:8, retLossPct:25, gstPct:10, fees:DEFAULT_FEES, keepPct:20,
+ // gstPct 0: the store operates without GST (tk, 5 Oct 2026).
+ cogs:12, ship:7, retPct:8, retLossPct:25, gstPct:0, fees:DEFAULT_FEES, keepPct:20,
 };
 
 /* What a cold Meta purchase costs in dollars, whatever the product. Landed

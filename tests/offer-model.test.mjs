@@ -15,7 +15,7 @@ test('Compare prices preserve canonical supplier-pack maths across plans, packs,
   {retPct:20,retLossPct:50,extraPerOrder:2.5,cpa:30},
   {retPct:100,retLossPct:100,extraPerOrder:0,cpa:12},
  ]){
-  const sc={totals,...scenario,gstPct:10,keepPct:20,fees:{...DEFAULT_FEES,plan}};
+  const sc={totals,...scenario,gstPct:0,keepPct:20,fees:{...DEFAULT_FEES,plan}};
   for(let units=1;units<=4;units++){
    const results=calculateOffers({cost:totals[units-1],plan,...scenario});
    TIERS.forEach((tier,i)=>{
@@ -51,6 +51,7 @@ test('every quoted price accounts for all deductions and the retained amount',()
 test('CPA is solved from landed cost alone and judged against the traffic floor',()=>{
  const [excellent,,,poor]=calculateOffers({cost:7.4});
  close(excellent.kept,0.2*excellent.net);
+ close(excellent.gst,0);close(excellent.net,excellent.price); // no GST: the retail price is the revenue
  assert.ok(excellent.breakEvenCpa>excellent.targetCpa);
  close(excellent.roasNeeded,excellent.price/excellent.targetCpa);
  assert.equal(excellent.fundsCpa,false); // $11.24 target cannot buy a $20 customer

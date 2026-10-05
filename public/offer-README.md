@@ -69,7 +69,7 @@ supports the scaling assumptions below. There is no page-local `BAKED` copy.
 
 | Baked value | Default |
 |---|---|
-| GST rate | 10%, always on |
+| GST rate | 0% — the store operates without GST |
 | Card mix | 85% domestic / 5% Amex / 10% international |
 | Extra fee points (Afterpay, FX, chargebacks) | 0 |
 | Third-party gateway | off |

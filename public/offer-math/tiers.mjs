@@ -7,7 +7,7 @@ export const TIERS = [
     { key: 'poor', label: 'Poor', before: 0.35, blurb: 'Only survives on cheap traffic. One CPA rise kills it.' },
 ];
 export const DEFAULT_COSTS = {
-    cogs: 12, ship: 7, retPct: 8, retLossPct: 25, gstPct: 10, fees: DEFAULT_FEES, keepPct: 20,
+    cogs: 12, ship: 7, retPct: 8, retLossPct: 25, gstPct: 0, fees: DEFAULT_FEES, keepPct: 20,
 };
 export const TRAFFIC_FLOOR_CPA = 20;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
