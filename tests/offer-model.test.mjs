@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {calculateOffers,TIERS} from '../public/offer-model.mjs';
+import {calculateOffers,offerAtPrice,TIERS} from '../public/offer-model.mjs';
 import {row,solvePrice} from '../app/lib/ecom/bundles.ts';
 import {DEFAULT_FEES} from '../app/lib/ecom/shopify-fees.ts';
 const close=(actual,expected)=>{
@@ -69,4 +69,15 @@ test('verdict grades each offer on dollars, and the fixes it names really fix it
   // At maxCost the same retail price funds exactly the $20 CPA.
   if(r.maxCost>0){const fixed=calculateOffers({cost:r.maxCost}).find(x=>Math.abs(x.floor-r.price)<1e-6);assert.ok(fixed,'price equals the floor at maxCost');}
  }
+});
+test('a typed price is graded by the same maths as a solved one',()=>{
+ for(const tier of calculateOffers({cost:13.9})){
+  const typed=offerAtPrice({cost:13.9,price:tier.price});
+  for(const k of ['price','targetCpa','breakEvenCpa','profit','fee','returns','floor'])close(typed[k],tier[k]);
+  assert.equal(typed.verdict,tier.verdict);assert.equal(typed.tierPct,tier.tierPct);
+ }
+ const cheap=offerAtPrice({cost:13.9,price:19.95}),dear=offerAtPrice({cost:13.9,price:49.95});
+ close(cheap.price,19.95);close(dear.price,49.95);
+ assert.equal(cheap.verdict,'bad');assert.equal(dear.verdict,'good');
+ assert.ok(offerAtPrice({cost:13.9,price:10}).tierPct<0); // below cost: a negative margin, not a crash
 });

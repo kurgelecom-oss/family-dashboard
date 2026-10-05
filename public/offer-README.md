@@ -30,6 +30,14 @@ current price (`maxCostAt`), the first bigger pack that passes at the same
 margin, and the real CPA needed. The last line is the lowest price that
 passes both tests, graded with `marginAt`, and warns above 4x cost.
 
+### Your price row
+
+The four margin rows solve the price. The fifth row runs the same maths the
+other way: type a retail price and `offerAtPrice` returns its margin, CPA
+figures and verdict. One typed price is kept per pack size and saved with the
+landed costs. Known limit: the customer cost stays at `TRAFFIC_FLOOR_CPA`
+whatever price is typed, though a higher price really converts worse.
+
 ### Explain mode
 
 The **Explain** button in the header turns on a guide over every key number.
