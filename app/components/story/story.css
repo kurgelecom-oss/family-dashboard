@@ -61,3 +61,5 @@
 .sty-page{padding:calc(var(--nav-h) + 16px) 16px 24px;max-width:1400px;margin:0 auto}
 .sty-home{padding-top:16px}
 .sty-page .sty-stage{max-height:calc(100dvh - 250px)} .sty-home .sty-stage{max-height:calc(100dvh - 300px)}
+.sty-stat small.sty-prev{font-size:1.2cqw;font-weight:600;color:var(--sty-faint)}
+.sty-sep{margin-left:12px;padding-left:14px;border-left:1px solid var(--sty-border)}

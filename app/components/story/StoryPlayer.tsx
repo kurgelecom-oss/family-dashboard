@@ -12,25 +12,35 @@ export const stagger = (p: number, i: number, step = 0.1, speed = 1.6) => ease(p
 const BUILD_MS = 1400; // every scene builds in over 1.4 s, then holds still for the rest of `hold`
 type Edits = { cap: Record<string, string>; hold: Record<string, number> };
 
-export function StoryPlayer<S extends BaseScene>({ scenes: raw, render, storageKey, brand, onEnd }: {
+export function StoryPlayer<S extends BaseScene>({ scenes: raw, render, storageKey, timingKey, brand, onEnd }: {
   scenes: S[];
   render: (s: S, p: number) => ReactNode; // p runs 0 → 1 during the build-in; 1 when reduced motion is on
-  storageKey: string;
+  storageKey: string; // caption + single-scene edits
+  timingKey?: string; // "All scenes" seconds; may outlive storageKey (e.g. kept across weeks)
   brand?: ReactNode;
   onEnd?: () => void; // fires once when the last scene is reached
 }) {
   const [edits, setEdits] = useState<Edits>({ cap: {}, hold: {} });
+  const [all, setAllState] = useState<number | null>(null);
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [still, setStill] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    try { setEdits({ cap: {}, hold: {}, ...JSON.parse(localStorage.getItem(storageKey) || "{}") }); } catch {}
+    try { setEdits({ cap: {}, hold: {}, ...JSON.parse(localStorage.getItem(storageKey) || "{}") }); } catch { setEdits({ cap: {}, hold: {} }); }
+    try { const a = Number(localStorage.getItem(timingKey ?? storageKey + ":all")); setAllState(a >= 2 && a <= 20 ? a : null); } catch {}
     setStill(matchMedia("(prefers-reduced-motion: reduce)").matches);
-  }, [storageKey]);
+    setT(0); setPlaying(false); // a new storageKey (a new week) starts the story from the top
+  }, [storageKey, timingKey]);
   const save = (e: Edits) => { setEdits(e); try { localStorage.setItem(storageKey, JSON.stringify(e)); } catch {} };
 
-  const scenes = useMemo(() => raw.map((s) => ({ ...s, hold: edits.hold[s.id] ?? s.hold, caption: edits.cap[s.id] ?? s.caption, auto: s.caption })), [raw, edits]);
+  // Every scene's seconds at once; clears single-scene timings. null = each scene's own default.
+  const setAll = (v: number | null) => {
+    const n = v === null ? null : Math.max(2, Math.min(20, v));
+    setAllState(n); save({ ...edits, hold: {} });
+    try { const k = timingKey ?? storageKey + ":all"; if (n === null) localStorage.removeItem(k); else localStorage.setItem(k, String(n)); } catch {}
+  };
+  const scenes = useMemo(() => raw.map((s) => ({ ...s, hold: edits.hold[s.id] ?? all ?? s.hold, caption: edits.cap[s.id] ?? s.caption, auto: s.caption })), [raw, edits, all]);
   const starts = scenes.reduce<number[]>((a, _, i) => (a.push(i ? a[i - 1] + scenes[i - 1].hold * 1000 : 0), a), []);
   const total = scenes.length ? starts[starts.length - 1] + scenes[scenes.length - 1].hold * 1000 : 0;
   let idx = 0; starts.forEach((s, i) => { if (s <= t) idx = i; });
@@ -86,21 +96,26 @@ export function StoryPlayer<S extends BaseScene>({ scenes: raw, render, storageK
       <div className="sty-ticks" role="group" aria-label="Scenes">{scenes.map((s, i) => (
         <button key={s.id} type="button" aria-pressed={i === idx} onClick={() => { setPlaying(false); go(i); }}>{s.label}<small>{s.hold}s</small></button>))}</div>
       <div className="sty-ctl">
-        <span className="sty-hint"><b>Steer it.</b> Pause, then click the caption to rewrite it. This scene holds</span>
+        <span className="sty-hint"><b>Steer it.</b> Pause and click the caption to rewrite it. This scene</span>
         <button className="sty-btn ghost sm" type="button" aria-label="Shorter" onClick={() => setHold(sc.hold - 1)}>−</button><b>{sc.hold}s</b>
         <button className="sty-btn ghost sm" type="button" aria-label="Longer" onClick={() => setHold(sc.hold + 1)}>+</button>
         {(edits.cap[sc.id] || edits.hold[sc.id]) && <button className="sty-btn ghost sm" type="button" onClick={() => { const c = { ...edits.cap }, h = { ...edits.hold }; delete c[sc.id]; delete h[sc.id]; save({ cap: c, hold: h }); }}>Reset this scene</button>}
         {edits.cap[sc.id] && <span className="sty-hint">Live wording: “{sc.auto}”</span>}
+        <span className="sty-hint sty-sep"><b>All scenes</b></span>
+        <button className="sty-btn ghost sm" type="button" aria-label="All scenes shorter" onClick={() => setAll((all ?? Math.round(total / 1000 / scenes.length)) - 1)}>−</button><b>{all !== null ? `${all}s each` : "own timing"}</b>
+        <button className="sty-btn ghost sm" type="button" aria-label="All scenes longer" onClick={() => setAll((all ?? Math.round(total / 1000 / scenes.length)) + 1)}>+</button>
+        {all !== null && <button className="sty-btn ghost sm" type="button" onClick={() => setAll(null)}>Reset all timing</button>}
+        <span className="sty-hint">{Math.round(total / 1000)}s in total</span>
       </div>
     </section>
   );
 }
 
 /** A row of big figures; null shows an em dash, never a zero. */
-export function Stats({ stats, p }: { stats: { label: string; v: number | null; unit?: "AUD" | "%" }[]; p: number }) {
+export function Stats({ stats, p }: { stats: { label: string; v: number | null; unit?: "AUD" | "%"; prev?: number | null }[]; p: number }) {
   const f = (v: number, u?: string) => u === "AUD" ? "$" + Math.round(v).toLocaleString("en-AU") : Math.round(v) + (u === "%" ? "%" : "");
   return <div className="sty-stats" style={{ gridTemplateColumns: `repeat(${stats.length},minmax(0,1fr))` }}>{stats.map((x, i) => { const e = stagger(p, i, 0.12); return (
-    <div key={x.label} className="sty-stat" style={{ opacity: e }}><b>{x.v === null ? "—" : f(x.v * e, x.unit)}</b><small>{x.label}</small></div>); })}</div>;
+    <div key={x.label} className="sty-stat" style={{ opacity: e }}><b>{x.v === null ? "—" : f(x.v * e, x.unit)}</b><small>{x.label}</small>{x.prev !== undefined && <small className="sty-prev">Last week {x.prev === null ? "—" : f(x.prev, x.unit)}</small>}</div>); })}</div>;
 }
 
 // ---- Visual primitives. Every one takes p (0 → 1) and draws its final state at p = 1. ----

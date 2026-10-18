@@ -35,3 +35,23 @@ test('stats email: kdgm tokens only, watch status, dashes for unknown',()=>{
  assert.match(html,/Unavailable this run: custm Meta ads/);assert.doesNotMatch(html,/<style|class=/);
 });
 test('reminder email escapes the link and names the person',()=>{const {html,subject}=reminderEmail('Nihal',report,'https://x/story?who=nihal&k=1');assert.match(subject,/^Nihal,/);assert.match(html,/who=nihal&amp;k=1/);});
+const lastWeek:WeeklyReport={...report,week:weekFor('2026-10-07'),through:'2026-10-11',people:[
+ {...person('taylan',[],[m('validated',3),m('launched',0),m('ad_leads',null),m('ad_spend',null)]),quran:quranWeek(['2026-10-05','2026-10-06','2026-10-10'].map(date=>({date,finished:true})),weekFor('2026-10-07').days,'2026-10-11')},
+ {...person('nihal',[],[m('discoveries',5),m('mentorship',1),m('os_opens',4)]),quran:quranWeek(['2026-10-05'].map(date=>({date,finished:true})),weekFor('2026-10-07').days,'2026-10-11')},
+ person('ansar',[],[m('school_score',80),m('school_work',3)]),person('ayah',[],[]),
+]};
+test('mid-week: last week cut to the same days; person totals not compared yet',()=>{
+ const s=buildStory(report,lastWeek),q=s.find(x=>x.id==='quran')!;
+ // Mon–Wed last week: Taylan 2 days (Sat excluded), Nihal 1 → 3. This week 4.
+ assert.equal(q.caption,'Together we read on 4 of 12 days (up 1 on last week). Nihal read every day.');
+ assert.match(s.find(x=>x.id==='showed')!.caption,/Family total: 6 days \(up 3 on last week\)\.$/);
+ assert.equal((s.find(x=>x.id==='person-nihal') as any).stats[0].prev,undefined);
+});
+test('complete week: each person compared, biggest change named',()=>{
+ const full={...report,week:weekFor('2026-10-18'),through:'2026-10-18'};
+ const s=buildStory(full,lastWeek),n=s.find(x=>x.id==='person-nihal') as any;
+ assert.deepEqual(n.stats.map((x:any)=>x.prev),[5,1,4]);
+ assert.match(n.caption,/Biggest change: products found down from 5 to 2\.$/);
+ assert.match((s.find(x=>x.id==='person-ansar') as any).caption,/Same as last week\.$/);
+});
+test('no last week: captions unchanged',()=>assert.equal(buildStory(report,null).find(x=>x.id==='quran')!.caption,'Together we read on 4 of 12 days. Nihal read every day.'));
