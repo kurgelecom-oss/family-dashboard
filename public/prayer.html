@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Home Prayer Board</title>
+<!-- Moved from the claude.ai artifact (EiMQUwdTeEBus1AST1hkG2) on 25 Oct 2026 so the family
+     dashboard's announcement bar can read it. Same board and buttons; the board now
+     lives in fds_prayer_board via /api/prayer and saves behind the family PIN. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Marcellus&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#F2F5F6; --surface:#FFFFFF; --sunk:#E6ECEF; --used:#CFD8DF; --ink:#14233A; --muted:#566578; --line:#CCD6DE;
+  --dad:#1F4FA3; --dad-soft:#E3EBF8; --an:#127F7A; --an-soft:#DDF1EF; --warn:#B4541A; --warn-soft:#FBEBDD; --focus:#C2412D; --t-lg:#A65A12; --t-md:#7E4A9E; --t-sh:#2F7D3C; --t-ps:#B0304F;
+  --f-display:"Marcellus","Iowan Old Style",Georgia,serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0E1622; --surface:#16212F; --sunk:#1D2A3A; --used:#2E3E52; --ink:#E7EDF3; --muted:#9AA9B9; --line:#2C3B4E;
+  --dad:#86A9F0; --dad-soft:#1D2D4B; --an:#5FCFC6; --an-soft:#123532; --warn:#F0A060; --warn-soft:#3A2516; --focus:#FF8A70; --t-lg:#E8A060; --t-md:#C39BE0; --t-sh:#7FCB86; --t-ps:#F08AA2; color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
+#app{max-width:1280px;margin:0 auto;padding:20px 16px 48px;display:grid;gap:14px}
+h1,h2{font-family:var(--f-display);font-weight:400;margin:0;text-wrap:balance}
+h1{font-size:1.7rem} h2{font-size:1.25rem}
+a.back{color:var(--muted);font-size:.85rem;text-decoration:none}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.top{display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center;justify-content:space-between}
+.sub{font-size:.85rem;color:var(--muted)}
+.lock{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);padding:7px 14px;border-radius:999px;font-weight:600;font-size:.88rem}
+.lock.open{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
+.lock svg{width:16px;height:16px}
+.status{font-size:.8rem;color:var(--muted);min-height:1.2em}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.82rem;color:var(--muted)}
+.who{display:inline-flex;align-items:center;gap:6px;font-weight:600}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--dad)} .dot.an{background:var(--an)}
+.rota-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+table.rota{border-collapse:collapse;width:100%;min-width:980px;table-layout:fixed}
+.rota col.p{width:96px}
+.rota th,.rota td{padding:8px 5px;text-align:center;border-bottom:1px solid var(--line);vertical-align:top}
+.rota tr:last-child th,.rota tr:last-child td{border-bottom:0}
+.rota thead th{font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;padding-block:12px}
+.rota thead th.today{color:var(--ink)}
+.rota tbody th{text-align:left;padding-left:14px;font-family:var(--f-display);font-weight:400;font-size:1.05rem;vertical-align:middle}
+.rota td.today{background:var(--sunk)}
+.cell{border-radius:10px;padding:6px;display:grid;gap:5px;background:var(--dad-soft)}
+.cell.an{background:var(--an-soft)}
+.cell.try{background:transparent;outline:1.5px dashed var(--an);outline-offset:-2px}
+.lead{border:0;background:none;padding:2px 0;font-size:.82rem;font-weight:600;color:var(--dad)}
+.cell.an .lead,.cell.try .lead{color:var(--an)}
+.lead[disabled]{cursor:default}
+.unlocked .lead:not([disabled]){text-decoration:underline dotted;text-underline-offset:3px}
+.sura{display:grid;grid-template-columns:auto 1fr;align-items:center;column-gap:6px;width:100%;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 7px;min-height:48px}
+.sura .num,.pk .num{font-size:.68rem;font-weight:500;color:var(--muted);font-variant-numeric:tabular-nums;min-width:1.6em}
+.sura .en{font-size:.76rem;font-weight:600;line-height:1.2}
+.sura.empty{grid-template-columns:1fr;text-align:center;color:var(--muted);font-size:.72rem;border-style:dashed}
+.picker,.pin{border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink);padding:0;width:min(560px,calc(100vw - 32px));max-height:min(80vh,640px)}
+.picker[open]{display:flex;flex-direction:column}
+.picker::backdrop,.pin::backdrop{background:rgb(10 20 35 / .45)}
+.pin form{padding:18px;display:grid;gap:10px}
+.pin input{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.pin .row{display:flex;gap:8px;justify-content:flex-end}
+.pin .row button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 16px;font-weight:600}
+.pin .err{color:var(--focus);font-size:.85rem;margin:0}
+.pk-head{padding:14px 16px 8px;display:grid;gap:2px;border-bottom:1px solid var(--line)}
+.pk-grid{overflow-y:auto;padding:10px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
+.pk{display:grid;grid-template-columns:auto 1fr;align-items:center;column-gap:6px;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 9px;font-size:.85rem;font-weight:500}
+.pk:hover{background:var(--sunk)} .pk.used{background:var(--used)}
+.pk .on{grid-column:2;font-size:.7rem;font-weight:500;color:var(--muted)}
+.pk-key{font-size:.78rem;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.pk-key i{width:12px;height:12px;border-radius:3px;background:var(--used);display:inline-block}
+.pk.cur{border-color:var(--focus);background:var(--warn-soft)}
+.pk-foot{padding:10px 16px;border-top:1px solid var(--line);display:flex;justify-content:flex-end}
+.pk-cancel{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 16px;font-weight:600}
+.t-lg{--tier:var(--t-lg)} .t-md{--tier:var(--t-md)} .t-sh{--tier:var(--t-sh)} .t-ps{--tier:var(--t-ps)}
+.sura[class*="t-"],.pk[class*="t-"]{border-left:5px solid var(--tier)!important}
+.sura[class*="t-"] .num,.pk[class*="t-"] .num{color:var(--tier);font-weight:600}
+.key{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:.82rem;color:var(--muted)}
+.key span{display:inline-flex;align-items:center;gap:6px}
+.key i{width:14px;height:14px;border-radius:3px;background:var(--tier);display:inline-block}
+.pool{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;display:grid;gap:10px}
+.pool h3{font-family:var(--f-body);font-size:.85rem;font-weight:600;margin:4px 0 0;display:flex;gap:8px;align-items:center}
+.pool h3 i{width:12px;height:12px;border-radius:3px;background:var(--tier);display:inline-block}
+.pool h3 small{font-weight:400;color:var(--muted);font-size:.8rem}
+.unlocked .sura{border-style:dashed;border-color:var(--muted);cursor:pointer}
+.sura.picked{outline:3px solid var(--focus);outline-offset:1px}
+.sura[disabled]{cursor:default}
+.ph{display:inline-flex;align-items:center;gap:6px}
+.shuf{border:0;background:none;color:var(--muted);width:24px;height:24px;padding:4px;border-radius:6px;opacity:.55;display:inline-grid;place-items:center}
+.shuf:hover,.shuf:focus-visible{opacity:1;background:var(--sunk);color:var(--ink)}
+.shuf svg{width:14px;height:14px}
+.why{font-size:.82rem;color:var(--muted);max-width:80ch}
+.why summary{cursor:pointer;font-weight:600}
+.why h3{font-family:var(--f-display);font-weight:400;font-size:1rem;color:var(--ink);margin:10px 0 2px}
+.why ul{margin:0;padding-left:18px;display:grid;gap:3px}
+.why b{color:var(--ink);font-variant-numeric:tabular-nums}
+.pool-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:6px}
+.pool .sura{min-height:40px;background:var(--bg);border-style:solid!important;border-color:var(--line)!important;cursor:default}
+@media (max-width:520px){h1{font-size:1.45rem}}
+@media (prefers-reduced-motion:no-preference){.sura,.cell{transition:background-color .15s,outline-color .15s}}
+</style></head><body>
+<div id="app"><p style="padding:20px">Loading the prayer board…</p></div>
+<script>
+(function(){
+var NAMES={tk:"TK",an:"Ansar",try:"Ansar?"};
+var SURAHS=[[78,"An-Naba"],[79,"An-Nazi'at"],[80,"'Abasa"],[81,"At-Takwir"],[82,"Al-Infitar"],[83,"Al-Mutaffifin"],[84,"Al-Inshiqaq"],[85,"Al-Buruj"],[86,"At-Tariq"],[87,"Al-A'la"],[88,"Al-Ghashiyah"],[89,"Al-Fajr"],[90,"Al-Balad"],[91,"Ash-Shams"],[92,"Al-Layl"],[93,"Ad-Duha"],[94,"Ash-Sharh"],[95,"At-Tin"],[96,"Al-'Alaq"],[97,"Al-Qadr"],[98,"Al-Bayyinah"],[99,"Az-Zalzalah"],[100,"Al-'Adiyat"],[101,"Al-Qari'ah"],[102,"At-Takathur"],[103,"Al-'Asr"],[104,"Al-Humazah"],[105,"Al-Fil"],[106,"Quraysh"],[107,"Al-Ma'un"],[108,"Al-Kawthar"],[109,"Al-Kafirun"],[110,"An-Nasr"],[111,"Al-Masad"],[112,"Al-Ikhlas"],[113,"Al-Falaq"],[114,"An-Nas"]];
+var CARDS={
+  kursi:{en:"Ayat al-Kursi",num:"2:255",kahf:true}, r1:{en:"Amana ar-Rasul 285",num:"2:285",kahf:true}, r2:{en:"Amana ar-Rasul 286",num:"2:286",kahf:true},
+  k1:{en:"Al-Kahf 1–5",num:"18",kahf:true}, k2:{en:"Al-Kahf 6–10",num:"18",kahf:true}, s32:{en:"As-Sajdah",num:"32",t:"t-lg"}, s76:{en:"Al-Insan",num:"76",t:"t-lg"}};
+var EXTRAS=["kursi","r1","r2","k1","k2","s32","s76"];
+// Sunnah-based pairs for the shuffle buttons. TK's days only; Ansar's cards stay as set.
+var PAIRS={
+  fajr:[
+    {ids:["81","82"],why:"At-Takwir: the Prophet ﷺ recited it in Fajr (Muslim 456). Al-Infitar is named with it in Tirmidhi 3333."},
+    {ids:["82","84"],why:"Al-Infitar and Al-Inshiqaq: named with At-Takwir as the suras that show the Day of Judgment (Tirmidhi 3333)."},
+    {ids:["79","80"],why:"An-Nazi'at and 'Abasa: long mufassal, the length encouraged for Fajr."},
+    {ids:["84","85"],why:"Al-Inshiqaq and Al-Buruj: long mufassal, the length encouraged for Fajr."},
+    {ids:["78","79"],why:"An-Naba and An-Nazi'at: long mufassal, the length encouraged for Fajr."},
+    {ids:["80","81"],why:"'Abasa and At-Takwir: long mufassal, the length encouraged for Fajr."},
+    {ids:["83","85"],why:"Al-Mutaffifin and Al-Buruj: long mufassal, the length encouraged for Fajr."},
+    {ids:["k1","k2"],why:"Al-Kahf 1–10: memorising these protects from the Dajjal (Muslim 809)."}
+  ],
+  fajrFri:{ids:["s32","s76"],why:"Friday Fajr: the Prophet ﷺ recited As-Sajdah and Al-Insan (Bukhari 891, Muslim 880)."},
+  maghrib:[
+    {ids:["109","112"],why:"Al-Kafirun and Al-Ikhlas: the Prophet ﷺ recited this pair in the sunnah after Maghrib (Tirmidhi 431)."},
+    {ids:["113","114"],why:"Al-Falaq and An-Nas: the two suras of refuge, recited as a pair."},
+    {ids:["105","106"],why:"Al-Fil and Quraysh: one story in two suras, recited together by some Companions."},
+    {ids:["99","100"],why:"Az-Zalzalah and Al-'Adiyat: short mufassal, the length encouraged for Maghrib."},
+    {ids:["101","102"],why:"Al-Qari'ah and At-Takathur: short mufassal, the length encouraged for Maghrib."},
+    {ids:["103","104"],why:"Al-'Asr and Al-Humazah: short mufassal, the length encouraged for Maghrib."},
+    {ids:["107","108"],why:"Al-Ma'un and Al-Kawthar: short mufassal, the length encouraged for Maghrib."},
+    {ids:["110","111"],why:"An-Nasr and Al-Masad: short mufassal, the length encouraged for Maghrib."}
+  ],
+  isha:[
+    {ids:["91","92"],why:"Ash-Shams and Al-Layl: the Prophet ﷺ told Mu'adh to recite these in Isha (Bukhari 705, Muslim 465)."},
+    {ids:["87","91"],why:"Al-A'la and Ash-Shams: both named in the Mu'adh hadith for Isha."},
+    {ids:["92","93"],why:"Al-Layl and Ad-Duha: both named in the Mu'adh hadith for Isha."},
+    {ids:["87","88"],why:"Al-A'la and Al-Ghashiyah: the Prophet ﷺ paired them in Jumu'ah and Eid (Muslim 878)."},
+    {ids:["95","96"],why:"At-Tin: the Prophet ﷺ recited it in Isha (Bukhari 767)."},
+    {ids:["84","86"],why:"Al-Inshiqaq: recited in Isha with a prostration, as the Prophet ﷺ did (Bukhari 766)."},
+    {ids:["89","90"],why:"Al-Fajr and Al-Balad: medium mufassal, the length encouraged for Isha."}
+  ]
+};
+SURAHS.forEach(function(s){CARDS[String(s[0])]={en:s[1]};});
+var POOL=EXTRAS.concat(SURAHS.map(function(s){return String(s[0]);}));
+var DAYS=["mon","tue","wed","thu","fri","sat","sun"];
+var DAYL={mon:"Mon",tue:"Tue",wed:"Wed",thu:"Thu",fri:"Fri",sat:"Sat",sun:"Sun"};
+var PRAYERS=[{id:"fajr",en:"Fajr"},{id:"maghrib",en:"Maghrib"},{id:"isha",en:"Isha"}];
+var pname=function(id){return PRAYERS.filter(function(P){return P.id===id;})[0].en;};
+
+var state=null;
+var todayKey=DAYS[(new Date().getDay()+6)%7];
+var locked=true,dirty=false,picked=null,status="";
+
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+// Classical mufassal lengths (Hanafi): tiwal to Al-Buruj, awsat to Al-Bayyinah, qisar after.
+function tier(id){var c=CARDS[id];if(!c)return "";if(c.t)return " "+c.t;if(c.kahf)return " t-ps";var n=+id;return n<=85?" t-lg":n<=98?" t-md":" t-sh";}
+function same(a,b){return a&&b&&a.d===b.d&&a.p===b.p&&a.i===b.i;}
+function suraHtml(id,attrs,extra){
+  var c=id&&CARDS[id];
+  var inner=c?'<span class="num">'+(c.num||id)+'</span><span class="en">'+esc(c.en)+'</span>':(locked?"—":"Choose a sura");
+  return '<button class="sura'+tier(id)+(c?"":" empty")+(extra||"")+'"'+attrs+'>'+inner+'</button>';
+}
+function cellHtml(d,p){
+  var v=state.rota[d][p], ids=state.cells[d][p];
+  var h='<div class="cell'+(v==="an"?" an":v==="try"?" try":"")+'"><button class="lead" data-act="rota" data-d="'+d+'" data-p="'+p+'"'+(locked?" disabled":"")+'>'+NAMES[v]+'</button>';
+  [0,1].forEach(function(i){
+    var id=ids[i];
+    var attrs=locked?" disabled":' data-act="slot" data-d="'+d+'" data-p="'+p+'" data-i="'+i+'" aria-haspopup="dialog"';
+    attrs+=' aria-label="'+DAYL[d]+" "+p+" rak'ah "+(i+1)+": "+esc(id&&CARDS[id]?CARDS[id].en:"empty")+'"';
+    h+=suraHtml(id,attrs,same(picked,{d:d,p:p,i:i})?" picked":"");
+  });
+  return h+'</div>';
+}
+var LOCK_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+var OPEN_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></svg>';
+var SHUF='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="M4 4l5 5"/></svg>';
+function render(){
+  var app=document.getElementById("app");
+  app.className=locked?"":"unlocked";
+  var n=0;DAYS.forEach(function(d){PRAYERS.forEach(function(P){if(state.rota[d][P.id]!=="tk")n++;});});
+  var h='<a class="back" href="/">← Family dashboard</a><header class="top"><div><h1>Who leads this week</h1><span class="sub">Ansar leads '+n+' of 21 recited prayers · top card = rak\'ah 1, bottom card = rak\'ah 2</span></div>'+
+    '<button class="lock'+(locked?"":" open")+'" data-act="lock" aria-pressed="'+!locked+'">'+(locked?LOCK_SVG+"Locked · tap to edit":OPEN_SVG+(dirty?"Lock and save":"Lock"))+'</button>'+
+    '</header><div class="status" role="status">'+esc(status)+'</div>';
+  h+='<div class="rota-wrap"><table class="rota"><colgroup><col class="p">'+DAYS.map(function(){return "<col>";}).join("")+'</colgroup><thead><tr><th></th>'+
+    DAYS.map(function(d){return '<th class="'+(d===todayKey?"today":"")+'">'+DAYL[d]+(d===todayKey?" · today":"")+'</th>';}).join("")+'</tr></thead><tbody>';
+  PRAYERS.forEach(function(P){h+='<tr><th scope="row"><span class="ph">'+P.en+'<button class="shuf" data-act="shuffle" data-p="'+P.id+'" title="Shuffle TK\'s '+P.en+' from sunnah pairs" aria-label="Shuffle TK\'s '+P.en+' suras from sunnah pairs">'+SHUF+'</button></span></th>'+DAYS.map(function(d){return '<td class="'+(d===todayKey?"today":"")+'">'+cellHtml(d,P.id)+'</td>';}).join("")+'</tr>';});
+  h+='</tbody></table></div><div class="legend"><span class="who"><span class="dot"></span>TK</span><span class="who"><span class="dot an"></span>Ansar</span><span>Dashed = trial</span>'+(locked?"":"<span>Tap a card to choose its sura · tap a name to change who leads</span>")+'</div>'+
+    '<div class="key" aria-label="Colour key"><span class="t-lg"><i></i>Long · sunnah for Fajr</span><span class="t-md"><i></i>Medium · sunnah for Isha</span><span class="t-sh"><i></i>Short · sunnah for Maghrib</span><span class="t-ps"><i></i>Passage from a longer sura</span></div>'+
+    '<details class="why"><summary>How the shuffle buttons choose</summary><p>Each shuffle fills TK\'s days for that prayer with pairs drawn from the list below, without repeating a pair in the week. Ansar\'s cards are left as you set them. References are worth confirming with your imam.</p>'+
+    PRAYERS.map(function(P){var list=PAIRS[P.id].slice();if(P.id==="fajr")list.unshift(PAIRS.fajrFri);
+      return '<h3>'+P.en+'</h3><ul>'+list.map(function(x){return '<li><b>'+x.ids.map(function(id){return CARDS[id].num||id;}).join(" + ")+'</b> '+esc(x.why)+'</li>';}).join("")+'</ul>';}).join("")+'</details>';
+  h+='<section class="pool" aria-label="Suras"><h2>Suras and passages</h2><h3 class="t-ps"><i></i>Passages and Friday Fajr suras</h3><div class="pool-grid">'+
+    EXTRAS.map(function(id){var c=CARDS[id];return '<div class="sura'+tier(id)+'"><span class="num">'+c.num+'</span><span class="en">'+esc(c.en)+'</span></div>';}).join("")+'</div>'+
+    [["t-lg","Long","78–85 · Fajr",78,85],["t-md","Medium","86–98 · Isha",86,98],["t-sh","Short","99–114 · Maghrib",99,114]].map(function(g){
+      return '<h3 class="'+g[0]+'"><i></i>'+g[1]+' <small>'+g[2]+'</small></h3><div class="pool-grid">'+
+        SURAHS.filter(function(s){return s[0]>=g[3]&&s[0]<=g[4];}).map(function(s){return '<div class="sura '+g[0]+'"><span class="num">'+s[0]+'</span><span class="en">'+esc(s[1])+'</span></div>';}).join("")+'</div>';
+    }).join("")+'</section>';
+  app.innerHTML=h;
+}
+var dlg=document.createElement("dialog");dlg.className="picker";document.body.appendChild(dlg);
+function openPicker(dst){
+  picked=dst;render();
+  var cur=state.cells[dst.d][dst.p][dst.i], used={};
+  DAYS.forEach(function(d){state.cells[d][dst.p].forEach(function(id){if(id){(used[id]=used[id]||[]);if(used[id].indexOf(DAYL[d])<0)used[id].push(DAYL[d]);}});});
+  dlg.innerHTML='<div class="pk-head"><h2>Choose a sura</h2><span class="sub">'+DAYL[dst.d]+' · '+pname(dst.p)+' · rak\'ah '+(dst.i+1)+'</span><span class="pk-key"><i></i>Darker = already on the board for '+pname(dst.p)+'</span></div>'+
+    '<div class="pk-grid">'+POOL.map(function(id){var c=CARDS[id];return '<button class="pk'+tier(id)+(used[id]?" used":"")+(id===cur?" cur":"")+'" data-id="'+id+'"'+(id===cur?' aria-current="true"':"")+'><span class="num">'+(c.num||id)+'</span><span class="en">'+esc(c.en)+'</span>'+(used[id]?'<span class="on">'+used[id].join(" · ")+'</span>':"")+'</button>';}).join("")+'</div>'+
+    '<div class="pk-foot"><button class="pk-cancel" data-cancel>Cancel</button></div>';
+  dlg.showModal();
+  var f=dlg.querySelector(".pk.cur")||dlg.querySelector(".pk");if(f){f.focus();f.scrollIntoView({block:"center"});}
+}
+dlg.addEventListener("click",function(ev){
+  if(ev.target===dlg||ev.target.closest("[data-cancel]")){dlg.close();return;}
+  var b=ev.target.closest(".pk");if(!b||!picked)return;
+  state.cells[picked.d][picked.p][picked.i]=b.dataset.id;touch();dlg.close();
+});
+dlg.addEventListener("close",function(){picked=null;render();});
+function touch(){dirty=true;state.updated=new Date().toISOString();}
+
+// Family PIN: same unlock the dashboard uses (/api/family-unlock sets the session cookie).
+function askPin(){
+  return new Promise(function(resolve){
+    var d=document.createElement("dialog");d.className="pin";
+    d.innerHTML='<form><h2>Unlock to save</h2><span class="sub">Use the family PIN. This device will remember it.</span><input type="password" inputmode="numeric" autocomplete="off" aria-label="Family PIN" required><p class="err" role="alert"></p><div class="row"><button type="button" data-no>Cancel</button><button type="submit">Unlock & save</button></div></form>';
+    document.body.appendChild(d);
+    var done=function(ok){d.close();d.remove();resolve(ok);};
+    d.querySelector("[data-no]").onclick=function(){done(false);};
+    d.addEventListener("cancel",function(){done(false);});
+    d.querySelector("form").onsubmit=function(e){
+      e.preventDefault();
+      fetch("/api/family-unlock",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({pin:d.querySelector("input").value})})
+        .then(function(r){return r.json().then(function(b){if(r.ok)done(true);else d.querySelector(".err").textContent=b.error||"Could not unlock";});})
+        .catch(function(){d.querySelector(".err").textContent="Could not unlock";});
+    };
+    d.showModal();
+  });
+}
+function put(){return fetch("/api/prayer",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(state)});}
+function save(){
+  status="Saving…";render();
+  put().then(function(r){
+    if(r.status!==401)return r;
+    return askPin().then(function(ok){return ok?put():r;});
+  }).then(function(r){
+    if(r.ok){status="Saved. The dashboard shows it within a minute.";dirty=false;}
+    else if(r.status===409){return r.json().then(function(b){state=b.board;dirty=false;status="Someone saved a newer board. Showing that one now.";});}
+    else if(r.status===401){status="Not saved: unlock with the family PIN to save.";locked=false;}
+    else status="Couldn't save. Try Lock again.";
+  }).catch(function(){status="Couldn't save. Check the connection and try Lock again.";locked=false;})
+  .then(function(){render();});
+}
+document.getElementById("app").addEventListener("click",function(ev){
+  var el=ev.target.closest("[data-act]");if(!el||!state)return;
+  var ds=el.dataset,act=ds.act;
+  if(act==="lock"){
+    if(locked){locked=false;status="Unlocked.";render();}
+    else{locked=true;picked=null;if(dirty)save();else{status="";render();}}
+    return;
+  }
+  if(act==="shuffle"){
+    var list=PAIRS[ds.p].slice(),k=0;
+    for(var j=list.length-1;j>0;j--){var r=Math.floor(Math.random()*(j+1)),t=list[j];list[j]=list[r];list[r]=t;}
+    DAYS.forEach(function(d){
+      if(state.rota[d][ds.p]!=="tk")return;
+      var pick=(ds.p==="fajr"&&d==="fri")?PAIRS.fajrFri:list[k++%list.length];
+      state.cells[d][ds.p]=pick.ids.slice();
+    });
+    touch();locked=false;status=pname(ds.p)+" shuffled from sunnah pairs. Tap Lock to save.";render();return;
+  }
+  if(locked)return;
+  if(act==="rota"){var cyc={tk:"an",an:"try",try:"tk"};state.rota[ds.d][ds.p]=cyc[state.rota[ds.d][ds.p]];touch();render();return;}
+  if(act==="slot")openPicker({d:ds.d,p:ds.p,i:+ds.i});
+});
+window.addEventListener("beforeunload",function(e){if(dirty){e.preventDefault();e.returnValue="";}});
+fetch("/api/prayer",{cache:"no-store"}).then(function(r){if(!r.ok)throw 0;return r.json();})
+  .then(function(b){state=b;render();})
+  .catch(function(){document.getElementById("app").innerHTML='<p style="padding:20px">The prayer board could not be loaded. Refresh to try again.</p>';});
+})();
+</script>
+</body></html>
