@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import './home.css';
 import { demoMoney, demoNow } from './demo';
 import { PopupStage, usePopups, type Popup } from './Popups';
+import { chime, soundReady, unlockSound } from './sound';
+import { familyWrite } from '../FamilyEditGate';
 import { RAG_LABEL, conversionRag, goalRag, listRag, paceRag, type Rag } from './rag';
 
 /* The family home board. One screen: an announcement bar, a column per person,
@@ -16,13 +18,14 @@ import { RAG_LABEL, conversionRag, goalRag, listRag, paceRag, type Rag } from '.
    Polling pauses while the tab is hidden (Netlify bills per request).
    ?demo=1 renders a weekday fixture so the layout can be judged on a weekend. */
 
-export type Item = { id: string; title: string; done: boolean; count: string | null };
+export type Item = { id: string; title: string; done: boolean; count: string | null; auto?: boolean; source?: string };
 export type Tasks = { done: number; total: number; items: Item[] } | null;
 export type Slot = { title: string; emoji: string; category: string; start: string; end: string; ticked: boolean | null };
 export type NowFeed = {
   generatedAt: string; weekday: string;
   ansar: { day: Slot[]; nextDay: { weekday: string; slots: { title: string; emoji: string; start: string }[] } | null; habits: Tasks; schoolTicks: { done: number; total: number } | null };
   nihal: Tasks; taylan: Tasks;
+  week?: { people: { id: string; days: { date: string; pct: number | null }[] }[]; pace: { key: string; label: string; value: string; of: string | null; pct: number | null; state: 'good' | 'warn' | null; stateLabel: string; note: string }[] } | null;
   prayer: { next: { name: string; at: string; leaderName: string; suras: string[] }; today: { prayer: string; name: string; at: string; leaderName: string }[] } | null;
   calendar: { id: string; subject: string; startISO: string; isAllDay: boolean; who: string }[] | null;
   store: { currency: string; today: { label: string; orders: number; revenue: number; sessions: number | null; conversion: number | null } | null; week: { date: string; revenue: number; orders: number }[]; weekRevenue: number; weekOrders: number; avgOrders: number; avgRevenue: number; dayFraction: number } | null;
@@ -58,6 +61,39 @@ function melHour(d: Date) {
 }
 const railPct = (d: Date) => Math.min(100, Math.max(0, (melHour(d) - DAY_START) / (DAY_END - DAY_START) * 100));
 const ragCls = (r: Rag) => r ? ` rag-${r}` : '';
+
+/** The board's sky: background and drifting colours follow the sun, from the
+ *  prayer times. Sunrise is taken as Fajr + 88 min (Guidance's gap on 25 Oct). */
+type Sky = { name: string; bg: string; b: [string, string, string] };
+const SKIES: Record<string, Sky> = {
+  night: { name: 'Night', bg: '#eee9e1', b: ['#9fb0c4', '#b9b3cf', '#c9d3dc'] },
+  dawn: { name: 'Dawn', bg: '#f8ebdf', b: ['#f4b49a', '#f7d3a8', '#e7c3c9'] },
+  day: { name: 'Day', bg: '#f6f1e8', b: ['#f0b089', '#9cc3b9', '#e9c9a6'] },
+  golden: { name: 'Golden hour', bg: '#f8ecd9', b: ['#f0a860', '#e9b98a', '#f3cf8e'] },
+  dusk: { name: 'Dusk', bg: '#f1e7e5', b: ['#c79bb0', '#a3a4cf', '#e0b7a4'] },
+};
+function skyAt(now: Date, times: { prayer: string; at: string }[]): Sky {
+  const t = (p: string) => { const x = times.find(y => y.prayer === p); return x ? new Date(x.at).getTime() : null; };
+  const f = t('fajr'), m = t('maghrib'), i = t('isha'), n = now.getTime();
+  if (f === null || m === null || i === null) return SKIES.day;
+  const sunrise = f + 88 * 60000;
+  if (n < f || n >= i) return SKIES.night;
+  if (n < sunrise + 60 * 60000) return SKIES.dawn;
+  if (n < m - 90 * 60000) return SKIES.day;
+  if (n < m) return SKIES.golden;
+  return SKIES.dusk;
+}
+
+/** A heartbeat line whose beat follows the store's sessions per hour today. */
+function Heartbeat({ perHour, spike }: { perHour: number; spike: boolean }) {
+  const beat = Math.min(4, Math.max(0.55, 3600 / Math.max(1, perHour) / 20));
+  const unit = 'h18 l6 -14 l6 26 l6 -18 l4 6 h20';
+  return (
+    <div className={'hb-heart' + (spike ? ' spike' : '')}>
+      <svg viewBox="0 0 400 40" preserveAspectRatio="none" aria-hidden="true"><path d={`M0 22 ${Array.from({ length: 7 }, () => unit).join(' ')}`} style={{ animationDuration: `${beat * 1.0}s` }} /></svg>
+    </div>
+  );
+}
 
 function Ring({ done, total, rag, active }: { done: number; total: number; rag: Rag; active: boolean }) {
   const r = 26, c = 2 * Math.PI * r, pct = total ? done / total : 0;
@@ -99,6 +135,11 @@ export default function HomeBoard() {
   const [gotAt, setGotAt] = useState<number | null>(null);
   const prev = useRef<NowFeed | null>(null);
   const fired = useRef<Set<string>>(new Set());
+  const [ticks, setTicks] = useState<Record<string, { done: boolean; at: number }>>({});
+  const mine = useRef<Set<string>>(new Set());
+  const [spikeAt, setSpikeAt] = useState(0);
+  const [sound, setSound] = useState(false);
+  const [soundBlocked, setSoundBlocked] = useState(false);
   const popups = usePopups();
   const { push } = popups;
 
@@ -108,7 +149,7 @@ export default function HomeBoard() {
     const people: [string, (f: NowFeed) => Tasks][] = [['Ansar', f => f.ansar.habits], ['Nihal', f => f.nihal], ['TK', f => f.taylan]];
     for (const [who, pick] of people) {
       const before = new Set(pick(a)?.items.filter(i => i.done).map(i => i.id));
-      for (const item of pick(b)?.items ?? []) if (item.done && !before.has(item.id)) { newly.push(item.id); push({ kind: 'tick', who, title: item.title }); }
+      for (const item of pick(b)?.items ?? []) if (item.done && !before.has(item.id) && !mine.current.delete(item.id)) { newly.push(item.id); push({ kind: 'tick', who, title: item.title }); }
       const p = pick(b);
       if (p && p.total && p.done === p.total && (pick(a)?.done ?? 0) < p.total) push({ kind: 'complete', who, total: p.total });
     }
@@ -116,7 +157,7 @@ export default function HomeBoard() {
     const blocks = b.ansar.day.filter(s => s.ticked !== null);
     for (const s of blocks) if (s.ticked && !beforeBlocks.has(s.title)) { newly.push(s.title); push({ kind: 'block', emoji: s.emoji, title: s.title, done: blocks.filter(x => x.ticked).length, total: blocks.length }); }
     const o1 = a.store?.today?.orders ?? 0, o2 = b.store?.today?.orders ?? 0;
-    if (b.store?.today && a.store?.today?.label === b.store.today.label && o2 > o1) push({ kind: 'order', added: o2 - o1, orders: o2, revenue: b.store.today.revenue });
+    if (b.store?.today && a.store?.today?.label === b.store.today.label && o2 > o1) { push({ kind: 'order', added: o2 - o1, orders: o2, revenue: b.store.today.revenue }); setSpikeAt(Date.now()); }
     if (newly.length) { setFresh(new Set(newly)); setTimeout(() => setFresh(new Set()), 2600); }
   }, [push]);
 
@@ -129,8 +170,21 @@ export default function HomeBoard() {
   }, [announce, demo]);
 
   const loadMoney = useCallback(async () => {
-    try { setCash(demo ? demoMoney : await fetch('/api/money-board', { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(); return r.json(); })); } catch { /* keep the last good one */ }
-  }, [demo]);
+    let m: Money;
+    try { m = demo ? demoMoney : await fetch('/api/money-board', { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(); return r.json(); }); } catch { return; /* keep the last good one */ }
+    setCash(m);
+    // A goal step reached is celebrated once per device: the weekly goal once per CLEO week, the bank goals once ever.
+    let seen: string[] = [];
+    try { seen = JSON.parse(localStorage.getItem('hb-goals-seen') || '[]'); } catch { /* private window */ }
+    m.goals.forEach((g, i) => {
+      const key = i === 2 ? `${g.short}-${m.asOf.slice(0, 10)}` : g.short;
+      if (g.pct >= 100 && (demo || !seen.includes(key))) {
+        seen.push(key);
+        push({ kind: 'goal', short: g.short, label: i === 2 ? 'weekly business take-home' : 'in the bank, net of card debt', now: g.now !== undefined ? `${money(g.now)} this week` : null });
+      }
+    });
+    try { localStorage.setItem('hb-goals-seen', JSON.stringify(seen.slice(-40))); } catch { /* private window */ }
+  }, [demo, push]);
 
   // Polling, paused while hidden; a returning tab refreshes at once.
   useEffect(() => {
@@ -145,6 +199,34 @@ export default function HomeBoard() {
 
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
   useEffect(() => { const t = setInterval(() => setSlide(s => s + 1), ROTATE); return () => clearInterval(t); }, []);
+
+  // Sound: remembered per device; after a reload the browser needs one tap anywhere to allow it.
+  useEffect(() => {
+    let on = false;
+    try { on = localStorage.getItem('hb-sound') === 'on'; } catch { /* private window */ }
+    if (!on) return;
+    const t = setTimeout(() => { setSound(true); unlockSound(); setSoundBlocked(!soundReady()); }, 0);
+    const tap = () => { unlockSound(); setTimeout(() => setSoundBlocked(!soundReady()), 200); };
+    window.addEventListener('pointerdown', tap);
+    return () => { clearTimeout(t); window.removeEventListener('pointerdown', tap); };
+  }, []);
+  function toggleSound() {
+    const next = !sound;
+    setSound(next);
+    try { localStorage.setItem('hb-sound', next ? 'on' : 'off'); } catch { /* private window */ }
+    if (next) { unlockSound(); setTimeout(() => { setSoundBlocked(!soundReady()); chime(); }, 150); }
+  }
+  const onShow = useCallback((p: Popup) => { if (sound && (p.kind === 'prayer' || p.kind === 'goal')) chime(); }, [sound]);
+
+  /** Tap a hand-ticked task to tick or untick it (family PIN, same as before). */
+  async function toggle(item: Item, done: boolean) {
+    if (item.auto) return;
+    setTicks(t => ({ ...t, [item.id]: { done: !done, at: Date.now() } }));
+    if (!done) mine.current.add(item.id);
+    const r = await familyWrite('/api/daily', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ taskId: item.id, done: !done }) }).catch(() => null);
+    if (!r?.ok) { mine.current.delete(item.id); setTicks(t => { const c = { ...t }; delete c[item.id]; return c; }); return; }
+    if (!done) push({ kind: 'tick', who: 'You', title: item.title });
+  }
 
   const day = useMemo(() => feed?.ansar.day ?? [], [feed]);
   const current = day.find(s => new Date(s.start) <= now && now < new Date(s.end));
@@ -225,14 +307,41 @@ export default function HomeBoard() {
   if (demo === null) return <main className="hb" />;
 
   const hour = melHour(now);
-  const personCard = (name: string, sub: string, t: Tasks | undefined) => {
+  const isSunday = feed?.weekday === 'Sun';
+  // A tap shows at once; the CDN-cached feed catches up within ~90 s.
+  const withTicks = (t: Tasks | undefined): Tasks | undefined => {
+    if (!t) return t;
+    const items = t.items.map(i => { const o = ticks[i.id]; return o && now.getTime() - o.at < 90_000 ? { ...i, done: o.done } : i; });
+    return { ...t, items, done: items.filter(i => i.done).length };
+  };
+  const weekView = (id: string, keys: string[]) => {
+    const w = feed?.week, days = w?.people.find(p => p.id === id)?.days.filter(d => d.pct !== null) ?? [];
+    const avg = days.length ? Math.round(days.reduce((a, d) => a + (d.pct ?? 0), 0) / days.length * 100) : null;
+    const best = days.reduce<{ date: string; pct: number | null } | null>((b, d) => (d.pct ?? 0) > (b?.pct ?? -1) ? d : b, null);
+    return (
+      <div className="hb-week">
+        <div className="hb-week-head"><span className="hb-eye">This week</span><b className={'hb-num' + ragCls(avg === null ? null : goalRag(avg))}>{avg === null ? '—' : `${avg}%`}</b><small>{best && best.pct ? `best ${new Intl.DateTimeFormat('en-AU', { weekday: 'long', timeZone: 'UTC' }).format(new Date(best.date + 'T12:00:00Z'))}` : 'of the daily list, Mon–Sat'}</small></div>
+        <div className="hb-week-bars">{days.map((d, i) => <div key={d.date} className={ragCls(goalRag(Math.round((d.pct ?? 0) * 100)))}><i style={{ height: `${Math.max(4, (d.pct ?? 0) * 100)}%`, animationDelay: `${i * 0.08}s` }} /><span>{new Intl.DateTimeFormat('en-AU', { weekday: 'narrow', timeZone: 'UTC' }).format(new Date(d.date + 'T12:00:00Z'))}</span></div>)}</div>
+        <ul className="hb-week-tiles">{(w?.pace ?? []).filter(x => keys.includes(x.key)).map(x => <li key={x.key} className={ragCls(x.state === 'good' ? 'good' : x.state === 'warn' ? 'bad' : null)}><span>{x.label}</span><b>{x.value}{x.of ? <small> {x.of}</small> : null}</b><em>{x.stateLabel}</em></li>)}</ul>
+      </div>
+    );
+  };
+
+  const personCard = (name: string, sub: string, raw: Tasks | undefined, id: string, keys: string[]) => {
+    const t = withTicks(raw);
     const n = nextTask(t), rag = t ? listRag(t.done, t.total, hour) : null;
+    if (isSunday && t !== undefined) return (
+      <section className="hb-card">
+        <div className="hb-head"><div><h2>{name}</h2><p>{sub} · week in review</p></div></div>
+        {weekView(id, keys)}
+      </section>
+    );
     return (
       <section className="hb-card">
         <div className="hb-head"><div><h2>{name}</h2><p>{sub} <Pill rag={rag} /></p></div><Ring done={t?.done ?? 0} total={t?.total ?? 0} rag={rag} active={!!n} /></div>
         {t === undefined ? <p className="hb-empty">Loading…</p> : t === null ? <p className="hb-empty">Not available right now.</p> : !t.total ? <div className="hb-now idle"><span className="hb-eye">Today</span><strong>Rest day — nothing scheduled</strong></div> : <>
           <div className={'hb-now' + (n ? '' : ' idle')}><span className="hb-eye">{n ? <><i className="hb-pulse" />Up next</> : 'Today'}</span><strong>{n ? n.title : 'All done today ✓'}</strong>{n && <small>{t.total - t.done} left of {t.total}</small>}</div>
-          <ul className="hb-list">{t.items.map(i => <li key={i.id} className={'hb-item' + (i.done ? ' done' : '') + (i === n ? ' now' : '') + (fresh.has(i.id) ? ' fresh' : '')}><span className="hb-check" /><span>{i.title}</span><span className="t">{i.count ?? ''}</span></li>)}</ul>
+          <ul className="hb-list">{t.items.map(i => <li key={i.id} className={'hb-item' + (i.done ? ' done' : '') + (i === n ? ' now' : '') + (fresh.has(i.id) ? ' fresh' : '') + (i.auto ? '' : ' tap')} onClick={() => toggle(i, i.done)} title={i.auto ? `Ticks itself from ${i.source ?? 'its app'}` : 'Tap to tick'}><span className="hb-check" /><span>{i.title}</span><span className="t">{i.count ?? (i.auto ? 'auto' : '')}</span></li>)}</ul>
         </>}
       </section>
     );
@@ -248,7 +357,9 @@ export default function HomeBoard() {
   const times = feed?.prayer?.today ?? [];
   const maghrib = times.find(p => p.prayer === 'maghrib'), fajr = times.find(p => p.prayer === 'fajr');
   const isNight = !!maghrib && !!fajr && (now >= new Date(maghrib.at) || now < new Date(fajr.at));
+  const sky = skyAt(now, times);
   const st = feed?.store;
+  const perHour = st?.today?.sessions ? st.today.sessions / Math.max(0.5, st.dayFraction * 24) : 0;
   const ordersRag = st?.today ? paceRag(st.today.orders, st.avgOrders * st.dayFraction) : null;
   const revenueRag = st?.today ? paceRag(st.today.revenue, st.avgRevenue * st.dayFraction) : null;
   const convRag = conversionRag(st?.today?.conversion ?? null);
@@ -264,7 +375,7 @@ export default function HomeBoard() {
   ];
 
   return (
-    <main className={'hb' + (isNight ? ' night' : '')}>
+    <main className={'hb' + (isNight ? ' night' : '')} style={{ '--sky': sky.bg, '--b1': sky.b[0], '--b2': sky.b[1], '--b3': sky.b[2] } as React.CSSProperties}>
       <div className="hb-amb" aria-hidden="true"><i /><i /><i /></div>
 
       <div className="hb-bar">
@@ -288,20 +399,25 @@ export default function HomeBoard() {
         )}
         <div className="hb-clock">
           <div className="hb-num">{fmtTime(now)}</div>
+          <div className="hb-clock-meta">
           <div className="hb-sec"><i style={{ width: `${now.getSeconds() / 59 * 100}%` }} /></div>
           <div>{new Intl.DateTimeFormat('en-AU', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long' }).format(now)}</div>
+          <div>
+          <button className={'hb-sound' + (sound ? ' on' : '') + (sound && soundBlocked ? ' blocked' : '')} onClick={toggleSound} title={sound && soundBlocked ? 'Tap anywhere to allow sound' : 'Chime for prayers and goals'}>{sound ? (soundBlocked ? '🔈 Tap for sound' : '🔔 Sound on') : '🔕 Sound off'}</button>
           <div className={'hb-live' + (failed ? ' off' : '')}><i />{failed ? 'Reconnecting' : demo ? 'Demo' : ago === null ? 'Connecting' : `Live · ${ago < 60 ? `${ago}s` : `${Math.round(ago / 60)}m`} ago`}</div>
+          </div>
+          </div>
         </div>
       </div>
 
       <div className="hb-people">
         <section className="hb-card">
           <div className="hb-head"><div><h2>Ansar</h2><p>Homeschool{feed?.ansar.schoolTicks?.total ? ` · ${feed.ansar.schoolTicks.done}/${feed.ansar.schoolTicks.total} blocks ticked` : ''} <Pill rag={blockRag} /></p></div>
-            <Ring done={feed?.ansar.habits?.done ?? 0} total={feed?.ansar.habits?.total ?? 0} rag={feed?.ansar.habits ? listRag(feed.ansar.habits.done, feed.ansar.habits.total, hour) : null} active={!!current} /></div>
+            {!isSunday && <Ring done={feed?.ansar.habits?.done ?? 0} total={feed?.ansar.habits?.total ?? 0} rag={feed?.ansar.habits ? listRag(feed.ansar.habits.done, feed.ansar.habits.total, hour) : null} active={!!current} />}</div>
           {!feed ? <p className="hb-empty">Loading…</p> : !day.length ? <>
-            <div className="hb-now idle"><span className="hb-eye">Today</span><strong>No school today</strong><small>Habits {feed.ansar.habits?.done ?? 0}/{feed.ansar.habits?.total ?? 0}</small></div>
-            {feed.ansar.nextDay && <><p className="hb-next"><b>{WEEKDAY[feed.ansar.nextDay.weekday]}&apos;s plan</b></p>
-              <ul className="hb-list">{feed.ansar.nextDay.slots.map(s => <li key={s.title} className="hb-item"><span className="hb-check" /><span>{s.emoji} {s.title}</span><span className="t">{s.start}</span></li>)}</ul></>}
+            {isSunday ? weekView('ansar', ['ansar']) : <div className="hb-now idle"><span className="hb-eye">Today</span><strong>No school today</strong><small>Habits {feed.ansar.habits?.done ?? 0}/{feed.ansar.habits?.total ?? 0}</small></div>}
+            {feed.ansar.nextDay && <div className="hb-plan"><span className="hb-eye">{WEEKDAY[feed.ansar.nextDay.weekday]}&apos;s plan</span>
+              <ul>{feed.ansar.nextDay.slots.map(s => <li key={s.title}><small>{s.start}</small><b>{s.emoji} {short(s.title)}</b></li>)}</ul></div>}
           </> : <>
             <div className="hb-flowrow">
               <div className="done"><span>Done</span><b>{lastDone ? `${lastDone.emoji} ${short(lastDone.title)}` : '—'}</b></div>
@@ -314,15 +430,15 @@ export default function HomeBoard() {
               {current && <><div className="hb-prog"><i style={{ width: `${Math.min(100, (now.getTime() - new Date(current.start).getTime()) / (new Date(current.end).getTime() - new Date(current.start).getTime()) * 100)}%` }} /></div>
                 <small>{clockDown(new Date(current.end).getTime() - now.getTime())} left{current.ticked === true ? ' · ticked ✓' : current.ticked === false ? ' · not ticked yet' : ''}</small></>}
             </div>
-            <ul className="hb-list">{list.map(s => {
+            <ul className="hb-list">{list.slice(0, 4).map(s => {
               const isNow = s === current, past = new Date(s.end) <= now;
               const cls = s.ticked ? ' done' : isNow ? ' now' : past && s.ticked === false ? ' missed' : past ? ' passed' : '';
               return <li key={s.title + s.start} className={'hb-item' + cls + (fresh.has(s.title) ? ' fresh' : '')}><span className="hb-check" /><span>{s.emoji} {s.title}</span><span className="t">{past && s.ticked === false ? 'not ticked' : fmtTime(s.start)}</span></li>;
-            })}</ul>
+            })}{list.length > 4 && <li className="hb-more">then {list.slice(4).map(s => short(s.title)).join(' · ')}</li>}</ul>
           </>}
         </section>
-        {personCard('Nihal', 'Find & learn', feed?.nihal)}
-        {personCard('TK', 'Build & launch', feed?.taylan)}
+        {personCard('Nihal', 'Find & learn', feed?.nihal, 'nihal', ['discoveries', 'quran'])}
+        {personCard('TK', 'Build & launch', feed?.taylan, 'taylan', ['validated', 'launched'])}
       </div>
 
       <div className="hb-band">
@@ -334,6 +450,7 @@ export default function HomeBoard() {
               <div className={ragCls(revenueRag)}><span><i className="dot" />Revenue</span><b className="hb-num"><Count value={st.today?.revenue ?? 0} prefix="$" /></b><small>pace ${Math.round(st.avgRevenue * st.dayFraction)}</small></div>
               <div className={ragCls(convRag)}><span><i className="dot" />Conversion</span><b className="hb-num">{st.today?.conversion != null ? <Count value={st.today.conversion} decimals={1} suffix="%" /> : '—'}</b><small>target 3%</small></div>
             </div>
+            {st.today?.sessions != null && <div className="hb-pulse-row"><Heartbeat perHour={perHour} spike={now.getTime() - spikeAt < 4000} /><small><b>{st.today.sessions}</b> sessions · ~{Math.round(perHour)}/hr</small></div>}
             <div className="hb-bars" aria-label="Revenue, last seven days">{(() => { const max = Math.max(1, ...st.week.map(w => w.revenue)); return st.week.map((w, i) => <div key={w.date} className={i === st.week.length - 1 ? 'today' : ''}><i style={{ height: `${Math.max(4, w.revenue / max * 100)}%` }} title={`US$${Math.round(w.revenue)}`} /><span>{new Intl.DateTimeFormat('en-AU', { weekday: 'narrow', timeZone: 'UTC' }).format(new Date(w.date + 'T12:00:00Z'))}</span></div>); })()}</div>
             <div className="hb-money"><span>7 days</span><b>US${Math.round(st.weekRevenue).toLocaleString('en-AU')} · {st.weekOrders} orders</b></div>
           </>}
@@ -359,7 +476,7 @@ export default function HomeBoard() {
         <section className="hb-tile">
           <header><h3>Coming up</h3><small>family calendars</small></header>
           {!feed?.calendar?.length ? <p className="hb-empty">{feed ? (feed.calendar ? 'Nothing booked.' : 'Calendar not available.') : 'Loading…'}</p> :
-            <ul className="hb-cal">{feed.calendar.slice(0, 4).map((e, i) => <li key={e.id} className={i === 0 ? 'first' : ''}><b>{e.subject.trim()}</b><span>{fmtDay(e.startISO)}{e.isAllDay ? '' : `, ${fmtTime(e.startISO)}`}{i === 0 && <span className="hb-cd"> · in {clockDown(new Date(e.startISO).getTime() - now.getTime())}</span>}</span><em>{WHO[e.who] ?? e.who}</em></li>)}</ul>}
+            <ul className="hb-cal">{feed.calendar.slice(0, 3).map((e, i) => <li key={e.id} className={i === 0 ? 'first' : ''}><b>{e.subject.trim()}</b><span>{fmtDay(e.startISO)}{e.isAllDay ? '' : `, ${fmtTime(e.startISO)}`}{i === 0 && <span className="hb-cd"> · in {clockDown(new Date(e.startISO).getTime() - now.getTime())}</span>}</span><em>{WHO[e.who] ?? e.who}</em></li>)}</ul>}
         </section>
       </div>
 
@@ -370,10 +487,10 @@ export default function HomeBoard() {
         {times.map(p => { const x = railPct(new Date(p.at)); return x > 0 && x < 100 ? <div key={p.prayer} className={'hb-mark pray' + (new Date(p.at) < now ? ' past' : '')} style={{ left: `${x}%` }}><b>{p.name}</b> {fmtTime(p.at)} · {p.leaderName}</div> : null; })}
         {day.length > 0 && [day[0], day.find(s => /homeschool ends/i.test(s.title)) ?? day[day.length - 1]].map((s, i) => <div key={i} className={'hb-mark low' + (new Date(s.start) < now ? ' past' : '')} style={{ left: `${railPct(new Date(s.start))}%` }}>{i === 0 ? 'School' : 'School ends'} {fmtTime(s.start)}</div>)}
         <div className={'hb-sun' + (isNight ? ' moon' : '')} style={{ left: `${rail}%` }} />
-        <span className="hb-rail-lbl" style={{ left: 0 }}>5am</span><span className="hb-rail-lbl" style={{ right: 0 }}>10pm</span>
+        <span className="hb-rail-lbl" style={{ left: 0 }}>5am · {sky.name}</span><span className="hb-rail-lbl" style={{ right: 0 }}>10pm</span>
       </div>
 
-      <PopupStage current={popups.current} waiting={popups.waiting} done={popups.done} />
+      <PopupStage current={popups.current} waiting={popups.waiting} done={popups.done} onShow={onShow} />
       {demo && <p className="hb-stale">Demo data — remove ?demo to see the live board.</p>}
     </main>
   );

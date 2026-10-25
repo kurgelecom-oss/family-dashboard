@@ -13,9 +13,10 @@ export type Popup =
   | { kind: 'complete'; who: string; total: number }
   | { kind: 'order'; added: number; orders: number; revenue: number }
   | { kind: 'event'; title: string; minutes: number; when: string }
-  | { kind: 'brief'; hour: string; lines: string[] };
+  | { kind: 'brief'; hour: string; lines: string[] }
+  | { kind: 'goal'; short: string; label: string; now: string | null };
 
-const SHOW_MS: Record<Popup['kind'], number> = { prayer: 14000, tick: 7000, block: 8000, complete: 9000, order: 7500, event: 9000, brief: 11000 };
+const SHOW_MS: Record<Popup['kind'], number> = { goal: 13000, prayer: 14000, tick: 7000, block: 8000, complete: 9000, order: 7500, event: 9000, brief: 11000 };
 const OUT_MS = 600;
 
 export function usePopups() {
@@ -23,7 +24,7 @@ export function usePopups() {
   const push = useCallback((p: Popup) => setQueue(q => {
     const item = { ...p, id: Date.now() + Math.random() };
     // Prayer goes straight to the front (after whatever is showing now).
-    return p.kind === 'prayer' ? [...q.slice(0, 1), item, ...q.slice(1)] : [...q, item].slice(0, 12);
+    return p.kind === 'prayer' || p.kind === 'goal' ? [...q.slice(0, 1), item, ...q.slice(1)] : [...q, item].slice(0, 12);
   }), []);
   const done = useCallback(() => setQueue(q => q.slice(1)), []);
   return { current: queue[0] ?? null, waiting: Math.max(0, queue.length - 1), push, done };
@@ -45,20 +46,32 @@ function Roll({ from, to, prefix = '' }: { from: number; to: number; prefix?: st
   return <>{prefix}{Math.round(v).toLocaleString('en-AU')}</>;
 }
 
-export function PopupStage({ current, waiting, done }: { current: (Popup & { id: number }) | null; waiting: number; done: () => void }) {
+export function PopupStage({ current, waiting, done, onShow }: { current: (Popup & { id: number }) | null; waiting: number; done: () => void; onShow?: (p: Popup) => void }) {
   // Keyed by id: each pop-up mounts fresh, so its own leave timer starts clean.
-  return current ? <PopupView key={current.id} p={current} waiting={waiting} done={done} /> : null;
+  return current ? <PopupView key={current.id} p={current} waiting={waiting} done={done} onShow={onShow} /> : null;
 }
 
-function PopupView({ p, waiting, done }: { p: Popup; waiting: number; done: () => void }) {
+function PopupView({ p, waiting, done, onShow }: { p: Popup; waiting: number; done: () => void; onShow?: (p: Popup) => void }) {
   const [leaving, setLeaving] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => { onShow?.(p); }, [p, onShow]);
   useEffect(() => {
     timer.current = setTimeout(() => { setLeaving(true); timer.current = setTimeout(done, OUT_MS); }, SHOW_MS[p.kind]);
     return () => clearTimeout(timer.current);
   }, [p, done]);
   const cls = `pp pp-${p.kind}${leaving ? ' out' : ''}`;
   const more = waiting > 0 && <span className="pp-more">+{waiting} more</span>;
+
+  if (p.kind === 'goal') return (
+    <div className={'pp-veil pp-goalveil' + (leaving ? ' out' : '')} role="alert">
+      <i className="pp-rain" aria-hidden="true">{Array.from({ length: 70 }, (_, i) => <b key={i} style={{ '--x': `${(i * 37) % 100}vw`, '--t': `${2.6 + (i % 7) * 0.45}s`, '--dl': `${(i % 10) * 0.18}s`, '--c': ['#b8612f', '#2b5d57', '#f0b089', '#557a75', '#e9c46a'][i % 5], '--r': `${(i * 53) % 360}deg` } as React.CSSProperties} />)}</i>
+      <div className={'pp pp-goal' + (leaving ? ' out' : '')}>
+        <span className="pp-eye">Goal reached</span>
+        <h2>{p.short}</h2><p>{p.label}</p>{p.now && <small>{p.now}</small>}
+        <div className="pp-stairs" aria-hidden="true"><i /><i /><i /></div>{more}
+      </div>
+    </div>
+  );
 
   if (p.kind === 'prayer') return (
     <div className={'pp-veil' + (leaving ? ' out' : '')} role="alert">

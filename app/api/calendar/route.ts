@@ -22,6 +22,8 @@ type CalEvent = {
   end:   { dateTime: string; timeZone: string };
   isAllDay?: boolean;
   isOrganizer?: boolean;
+  isCancelled?: boolean;
+  responseStatus?: { response?: string };
   /** Outlook web URL for the event — what "tap → the event" opens. */
   webLink?: string;
 };
@@ -68,7 +70,7 @@ async function fetchEvents(accessToken: string, startISO: string, endISO: string
   const url = new URL("https://graph.microsoft.com/v1.0/me/calendarView");
   url.searchParams.set("startDateTime", startISO);
   url.searchParams.set("endDateTime", endISO);
-  url.searchParams.set("$select", "id,subject,start,end,isAllDay,isOrganizer,webLink");
+  url.searchParams.set("$select", "id,subject,start,end,isAllDay,isOrganizer,isCancelled,responseStatus,webLink");
   url.searchParams.set("$orderby", "start/dateTime");
   url.searchParams.set("$top", "20");
 
@@ -123,7 +125,8 @@ export async function GET() {
     try {
       const accessToken = await getAccessToken(refreshToken);
       const raw = await fetchEvents(accessToken, startISO, endISO);
-      raw.filter(e => e.isOrganizer === true).slice(0, 3).forEach(e => {
+      // Own events and invitations (tk, 25 Oct 2026); declined or cancelled ones stay off the board.
+      raw.filter(e => !e.isCancelled && e.responseStatus?.response !== "declined").slice(0, 6).forEach(e => {
         events.push({
           id:       `${account.key}-${e.id}`,
           subject:  e.subject ?? "(No title)",
@@ -143,8 +146,12 @@ export async function GET() {
 
   events.sort((a, b) => new Date(a.startISO).getTime() - new Date(b.startISO).getTime());
 
+  // An invitation shared by two of us shows once: same title and start = same event.
+  const seen = new Set<string>();
+  const unique = events.filter(e => { const k = `${e.subject.trim().toLowerCase()}|${e.startISO}`; if (seen.has(k)) return false; seen.add(k); return true; });
+
   return NextResponse.json({
-    events,
+    events: unique,
     configured,
     missing,
     errors: errors.length ? errors : undefined,

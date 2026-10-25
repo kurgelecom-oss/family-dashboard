@@ -42,7 +42,7 @@ type SchoolBlocks = { blocks: { rowId: string; name: string }[]; done: string[] 
 
 const tasks = (p: DailyPerson | undefined) => p ? {
   done: p.done, total: p.total,
-  items: p.groups.flatMap(g => g.tasks).map(t => ({ id: t.id, title: t.title, done: t.done, count: 'count' in t ? (t as { count?: string }).count ?? null : null })),
+  items: p.groups.flatMap(g => g.tasks).map(t => ({ id: t.id, title: t.title, done: t.done, auto: t.auto, source: t.source, count: t.count ?? null })),
 } : null;
 
 export async function GET() {
@@ -108,6 +108,11 @@ export async function GET() {
     generatedAt: now.toISOString(),
     weekday,
     ansar: { day: ansarDay, nextDay, habits: tasks(person('ansar')), schoolTicks: sb ? { done: sb.done.length, total: sb.blocks.length } : null },
+    // Sunday's weekly results: each person's Mon–Sat bars and the week's pace tiles.
+    week: d ? {
+      people: (['ansar', 'nihal', 'taylan'] as const).map(id => ({ id, days: (person(id)?.week ?? []).filter(x => !x.future).map(x => ({ date: x.date, pct: x.pct })) })),
+      pace: d.pace.map(t => ({ key: t.key, label: t.label, value: t.value, of: t.of, pct: t.pct, state: t.state, stateLabel: t.stateLabel, note: t.note })),
+    } : null,
     nihal: tasks(person('nihal')),
     taylan: tasks(person('taylan')),
     prayer: b ? { next: nextPrayer(b, now), today: todaysPrayers(b, now) } : null,
