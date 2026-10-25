@@ -417,3 +417,11 @@
 .hb-stairs{min-height:110px}
 .hb-cal li{padding:7px 0}
 .hb-rail{height:56px}
+
+/* ── Fit to screen, never scroll (tk, 25 Oct) ──
+   .hb is the window-sized frame; .hb-fit holds the sections at their natural
+   height and is scaled down by HomeBoard when it would not fit. */
+.hb{display:block;overflow:clip}
+.hb-fit{display:grid;grid-template-rows:repeat(5,max-content);gap:1.4vh;transform-origin:top left;position:relative;z-index:1}
+.hb-fit > *{position:relative;z-index:1}
+@media (max-width:900px){.hb{overflow-y:auto}}

@@ -141,6 +141,30 @@ export default function HomeBoard() {
   const [sound, setSound] = useState(false);
   const [soundBlocked, setSoundBlocked] = useState(false);
   const popups = usePopups();
+  // Fit to screen, never scroll: if the content is taller than the window, the whole
+  // board scales down evenly (and widens by the same factor) until it fits.
+  const boxRef = useRef<HTMLElement>(null), fitRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    if (demo === null) return;
+    const box = boxRef.current, el = fitRef.current;
+    if (!box || !el) return;
+    let raf = 0;
+    const fit = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        if (window.innerWidth < 900) { setScale(1); return; } // phones stack and scroll
+        const cs = getComputedStyle(box);
+        const avail = box.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+        const next = Math.min(1, avail / el.offsetHeight);
+        setScale(prev => Math.abs(prev - next) < 0.004 ? prev : next);
+      });
+    };
+    const ro = new ResizeObserver(fit);
+    ro.observe(el); ro.observe(box);
+    fit();
+    return () => { ro.disconnect(); cancelAnimationFrame(raf); };
+  }, [demo]);
   const { push } = popups;
 
   /** Compare two feeds and pop up what changed since the last one. */
@@ -304,7 +328,7 @@ export default function HomeBoard() {
     if (ok) loadMoney();
   }
 
-  if (demo === null) return <main className="hb" />;
+  if (demo === null) return <main ref={boxRef} className="hb" />;
 
   const hour = melHour(now);
   const isSunday = feed?.weekday === 'Sun';
@@ -375,8 +399,9 @@ export default function HomeBoard() {
   ];
 
   return (
-    <main className={'hb' + (isNight ? ' night' : '')} style={{ '--sky': sky.bg, '--b1': sky.b[0], '--b2': sky.b[1], '--b3': sky.b[2] } as React.CSSProperties}>
+    <main ref={boxRef} className={'hb' + (isNight ? ' night' : '')} style={{ '--sky': sky.bg, '--b1': sky.b[0], '--b2': sky.b[1], '--b3': sky.b[2] } as React.CSSProperties}>
       <div className="hb-amb" aria-hidden="true"><i /><i /><i /></div>
+      <div className="hb-fit" ref={fitRef} style={scale < 1 ? { width: `${100 / scale}%`, transform: `scale(${scale})` } : undefined}>
 
       <div className="hb-bar">
         {takeover === 'prayer' && prayer ? (
@@ -488,6 +513,8 @@ export default function HomeBoard() {
         {day.length > 0 && [day[0], day.find(s => /homeschool ends/i.test(s.title)) ?? day[day.length - 1]].map((s, i) => <div key={i} className={'hb-mark low' + (new Date(s.start) < now ? ' past' : '')} style={{ left: `${railPct(new Date(s.start))}%` }}>{i === 0 ? 'School' : 'School ends'} {fmtTime(s.start)}</div>)}
         <div className={'hb-sun' + (isNight ? ' moon' : '')} style={{ left: `${rail}%` }} />
         <span className="hb-rail-lbl" style={{ left: 0 }}>5am · {sky.name}</span><span className="hb-rail-lbl" style={{ right: 0 }}>10pm</span>
+      </div>
+
       </div>
 
       <PopupStage current={popups.current} waiting={popups.waiting} done={popups.done} onShow={onShow} />
