@@ -29,6 +29,7 @@ export type NowFeed = {
   prayer: { next: { name: string; at: string; leaderName: string; suras: string[] }; today: { prayer: string; name: string; at: string; leaderName: string }[] } | null;
   calendar: { id: string; subject: string; startISO: string; isAllDay: boolean; who: string }[] | null;
   store: { currency: string; today: { label: string; orders: number; revenue: number; sessions: number | null; conversion: number | null } | null; week: { date: string; revenue: number; orders: number }[]; weekRevenue: number; weekOrders: number; avgOrders: number; avgRevenue: number; dayFraction: number } | null;
+  ads?: { live: boolean; activeAds: number; reason: string | null } | null;
 };
 export type Money = {
   unlocked: boolean; asOf: string;
@@ -84,13 +85,13 @@ function skyAt(now: Date, times: { prayer: string; at: string }[]): Sky {
   return SKIES.dusk;
 }
 
-/** A heartbeat line whose beat follows the store's sessions per hour today. */
-function Heartbeat({ perHour, spike }: { perHour: number; spike: boolean }) {
-  const beat = Math.min(4, Math.max(0.55, 3600 / Math.max(1, perHour) / 20));
+/** The ad account's pulse: the line beats only while Meta confirms ads are
+   delivering. Stopped, or Meta unreadable, = a flat red line. An order spikes it. */
+function Heartbeat({ live, spike }: { live: boolean; spike: boolean }) {
   const unit = 'h18 l6 -14 l6 26 l6 -18 l4 6 h20';
   return (
-    <div className={'hb-heart' + (spike ? ' spike' : '')}>
-      <svg viewBox="0 0 400 40" preserveAspectRatio="none" aria-hidden="true"><path d={`M0 22 ${Array.from({ length: 7 }, () => unit).join(' ')}`} style={{ animationDuration: `${beat * 1.0}s` }} /></svg>
+    <div className={'hb-heart' + (live ? spike ? ' spike' : '' : ' flat')}>
+      <svg viewBox="0 0 400 40" preserveAspectRatio="none" aria-hidden="true"><path d={live ? `M0 22 ${Array.from({ length: 7 }, () => unit).join(' ')}` : 'M0 22 H800'} /></svg>
     </div>
   );
 }
@@ -383,7 +384,7 @@ export default function HomeBoard() {
   const isNight = !!maghrib && !!fajr && (now >= new Date(maghrib.at) || now < new Date(fajr.at));
   const sky = skyAt(now, times);
   const st = feed?.store;
-  const perHour = st?.today?.sessions ? st.today.sessions / Math.max(0.5, st.dayFraction * 24) : 0;
+  const ads = feed?.ads ?? null;
   const ordersRag = st?.today ? paceRag(st.today.orders, st.avgOrders * st.dayFraction) : null;
   const revenueRag = st?.today ? paceRag(st.today.revenue, st.avgRevenue * st.dayFraction) : null;
   const convRag = conversionRag(st?.today?.conversion ?? null);
@@ -475,7 +476,7 @@ export default function HomeBoard() {
               <div className={ragCls(revenueRag)}><span><i className="dot" />Revenue</span><b className="hb-num"><Count value={st.today?.revenue ?? 0} prefix="$" /></b><small>pace ${Math.round(st.avgRevenue * st.dayFraction)}</small></div>
               <div className={ragCls(convRag)}><span><i className="dot" />Conversion</span><b className="hb-num">{st.today?.conversion != null ? <Count value={st.today.conversion} decimals={1} suffix="%" /> : '—'}</b><small>target 3%</small></div>
             </div>
-            {st.today?.sessions != null && <div className="hb-pulse-row"><Heartbeat perHour={perHour} spike={now.getTime() - spikeAt < 4000} /><small><b>{st.today.sessions}</b> sessions · ~{Math.round(perHour)}/hr</small></div>}
+            {feed && <div className={'hb-pulse-row' + (ads?.live ? '' : ' down')} role="status"><Heartbeat live={!!ads?.live} spike={now.getTime() - spikeAt < 4000} /><small>{ads?.live ? <><b>Ads live</b> · {ads.activeAds} running</> : <b>{ads ? `Ads stopped · ${ads.reason}` : 'Ads unknown · Meta not answering'}</b>}</small></div>}
             <div className="hb-bars" aria-label="Revenue, last seven days">{(() => { const max = Math.max(1, ...st.week.map(w => w.revenue)); return st.week.map((w, i) => <div key={w.date} className={i === st.week.length - 1 ? 'today' : ''}><i style={{ height: `${Math.max(4, w.revenue / max * 100)}%` }} title={`US$${Math.round(w.revenue)}`} /><span>{new Intl.DateTimeFormat('en-AU', { weekday: 'narrow', timeZone: 'UTC' }).format(new Date(w.date + 'T12:00:00Z'))}</span></div>); })()}</div>
             <div className="hb-money"><span>7 days</span><b>US${Math.round(st.weekRevenue).toLocaleString('en-AU')} · {st.weekOrders} orders</b></div>
           </>}

@@ -48,6 +48,7 @@ export function demoNow(prev: NowFeed | null): NowFeed {
       week: [552, 550, 413, 370, 918, 175, 358].map((revenue, i) => ({ date: `2026-10-${20 + i}`, revenue, orders: Math.round(revenue / 60) })),
       weekRevenue: 3336, weekOrders: 52, avgOrders: 7.7, avgRevenue: 496, dayFraction: 0.55,
     },
+    ads: step % 4 === 3 ? { live: false, activeAds: 0, reason: 'no ads delivering' } : { live: true, activeAds: 71, reason: null },
   };
 }
 

@@ -37,6 +37,24 @@ function todayAt(clock: string, now: Date): Date | null {
   return new Date(Date.UTC(+p.year, +p.month - 1, +p.day, h, +m[2]) - offset * 60000);
 }
 
+/** Is the Omega X ad account (Pinnacle) delivering right now? Live = account
+   active and at least one ad whose effective status is ACTIVE (that also means
+   its campaign and ad set are on). One Graph call per CDN minute. */
+const ADS_ACCOUNT = 'act_873012775622153';
+const ACCOUNT_STATUS: Record<number, string> = { 2: 'account disabled', 3: 'payment unsettled', 7: 'in risk review', 8: 'pending settlement', 100: 'closing', 101: 'account closed' };
+async function adsLive() {
+  const token = process.env.FAMILY_ADS_TOKEN;
+  if (!token) throw new Error('FAMILY_ADS_TOKEN not set');
+  const u = new URL(`https://graph.facebook.com/v24.0/${ADS_ACCOUNT}`);
+  u.searchParams.set('fields', 'account_status,ads.effective_status(["ACTIVE"]).limit(1).summary(total_count){id}');
+  const r = await fetch(u, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', signal: AbortSignal.timeout(8000) });
+  const d = await r.json() as { account_status?: number; ads?: { summary?: { total_count?: number } }; error?: { message: string } };
+  if (!r.ok || d.error || d.account_status == null) throw new Error(d.error?.message ?? `meta ${r.status}`);
+  const active = d.ads?.summary?.total_count ?? 0;
+  const accountOk = d.account_status === 1 || d.account_status === 9; // 9 = grace period, still delivers
+  return { live: accountOk && active > 0, activeAds: active, reason: !accountOk ? ACCOUNT_STATUS[d.account_status] ?? `account status ${d.account_status}` : active ? null : 'no ads delivering' };
+}
+
 type ScheduleRow = { entry: string; days: string[] | null; date: string | null; start: string; end: string; category: string; emoji: string };
 type SchoolBlocks = { blocks: { rowId: string; name: string }[]; done: string[] };
 
@@ -48,13 +66,14 @@ const tasks = (p: DailyPerson | undefined) => p ? {
 export async function GET() {
   const now = new Date();
   const weekday = new Intl.DateTimeFormat('en-AU', { timeZone: TZ, weekday: 'short' }).format(now);
-  const [daily, calendar, shop, schedule, school, board] = await Promise.allSettled([
+  const [daily, calendar, shop, schedule, school, board, adsRes] = await Promise.allSettled([
     json<DailyPayload>(dailyGET()),
     json<{ events: { id: string; subject: string; startISO: string; isAllDay: boolean; account: string }[] }>(calendarGET()),
     json<{ timezone: string; days: { date: string; label: string; isToday: boolean; orders: number; revenue: number; sessions: number | null; conversion: number | null }[] }>(shopifyGET()),
     json<ScheduleRow[]>(scheduleGET()),
     fetch(`${ANSAR}/api/school-block`, { cache: 'no-store', signal: AbortSignal.timeout(10000) }).then(r => r.json() as Promise<SchoolBlocks>),
     readBoard(),
+    adsLive(),
   ]);
   const ok = <T,>(r: PromiseSettledResult<T>) => r.status === 'fulfilled' ? r.value : null;
 
@@ -119,6 +138,9 @@ export async function GET() {
     calendar: cal ? cal.events.filter(e => new Date(e.startISO).getTime() > now.getTime() - 3600e3).sort((x, y) => x.startISO.localeCompare(y.startISO)).slice(0, 5)
       .map(e => ({ id: e.id, subject: e.subject, startISO: e.startISO, isAllDay: e.isAllDay, who: e.account })) : null,
     store,
+    // null = Meta could not be read; the board treats that as not confirmed live.
+    ads: ok(adsRes),
   };
+  if (adsRes.status === 'rejected') console.error('ads status', adsRes.reason);
   return NextResponse.json(body, { headers: { 'Cache-Control': 'public, max-age=0, s-maxage=60, stale-while-revalidate=30' } });
 }
