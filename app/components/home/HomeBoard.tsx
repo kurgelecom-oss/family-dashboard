@@ -2,13 +2,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import './home.css';
 import { demoMoney, demoNow } from './demo';
+import { PopupStage, usePopups, type Popup } from './Popups';
+import { RAG_LABEL, conversionRag, goalRag, listRag, paceRag, type Rag } from './rag';
 
 /* The family home board. One screen: an announcement bar, a column per person,
-   a shared band (store · goals · calendar) and a rail that walks through the day.
+   a shared band (store · goals · calendar), a ticker and a sky rail.
 
-   Motion is reserved for change: a tick, an order, a prayer coming up. The clock,
-   the "now" bar and the rail move with time; everything else moves only when the
-   data does. Polling pauses while the tab is hidden (Netlify bills per request).
+   Three kinds of motion, each with a job:
+     · pop-ups (Popups.tsx) — something happened or is about to; the main event
+     · live motion — clock, now-bars, countdowns, sun/moon, ticker: time passing
+     · ambient — slow background drift, orbits, shimmer: the board is running
+   Colours: green / amber / red against pace (rag.ts), never against the whole day.
+   Polling pauses while the tab is hidden (Netlify bills per request).
    ?demo=1 renders a weekday fixture so the layout can be judged on a weekend. */
 
 export type Item = { id: string; title: string; done: boolean; count: string | null };
@@ -16,11 +21,11 @@ export type Tasks = { done: number; total: number; items: Item[] } | null;
 export type Slot = { title: string; emoji: string; category: string; start: string; end: string; ticked: boolean | null };
 export type NowFeed = {
   generatedAt: string; weekday: string;
-  ansar: { day: Slot[]; habits: Tasks; schoolTicks: { done: number; total: number } | null };
+  ansar: { day: Slot[]; nextDay: { weekday: string; slots: { title: string; emoji: string; start: string }[] } | null; habits: Tasks; schoolTicks: { done: number; total: number } | null };
   nihal: Tasks; taylan: Tasks;
   prayer: { next: { name: string; at: string; leaderName: string; suras: string[] }; today: { prayer: string; name: string; at: string; leaderName: string }[] } | null;
   calendar: { id: string; subject: string; startISO: string; isAllDay: boolean; who: string }[] | null;
-  store: { currency: string; today: { label: string; orders: number; revenue: number; sessions: number | null; conversion: number | null } | null; week: { date: string; revenue: number; orders: number }[]; weekRevenue: number; weekOrders: number } | null;
+  store: { currency: string; today: { label: string; orders: number; revenue: number; sessions: number | null; conversion: number | null } | null; week: { date: string; revenue: number; orders: number }[]; weekRevenue: number; weekOrders: number; avgOrders: number; avgRevenue: number; dayFraction: number } | null;
 };
 export type Money = {
   unlocked: boolean; asOf: string;
@@ -34,79 +39,92 @@ const TZ = 'Australia/Melbourne';
 const noop = () => () => {};
 const NOW_POLL = 60_000, MONEY_POLL = 10 * 60_000, ROTATE = 8000;
 const DAY_START = 5, DAY_END = 22; // the rail spans 5 am – 10 pm
+const WEEKDAY: Record<string, string> = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
+const WHO: Record<string, string> = { TAYLAN: 'TK', NIHAL: 'Nihal', ANSAR: 'Ansar' };
 
 const fmtTime = (iso: string | Date) => new Intl.DateTimeFormat('en-AU', { timeZone: TZ, hour: 'numeric', minute: '2-digit' }).format(new Date(iso)).replace(' ', '').toLowerCase();
 const fmtDay = (iso: string) => new Intl.DateTimeFormat('en-AU', { timeZone: TZ, weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(iso));
-const money = (n: number, cur = '$') => `${n < 0 ? '−' : ''}${cur}${Math.abs(Math.round(n)).toLocaleString('en-AU')}`;
+const money = (n: number) => `${n < 0 ? '−' : ''}$${Math.abs(Math.round(n)).toLocaleString('en-AU')}`;
 const mins = (ms: number) => Math.max(0, Math.round(ms / 60000));
-const until = (ms: number) => { const m = mins(ms); return m < 60 ? `${m} min` : m < 1440 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${Math.round(m / 1440)} day${Math.round(m / 1440) === 1 ? "" : "s"}`; };
-const WHO: Record<string, string> = { TAYLAN: 'TK', NIHAL: 'Nihal', ANSAR: 'Ansar' };
+const until = (ms: number) => { const m = mins(ms); return m < 60 ? `${m} min` : m < 1440 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${Math.round(m / 1440)} day${Math.round(m / 1440) === 1 ? '' : 's'}`; };
+/** Live countdown: d h m beyond the hour, mm:ss inside it. */
+const clockDown = (ms: number) => { if (ms <= 0) return 'now'; const s = Math.floor(ms / 1000), d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60; return d ? `${d}d ${h}h ${m}m` : h ? `${h}h ${String(m).padStart(2, '0')}m ${String(sec).padStart(2, '0')}s` : `${m}:${String(sec).padStart(2, '0')}`; };
+const short = (title: string) => title.replace(/^Block \d+ — /, '');
 
 /** Hour of day (fractional) in Melbourne. */
 function melHour(d: Date) {
-  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(d).map(x => [x.type, x.value]));
-  return +p.hour + +p.minute / 60;
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: TZ, hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(d).map(x => [x.type, x.value]));
+  return +p.hour + +p.minute / 60 + +p.second / 3600;
 }
 const railPct = (d: Date) => Math.min(100, Math.max(0, (melHour(d) - DAY_START) / (DAY_END - DAY_START) * 100));
+const ragCls = (r: Rag) => r ? ` rag-${r}` : '';
 
-function Ring({ done, total }: { done: number; total: number }) {
+function Ring({ done, total, rag, active }: { done: number; total: number; rag: Rag; active: boolean }) {
   const r = 26, c = 2 * Math.PI * r, pct = total ? done / total : 0;
   return (
-    <div className={'hb-ring' + (total && done === total ? ' full' : '')} aria-label={`${done} of ${total} done`}>
-      <svg viewBox="0 0 64 64"><circle className="bg" cx="32" cy="32" r={r} /><circle className="fg" cx="32" cy="32" r={r} strokeDasharray={c} strokeDashoffset={c * (1 - pct)} /></svg>
+    <div className={'hb-ring' + ragCls(rag) + (active ? ' active' : '')} aria-label={`${done} of ${total} done${rag ? `, ${RAG_LABEL[rag]}` : ''}`}>
+      <svg viewBox="0 0 64 64"><circle className="orbit" cx="32" cy="32" r="31" /><circle className="bg" cx="32" cy="32" r={r} /><circle className="fg" cx="32" cy="32" r={r} strokeDasharray={c} strokeDashoffset={c * (1 - pct)} /></svg>
       <span>{total ? `${done}/${total}` : '—'}</span>
     </div>
   );
 }
 
-type Toast = { id: number; icon: string; title: string; note: string; tone?: 'clay' | 'teal'; out?: boolean };
+function Pill({ rag }: { rag: Rag }) {
+  return rag ? <span className={'hb-pill' + ragCls(rag)}><i />{RAG_LABEL[rag]}</span> : null;
+}
+
+/** Number that rolls to its new value instead of jumping. */
+function Count({ value, prefix = '', decimals = 0, suffix = '' }: { value: number; prefix?: string; decimals?: number; suffix?: string }) {
+  const [shown, setShown] = useState(value);
+  const from = useRef(value);
+  useEffect(() => {
+    const a = from.current, t0 = performance.now();
+    let raf = 0;
+    const step = (t: number) => { const k = Math.min(1, (t - t0) / 1200); setShown(a + (value - a) * (1 - Math.pow(1 - k, 3))); if (k < 1) raf = requestAnimationFrame(step); else from.current = value; };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <>{prefix}{shown.toLocaleString('en-AU', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}{suffix}</>;
+}
 
 export default function HomeBoard() {
-  // Client-only board: the clock and ?demo differ between server and browser, so
-  // nothing renders until mounted (a TV never needs the server HTML).
+  // Client-only board: the clock and ?demo differ between server and browser.
   const demo = useSyncExternalStore(noop, () => new URLSearchParams(window.location.search).has('demo'), () => null);
   const [feed, setFeed] = useState<NowFeed | null>(null);
   const [cash, setCash] = useState<Money | null>(null);
   const [now, setNow] = useState(() => new Date());
   const [slide, setSlide] = useState(0);
-  const [toasts, setToasts] = useState<Toast[]>([]);
   const [fresh, setFresh] = useState<Set<string>>(new Set());
   const [failed, setFailed] = useState(false);
+  const [gotAt, setGotAt] = useState<number | null>(null);
   const prev = useRef<NowFeed | null>(null);
-  const warned = useRef<string>('');
+  const fired = useRef<Set<string>>(new Set());
+  const popups = usePopups();
+  const { push } = popups;
 
-  const toast = useCallback((t: Omit<Toast, 'id'>) => {
-    const id = Date.now() + Math.random();
-    setToasts(list => [...list.slice(-3), { ...t, id }]);
-    setTimeout(() => setToasts(list => list.map(x => x.id === id ? { ...x, out: true } : x)), 8000);
-    setTimeout(() => setToasts(list => list.filter(x => x.id !== id)), 8600);
-  }, []);
-
-  /** Compare two feeds and announce what changed since the last one. */
+  /** Compare two feeds and pop up what changed since the last one. */
   const announce = useCallback((a: NowFeed, b: NowFeed) => {
     const newly: string[] = [];
     const people: [string, (f: NowFeed) => Tasks][] = [['Ansar', f => f.ansar.habits], ['Nihal', f => f.nihal], ['TK', f => f.taylan]];
-    for (const [name, pick] of people) {
+    for (const [who, pick] of people) {
       const before = new Set(pick(a)?.items.filter(i => i.done).map(i => i.id));
-      for (const item of pick(b)?.items ?? []) if (item.done && !before.has(item.id)) {
-        newly.push(item.id);
-        toast({ icon: '✓', title: `${name} · ${item.title}`, note: 'just ticked', tone: 'teal' });
-      }
+      for (const item of pick(b)?.items ?? []) if (item.done && !before.has(item.id)) { newly.push(item.id); push({ kind: 'tick', who, title: item.title }); }
       const p = pick(b);
-      if (p && p.total && p.done === p.total && (pick(a)?.done ?? 0) < p.total) toast({ icon: '★', title: `${name} finished the day's list`, note: `${p.total} of ${p.total}`, tone: 'clay' });
+      if (p && p.total && p.done === p.total && (pick(a)?.done ?? 0) < p.total) push({ kind: 'complete', who, total: p.total });
     }
     const beforeBlocks = new Set(a.ansar.day.filter(s => s.ticked).map(s => s.title));
-    for (const s of b.ansar.day) if (s.ticked && !beforeBlocks.has(s.title)) { newly.push(s.title); toast({ icon: s.emoji || '✓', title: `Ansar · ${s.title}`, note: 'block done', tone: 'teal' }); }
+    const blocks = b.ansar.day.filter(s => s.ticked !== null);
+    for (const s of blocks) if (s.ticked && !beforeBlocks.has(s.title)) { newly.push(s.title); push({ kind: 'block', emoji: s.emoji, title: s.title, done: blocks.filter(x => x.ticked).length, total: blocks.length }); }
     const o1 = a.store?.today?.orders ?? 0, o2 = b.store?.today?.orders ?? 0;
-    if (b.store?.today && a.store?.today?.label === b.store.today.label && o2 > o1) toast({ icon: '🛍', title: `${o2 - o1 === 1 ? 'New order' : `${o2 - o1} new orders`}`, note: `${o2} today · US$${Math.round(b.store.today.revenue)}` });
+    if (b.store?.today && a.store?.today?.label === b.store.today.label && o2 > o1) push({ kind: 'order', added: o2 - o1, orders: o2, revenue: b.store.today.revenue });
     if (newly.length) { setFresh(new Set(newly)); setTimeout(() => setFresh(new Set()), 2600); }
-  }, [toast]);
+  }, [push]);
 
   const loadNow = useCallback(async () => {
     try {
       const next: NowFeed = demo ? demoNow(prev.current) : await fetch('/api/now', { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(); return r.json(); });
       if (prev.current) announce(prev.current, next);
-      prev.current = next; setFeed(next); setFailed(false);
+      prev.current = next; setFeed(next); setFailed(false); setGotAt(Date.now());
     } catch { setFailed(true); }
   }, [announce, demo]);
 
@@ -118,57 +136,100 @@ export default function HomeBoard() {
   useEffect(() => {
     if (demo === null) return;
     let a: ReturnType<typeof setInterval> | undefined, b: ReturnType<typeof setInterval> | undefined;
-    const start = () => { stop(); loadNow(); loadMoney(); a = setInterval(loadNow, demo ? 15_000 : NOW_POLL); b = setInterval(loadMoney, MONEY_POLL); };
     const stop = () => { clearInterval(a); clearInterval(b); };
+    const start = () => { stop(); loadNow(); loadMoney(); a = setInterval(loadNow, demo ? 15_000 : NOW_POLL); b = setInterval(loadMoney, MONEY_POLL); };
     const vis = () => document.hidden ? stop() : start();
     start(); document.addEventListener('visibilitychange', vis);
     return () => { stop(); document.removeEventListener('visibilitychange', vis); };
   }, [loadNow, loadMoney, demo]);
 
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
-
-  // Announcement bar: a rotating set of the most useful next things.
-  const messages = useMemo(() => {
-    const out: { key: string; tag: string; node: React.ReactNode; soon?: boolean }[] = [];
-    const p = feed?.prayer?.next;
-    if (p) {
-      const left = new Date(p.at).getTime() - now.getTime();
-      out.push({ key: 'prayer', tag: left < 20 * 60000 ? `In ${until(left)}` : 'Next prayer', soon: left < 20 * 60000, node: <><b>{p.name} · {fmtTime(p.at)}</b><i>·</i>{p.leaderName} leads<i>·</i>{p.suras.join(' + ')}</> });
-    }
-    const ev = feed?.calendar?.[0];
-    if (ev) out.push({ key: 'cal', tag: 'Coming up', node: <><b>{ev.subject.trim()}</b><i>·</i>{fmtDay(ev.startISO)}, {fmtTime(ev.startISO)}</> });
-    const slot = feed?.ansar.day.find(s => new Date(s.start) <= now && now < new Date(s.end));
-    if (slot) out.push({ key: 'ansar', tag: 'Ansar now', node: <><b>{slot.emoji} {slot.title}</b><i>·</i>until {fmtTime(slot.end)}</> });
-    if (cash?.unlocked && cash.headline) out.push({ key: 'money', tag: 'Money', node: <b>{cash.headline}</b> });
-    const st = feed?.store?.today;
-    if (st) out.push({ key: 'store', tag: 'Store', node: <><b>{st.orders} orders · US${Math.round(st.revenue).toLocaleString('en-AU')}</b><i>·</i>{st.label} (store time)</> });
-    return out;
-  }, [feed, cash, now]);
-
   useEffect(() => { const t = setInterval(() => setSlide(s => s + 1), ROTATE); return () => clearInterval(t); }, []);
-  // A prayer inside 20 minutes holds the bar instead of rotating away.
-  const soon = messages.find(m => m.soon);
-  const shown = soon ?? messages[slide % Math.max(1, messages.length)];
+
+  const day = useMemo(() => feed?.ansar.day ?? [], [feed]);
+  const current = day.find(s => new Date(s.start) <= now && now < new Date(s.end));
+  const upcoming = day.find(s => new Date(s.start) > now && !/break/i.test(s.title));
+  const doneBlocks = day.filter(s => s.ticked);
+  const lastDone = doneBlocks[doneBlocks.length - 1];
+  const nextTask = (t: Tasks | undefined) => t?.items.find(i => !i.done);
+  const nextEvent = feed?.calendar?.find(e => new Date(e.startISO) > now);
+  const prayer = feed?.prayer?.next;
+  const prayerMs = prayer ? new Date(prayer.at).getTime() - now.getTime() : Infinity;
+  const eventMs = nextEvent ? new Date(nextEvent.startISO).getTime() - now.getTime() : Infinity;
+
+  // Time-based pop-ups: prayer at 20 / 5 / 0 min, events at 60 / 15 min, an hourly brief.
+  const minuteKey = Math.floor(now.getTime() / 60000);
   useEffect(() => {
-    const p = feed?.prayer?.next;
-    if (soon && p && warned.current !== p.at) { warned.current = p.at; toast({ icon: '🕌', title: `${p.name} in ${until(new Date(p.at).getTime() - Date.now())}`, note: `${p.leaderName} leads · ${p.suras.join(' + ')}`, tone: 'clay' }); }
-  }, [soon, feed, toast]);
+    if (!feed) return;
+    const once = (key: string, p: Popup) => { if (!fired.current.has(key)) { fired.current.add(key); push(p); } };
+    const t = Date.now();
+    if (prayer) {
+      const left = new Date(prayer.at).getTime() - t;
+      const base = { kind: 'prayer' as const, name: prayer.name, leader: prayer.leaderName, suras: prayer.suras };
+      if (left <= 20 * 60000 && left > 6 * 60000) once(`p20-${prayer.at}`, { ...base, minutes: mins(left) });
+      if (left <= 5 * 60000 && left > 60000) once(`p5-${prayer.at}`, { ...base, minutes: mins(left) });
+    }
+    for (const p of feed.prayer?.today ?? []) {
+      const since = t - new Date(p.at).getTime();
+      if (since >= 0 && since < 3 * 60000) once(`p0-${p.at}`, { kind: 'prayer', name: p.name, leader: p.leaderName, suras: [], minutes: 0, now: true });
+    }
+    if (nextEvent) {
+      const left = new Date(nextEvent.startISO).getTime() - t;
+      const ev = { kind: 'event' as const, title: nextEvent.subject.trim(), when: `${fmtDay(nextEvent.startISO)} · ${fmtTime(nextEvent.startISO)}` };
+      if (left <= 60 * 60000 && left > 16 * 60000) once(`e60-${nextEvent.id}`, { ...ev, minutes: mins(left) });
+      if (left <= 15 * 60000 && left > 0) once(`e15-${nextEvent.id}`, { ...ev, minutes: mins(left) });
+    }
+    // The brief: on the hour from 6 am to 9 pm, and once shortly after the board opens.
+    const h = melHour(new Date(t));
+    if ((h >= 6 && h < 21.5 && h % 1 < 2 / 60) || !fired.current.has('brief-open')) {
+      fired.current.add('brief-open');
+      const lines: string[] = [];
+      if (prayer) lines.push(`🕌 ${prayer.name} ${fmtTime(prayer.at)} · ${prayer.leaderName} leads`);
+      if (current) lines.push(`${current.emoji} Ansar: ${current.title}${upcoming ? `, then ${short(upcoming.title)}` : ''}`);
+      else if (upcoming) lines.push(`${upcoming.emoji} Ansar next: ${upcoming.title} at ${fmtTime(upcoming.start)}`);
+      const n = nextTask(feed.nihal), k = nextTask(feed.taylan);
+      if (n) lines.push(`Nihal next: ${n.title}`);
+      if (k) lines.push(`TK next: ${k.title}`);
+      if (nextEvent) lines.push(`📅 ${nextEvent.subject.trim()} · ${fmtDay(nextEvent.startISO)}`);
+      if (lines.length) once(`brief-${new Date(t).toISOString().slice(0, 13)}`, { kind: 'brief', hour: fmtTime(new Date(t)), lines: lines.slice(0, 5) });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- checked once a minute, not every second
+  }, [minuteKey, feed]);
+
+  // Announcement bar. A prayer inside 20 min or an event inside the hour takes it over; otherwise it rotates.
+  const takeover = prayerMs <= 20 * 60000 ? 'prayer' : eventMs <= 60 * 60000 ? 'event' : null;
+  const messages = useMemo(() => {
+    const out: { key: string; tag: string; node: React.ReactNode }[] = [];
+    if (day.length) out.push({
+      key: 'ansar', tag: 'Ansar', node: <>
+        {lastDone && <span className="hb-flow done">✓ {short(lastDone.title)}</span>}
+        <b>{current ? `${current.emoji} ${current.title}` : upcoming ? `Next: ${upcoming.emoji} ${upcoming.title}` : 'School done for today'}</b>
+        {current && upcoming && <span className="hb-flow">then {short(upcoming.title)} {fmtTime(upcoming.start)}</span>}
+      </>,
+    });
+    const n = nextTask(feed?.nihal), k = nextTask(feed?.taylan);
+    if (n || k) out.push({ key: 'next', tag: 'Up next', node: <>{n && <><b>Nihal</b>{n.title}</>}{n && k && <i>·</i>}{k && <><b>TK</b>{k.title}</>}</> });
+    if (nextEvent && eventMs < 7 * 864e5) out.push({ key: 'cal', tag: 'Coming up', node: <><b>{nextEvent.subject.trim()}</b><i>·</i>{fmtDay(nextEvent.startISO)}, {fmtTime(nextEvent.startISO)}<i>·</i>in {until(eventMs)}</> });
+    const s = feed?.store;
+    if (s?.today) out.push({ key: 'store', tag: 'Store', node: <><b>{s.today.orders} orders · US${Math.round(s.today.revenue).toLocaleString('en-AU')}</b><i>·</i>{s.today.orders >= s.avgOrders * s.dayFraction ? 'ahead of' : 'behind'} the 7-day pace</> });
+    if (cash?.unlocked && cash.headline) out.push({ key: 'money', tag: 'Money', node: <b>{cash.headline}</b> });
+    return out;
+  }, [feed, cash, day, current, upcoming, lastDone, nextEvent, eventMs]);
+  const shown = messages[slide % Math.max(1, messages.length)];
 
   async function unlock() {
     const ok = await new Promise<boolean>(resolve => window.dispatchEvent(new CustomEvent('family-edit-unlock', { detail: { resolve } })));
     if (ok) loadMoney();
   }
 
-  const day = feed?.ansar.day ?? [];
-  const current = day.find(s => new Date(s.start) <= now && now < new Date(s.end));
-  const upcoming = day.find(s => new Date(s.start) > now);
-  const nextTask = (t: Tasks | undefined) => t?.items.find(i => !i.done);
+  if (demo === null) return <main className="hb" />;
 
+  const hour = melHour(now);
   const personCard = (name: string, sub: string, t: Tasks | undefined) => {
-    const n = nextTask(t);
+    const n = nextTask(t), rag = t ? listRag(t.done, t.total, hour) : null;
     return (
       <section className="hb-card">
-        <div className="hb-head"><div><h2>{name}</h2><p>{sub}</p></div><Ring done={t?.done ?? 0} total={t?.total ?? 0} /></div>
+        <div className="hb-head"><div><h2>{name}</h2><p>{sub} <Pill rag={rag} /></p></div><Ring done={t?.done ?? 0} total={t?.total ?? 0} rag={rag} active={!!n} /></div>
         {t === undefined ? <p className="hb-empty">Loading…</p> : t === null ? <p className="hb-empty">Not available right now.</p> : !t.total ? <div className="hb-now idle"><span className="hb-eye">Today</span><strong>Rest day — nothing scheduled</strong></div> : <>
           <div className={'hb-now' + (n ? '' : ' idle')}><span className="hb-eye">{n ? <><i className="hb-pulse" />Up next</> : 'Today'}</span><strong>{n ? n.title : 'All done today ✓'}</strong>{n && <small>{t.total - t.done} left of {t.total}</small>}</div>
           <ul className="hb-list">{t.items.map(i => <li key={i.id} className={'hb-item' + (i.done ? ' done' : '') + (i === n ? ' now' : '') + (fresh.has(i.id) ? ' fresh' : '')}><span className="hb-check" /><span>{i.title}</span><span className="t">{i.count ?? ''}</span></li>)}</ul>
@@ -177,37 +238,85 @@ export default function HomeBoard() {
     );
   };
 
-  // Breaks drop out of the list; the list starts one row before "now" so the current block is always on screen.
+  // Ansar's list: breaks drop out, and it starts one row before "now" so the current block stays on screen.
   const lessons = day.filter(s => !/^break$/i.test(s.title.replace(/[^a-z]/gi, '')));
-  const at = lessons.findIndex(s => new Date(s.end) > now);
-  const list = at > 1 ? lessons.slice(at - 1) : lessons;
+  const firstOpen = lessons.findIndex(s => new Date(s.end) > now);
+  const list = firstOpen > 1 ? lessons.slice(firstOpen - 1) : lessons;
+  const due = day.filter(s => s.ticked !== null && new Date(s.end) <= now);
+  const blockRag: Rag = due.length ? paceRag(due.filter(s => s.ticked).length, due.length) : null;
   const rail = railPct(now);
+  const times = feed?.prayer?.today ?? [];
+  const maghrib = times.find(p => p.prayer === 'maghrib'), fajr = times.find(p => p.prayer === 'fajr');
+  const isNight = !!maghrib && !!fajr && (now >= new Date(maghrib.at) || now < new Date(fajr.at));
+  const st = feed?.store;
+  const ordersRag = st?.today ? paceRag(st.today.orders, st.avgOrders * st.dayFraction) : null;
+  const revenueRag = st?.today ? paceRag(st.today.revenue, st.avgRevenue * st.dayFraction) : null;
+  const convRag = conversionRag(st?.today?.conversion ?? null);
+  const nextGoal = cash?.goals.findIndex(g => g.pct < 100) ?? -1;
+  const ago = gotAt ? Math.max(0, Math.round((now.getTime() - gotAt) / 1000)) : null;
 
-  if (demo === null) return <main className="hb" />;
+  const ticker: string[] = [
+    ...times.map(p => `🕌 ${p.name} ${fmtTime(p.at)} · ${p.leaderName}`),
+    ...(feed ? ([['Ansar', feed.ansar.habits], ['Nihal', feed.nihal], ['TK', feed.taylan]] as const).flatMap(([who, t]) => (t?.items ?? []).filter(i => i.done).map(i => `✓ ${who} · ${i.title}`)) : []),
+    ...doneBlocks.map(s => `${s.emoji} Ansar finished ${s.title}`),
+    ...(feed?.calendar ?? []).slice(0, 3).map(e => `📅 ${e.subject.trim()} · ${fmtDay(e.startISO)}`),
+    ...(st ? [`🛍 7 days · US$${Math.round(st.weekRevenue).toLocaleString('en-AU')} · ${st.weekOrders} orders`] : []),
+  ];
+
   return (
-    <main className="hb">
+    <main className={'hb' + (isNight ? ' night' : '')}>
+      <div className="hb-amb" aria-hidden="true"><i /><i /><i /></div>
+
       <div className="hb-bar">
-        <div className={'hb-ann' + (shown?.soon ? ' soon' : '')}>
-          {shown?.key === 'prayer' ? <a className="hb-tag" href="/prayer.html" title="Open the prayer board">{shown.tag}</a> : <span className="hb-tag">{shown?.tag ?? 'Today'}</span>}
-          <div className="hb-msg">{shown ? <span key={shown.key + (soon ? '' : slide)}>{shown.node}</span> : <span>Loading the day…</span>}</div>
-          {!soon && messages.length > 1 && <div className="hb-dots">{messages.map((m, i) => <i key={m.key} className={i === slide % messages.length ? 'on' : ''} />)}</div>}
+        {takeover === 'prayer' && prayer ? (
+          <div className="hb-ann takeover clay" role="status">
+            <span className="hb-tag">🕌 {prayer.name}</span>
+            <div className="hb-msg"><span><b>{clockDown(prayerMs)}</b><i>·</i>{prayer.leaderName} leads<i>·</i>{prayer.suras.join(' + ')}</span></div>
+          </div>
+        ) : takeover === 'event' && nextEvent ? (
+          <div className="hb-ann takeover teal" role="status">
+            <span className="hb-tag">📅 Starting soon</span>
+            <div className="hb-msg"><span><b>{nextEvent.subject.trim()}</b><i>·</i>in {clockDown(eventMs)}</span></div>
+          </div>
+        ) : (
+          <div className="hb-ann">
+            {prayer && <a className="hb-chip" href="/prayer.html" title="Open the prayer board"><span>🕌</span><b>{prayer.name} {fmtTime(prayer.at)}</b><small>{prayer.leaderName} · in {until(prayerMs)}</small></a>}
+            <span className="hb-tag">{shown?.tag ?? 'Today'}</span>
+            <div className="hb-msg">{shown ? <span key={shown.key + slide}>{shown.node}</span> : <span>Loading the day…</span>}</div>
+            {messages.length > 1 && <div className="hb-dots">{messages.map((m, i) => <i key={m.key} className={i === slide % messages.length ? 'on' : ''} />)}</div>}
+          </div>
+        )}
+        <div className="hb-clock">
+          <div className="hb-num">{fmtTime(now)}</div>
+          <div className="hb-sec"><i style={{ width: `${now.getSeconds() / 59 * 100}%` }} /></div>
+          <div>{new Intl.DateTimeFormat('en-AU', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long' }).format(now)}</div>
+          <div className={'hb-live' + (failed ? ' off' : '')}><i />{failed ? 'Reconnecting' : demo ? 'Demo' : ago === null ? 'Connecting' : `Live · ${ago < 60 ? `${ago}s` : `${Math.round(ago / 60)}m`} ago`}</div>
         </div>
-        <div className="hb-clock"><div className="hb-num">{fmtTime(now)}</div><div>{new Intl.DateTimeFormat('en-AU', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long' }).format(now)}</div></div>
       </div>
 
       <div className="hb-people">
         <section className="hb-card">
-          <div className="hb-head"><div><h2>Ansar</h2><p>Homeschool{feed?.ansar.schoolTicks?.total ? ` · ${feed.ansar.schoolTicks.done}/${feed.ansar.schoolTicks.total} blocks ticked` : ''}</p></div><Ring done={feed?.ansar.habits?.done ?? 0} total={feed?.ansar.habits?.total ?? 0} /></div>
-          {!feed ? <p className="hb-empty">Loading…</p> : !day.length ? <div className="hb-now idle"><span className="hb-eye">Today</span><strong>No school today</strong><small>Habits {feed.ansar.habits?.done ?? 0}/{feed.ansar.habits?.total ?? 0}</small></div> : <>
+          <div className="hb-head"><div><h2>Ansar</h2><p>Homeschool{feed?.ansar.schoolTicks?.total ? ` · ${feed.ansar.schoolTicks.done}/${feed.ansar.schoolTicks.total} blocks ticked` : ''} <Pill rag={blockRag} /></p></div>
+            <Ring done={feed?.ansar.habits?.done ?? 0} total={feed?.ansar.habits?.total ?? 0} rag={feed?.ansar.habits ? listRag(feed.ansar.habits.done, feed.ansar.habits.total, hour) : null} active={!!current} /></div>
+          {!feed ? <p className="hb-empty">Loading…</p> : !day.length ? <>
+            <div className="hb-now idle"><span className="hb-eye">Today</span><strong>No school today</strong><small>Habits {feed.ansar.habits?.done ?? 0}/{feed.ansar.habits?.total ?? 0}</small></div>
+            {feed.ansar.nextDay && <><p className="hb-next"><b>{WEEKDAY[feed.ansar.nextDay.weekday]}&apos;s plan</b></p>
+              <ul className="hb-list">{feed.ansar.nextDay.slots.map(s => <li key={s.title} className="hb-item"><span className="hb-check" /><span>{s.emoji} {s.title}</span><span className="t">{s.start}</span></li>)}</ul></>}
+          </> : <>
+            <div className="hb-flowrow">
+              <div className="done"><span>Done</span><b>{lastDone ? `${lastDone.emoji} ${short(lastDone.title)}` : '—'}</b></div>
+              <div className="now"><span>Now</span><b>{current ? `${current.emoji} ${short(current.title)}` : '—'}</b></div>
+              <div className="next"><span>Next</span><b>{upcoming ? `${upcoming.emoji} ${short(upcoming.title)}` : '—'}</b></div>
+            </div>
             <div className={'hb-now' + (current ? '' : ' idle')}>
               <span className="hb-eye">{current ? <><i className="hb-pulse" />Now · until {fmtTime(current.end)}</> : now < new Date(day[0].start) ? `Starts ${fmtTime(day[0].start)}` : 'School day finished'}</span>
               <strong>{current ? `${current.emoji} ${current.title}` : upcoming ? `${upcoming.emoji} ${upcoming.title}` : 'Done for today'}</strong>
-              {current && <><div className="hb-prog"><i style={{ width: `${Math.min(100, (now.getTime() - new Date(current.start).getTime()) / (new Date(current.end).getTime() - new Date(current.start).getTime()) * 100)}%` }} /></div><small>{until(new Date(current.end).getTime() - now.getTime())} left{current.ticked === true ? ' · ticked ✓' : current.ticked === false ? ' · not ticked yet' : ''}</small></>}
+              {current && <><div className="hb-prog"><i style={{ width: `${Math.min(100, (now.getTime() - new Date(current.start).getTime()) / (new Date(current.end).getTime() - new Date(current.start).getTime()) * 100)}%` }} /></div>
+                <small>{clockDown(new Date(current.end).getTime() - now.getTime())} left{current.ticked === true ? ' · ticked ✓' : current.ticked === false ? ' · not ticked yet' : ''}</small></>}
             </div>
-            {current && upcoming && <p className="hb-next">Next <b>{upcoming.emoji} {upcoming.title}</b> at {fmtTime(upcoming.start)}</p>}
             <ul className="hb-list">{list.map(s => {
               const isNow = s === current, past = new Date(s.end) <= now;
-              const cls = s.ticked ? ' done' : isNow ? ' now' : past ? ' passed' : '';
+              const cls = s.ticked ? ' done' : isNow ? ' now' : past && s.ticked === false ? ' missed' : past ? ' passed' : '';
               return <li key={s.title + s.start} className={'hb-item' + cls + (fresh.has(s.title) ? ' fresh' : '')}><span className="hb-check" /><span>{s.emoji} {s.title}</span><span className="t">{past && s.ticked === false ? 'not ticked' : fmtTime(s.start)}</span></li>;
             })}</ul>
           </>}
@@ -218,51 +327,54 @@ export default function HomeBoard() {
 
       <div className="hb-band">
         <section className="hb-tile">
-          <header><h3>Store</h3><small>{feed?.store?.today ? `${feed.store.today.label} · US$, store time` : ''}</small></header>
-          {!feed?.store ? <p className="hb-empty">{feed ? 'Shopify not available right now.' : 'Loading…'}</p> : <>
+          <header><h3>Store</h3><small>{st?.today ? `${st.today.label} · US$, store time` : ''}</small></header>
+          {!st ? <p className="hb-empty">{feed ? 'Shopify not available right now.' : 'Loading…'}</p> : <>
             <div className="hb-stats">
-              <div><span>Orders today</span><b className="hb-num">{feed.store.today?.orders ?? 0}</b></div>
-              <div><span>Revenue today</span><b className="hb-num">${Math.round(feed.store.today?.revenue ?? 0).toLocaleString('en-AU')}</b></div>
-              <div><span>Conversion</span><b className="hb-num">{feed.store.today?.conversion != null ? `${feed.store.today.conversion.toFixed(1)}%` : '—'}</b></div>
+              <div className={ragCls(ordersRag)}><span><i className="dot" />Orders</span><b className="hb-num"><Count value={st.today?.orders ?? 0} /></b><small>pace {Math.round(st.avgOrders * st.dayFraction)}</small></div>
+              <div className={ragCls(revenueRag)}><span><i className="dot" />Revenue</span><b className="hb-num"><Count value={st.today?.revenue ?? 0} prefix="$" /></b><small>pace ${Math.round(st.avgRevenue * st.dayFraction)}</small></div>
+              <div className={ragCls(convRag)}><span><i className="dot" />Conversion</span><b className="hb-num">{st.today?.conversion != null ? <Count value={st.today.conversion} decimals={1} suffix="%" /> : '—'}</b><small>target 3%</small></div>
             </div>
-            <div className="hb-bars" aria-label="Revenue, last seven days">{(() => { const max = Math.max(1, ...feed.store!.week.map(w => w.revenue)); return feed.store!.week.map(w => <div key={w.date}><i style={{ height: `${Math.max(4, w.revenue / max * 100)}%` }} title={`US$${Math.round(w.revenue)}`} /><span>{new Intl.DateTimeFormat('en-AU', { weekday: 'narrow', timeZone: 'UTC' }).format(new Date(w.date + 'T12:00:00Z'))}</span></div>); })()}</div>
-            <div className="hb-money"><span>7 days</span><b>US${Math.round(feed.store.weekRevenue).toLocaleString('en-AU')} · {feed.store.weekOrders} orders</b></div>
+            <div className="hb-bars" aria-label="Revenue, last seven days">{(() => { const max = Math.max(1, ...st.week.map(w => w.revenue)); return st.week.map((w, i) => <div key={w.date} className={i === st.week.length - 1 ? 'today' : ''}><i style={{ height: `${Math.max(4, w.revenue / max * 100)}%` }} title={`US$${Math.round(w.revenue)}`} /><span>{new Intl.DateTimeFormat('en-AU', { weekday: 'narrow', timeZone: 'UTC' }).format(new Date(w.date + 'T12:00:00Z'))}</span></div>); })()}</div>
+            <div className="hb-money"><span>7 days</span><b>US${Math.round(st.weekRevenue).toLocaleString('en-AU')} · {st.weekOrders} orders</b></div>
           </>}
         </section>
 
         <section className="hb-tile">
-          <header><h3>Our goals</h3>{cash && !cash.unlocked ? <button className="hb-unlock" onClick={unlock}>Unlock numbers</button> : <small>{cash ? `CLEO · ${fmtDay(cash.asOf)}` : ''}</small>}</header>
+          <header><h3>Our goals</h3>{cash && !cash.unlocked ? <button className="hb-unlock" onClick={unlock}>🔒 Show numbers</button> : <small>{cash ? `CLEO · ${fmtDay(cash.asOf)}` : ''}</small>}</header>
           {cash?.unlocked && cash.headline && <p className="hb-headline">{cash.headline}</p>}
           <div className="hb-stairs">{(cash?.goals ?? []).map((g, i) => (
-            <div className="hb-step" key={i}>
+            <div className={'hb-step' + ragCls(goalRag(g.pct))} key={i}>
+              {i === nextGoal && <span className="hb-flag" aria-hidden="true">⚑</span>}
               <i className="fill" style={{ height: `${g.pct}%` }} />
               <span className="hb-num">{g.short}</span><small>{i === 2 ? 'weekly business take-home' : 'net of card debt'}</small>
-              <em>{g.now !== undefined ? `${money(g.now)} · ` : ''}{g.pct}%</em>
+              <em><i className="dot" />{g.now !== undefined ? `${money(g.now)} · ` : ''}{g.pct}%</em>
             </div>
           ))}</div>
-          {cash?.unlocked && cash.cash && cash.week_income && <div className="hb-money">
-            <span>Bank <b>{money(cash.cash.bank)}</b></span><span>Cards <b>{money(-cash.cash.cardDebt)}</b></span><span>Wages <b>{money(cash.week_income.wages)}</b>/wk</span>
-          </div>}
+          {cash?.unlocked && cash.cash && cash.week_income ? <div className="hb-money">
+            <span>Bank <b>{money(cash.cash.bank)}</b></span><span className="neg">Cards <b>{money(-cash.cash.cardDebt)}</b></span><span className={cash.cash.net < 0 ? 'neg' : ''}>Net <b>{money(cash.cash.net)}</b></span><span>Wages <b>{money(cash.week_income.wages)}</b>/wk</span>
+          </div> : cash && <p className="hb-locked">Balances stay hidden until this screen is unlocked with the family PIN.</p>}
           {!cash && <p className="hb-empty">Loading…</p>}
         </section>
 
         <section className="hb-tile">
           <header><h3>Coming up</h3><small>family calendars</small></header>
           {!feed?.calendar?.length ? <p className="hb-empty">{feed ? (feed.calendar ? 'Nothing booked.' : 'Calendar not available.') : 'Loading…'}</p> :
-            <ul className="hb-cal">{feed.calendar.slice(0, 4).map((e, i) => <li key={e.id}><b>{e.subject.trim()}</b><span>{fmtDay(e.startISO)}{e.isAllDay ? '' : `, ${fmtTime(e.startISO)}`}{i === 0 ? ` · in ${until(new Date(e.startISO).getTime() - now.getTime())}` : ''}</span><em>{WHO[e.who] ?? e.who}</em></li>)}</ul>}
+            <ul className="hb-cal">{feed.calendar.slice(0, 4).map((e, i) => <li key={e.id} className={i === 0 ? 'first' : ''}><b>{e.subject.trim()}</b><span>{fmtDay(e.startISO)}{e.isAllDay ? '' : `, ${fmtTime(e.startISO)}`}{i === 0 && <span className="hb-cd"> · in {clockDown(new Date(e.startISO).getTime() - now.getTime())}</span>}</span><em>{WHO[e.who] ?? e.who}</em></li>)}</ul>}
         </section>
       </div>
 
+      <div className="hb-ticker" aria-hidden="true"><div style={{ animationDuration: `${Math.max(40, ticker.length * 7)}s` }}>{[...ticker, ...ticker].map((t, i) => <span key={i}>{t}</span>)}</div></div>
+
       <div className="hb-rail" aria-hidden="true">
         <div className="hb-track"><i style={{ width: `${rail}%` }} /></div>
-        {feed?.prayer?.today.map(p => { const x = railPct(new Date(p.at)); return x > 0 && x < 100 ? <div key={p.prayer} className={'hb-mark pray' + (new Date(p.at) < now ? ' past' : '')} style={{ left: `${x}%` }}><b>{p.name}</b> {fmtTime(p.at)} · {p.leaderName}</div> : null; })}
+        {times.map(p => { const x = railPct(new Date(p.at)); return x > 0 && x < 100 ? <div key={p.prayer} className={'hb-mark pray' + (new Date(p.at) < now ? ' past' : '')} style={{ left: `${x}%` }}><b>{p.name}</b> {fmtTime(p.at)} · {p.leaderName}</div> : null; })}
         {day.length > 0 && [day[0], day.find(s => /homeschool ends/i.test(s.title)) ?? day[day.length - 1]].map((s, i) => <div key={i} className={'hb-mark low' + (new Date(s.start) < now ? ' past' : '')} style={{ left: `${railPct(new Date(s.start))}%` }}>{i === 0 ? 'School' : 'School ends'} {fmtTime(s.start)}</div>)}
-        <div className="hb-nowdot" style={{ left: `${rail}%` }} />
+        <div className={'hb-sun' + (isNight ? ' moon' : '')} style={{ left: `${rail}%` }} />
         <span className="hb-rail-lbl" style={{ left: 0 }}>5am</span><span className="hb-rail-lbl" style={{ right: 0 }}>10pm</span>
       </div>
 
-      <div className="hb-toasts" role="status" aria-live="polite">{toasts.map(t => <div key={t.id} className={'hb-toast' + (t.tone ? ` ${t.tone}` : '') + (t.out ? ' out' : '')}><span>{t.icon}</span><div><b>{t.title}</b><small>{t.note}</small></div></div>)}</div>
-      {(failed || demo) && <p className="hb-stale">{demo ? 'Demo data — remove ?demo to see the live board.' : `Connection lost — showing ${feed ? `data from ${fmtTime(feed.generatedAt)}` : 'nothing yet'}. Retrying.`}</p>}
+      <PopupStage current={popups.current} waiting={popups.waiting} done={popups.done} />
+      {demo && <p className="hb-stale">Demo data — remove ?demo to see the live board.</p>}
     </main>
   );
 }

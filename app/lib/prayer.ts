@@ -1,9 +1,12 @@
 /* Home Prayer Board — the read side the dashboard needs: today's leader and
    suras for the next recited prayer (Fajr, Maghrib, Isha).
 
-   Prayer times are calculated, not fetched: Melbourne, Muslim World League
-   angles (Fajr 18°, Isha 17°), Maghrib = sunset. Accurate to a minute or two,
-   which is enough for "who leads next"; it is not a timetable to pray by.
+   Prayer times are calculated, not fetched, with the SAME settings as tk's
+   Guidance app on the Mac mini (com.batoulapps.GuidanceMac prefs, read
+   25 Oct 2026): Oak Park VIC, method 3 = Muslim World League (Fajr 18°,
+   Isha 17°), Maghrib = sunset, plus Guidance's own minute adjustments.
+   Checked against Guidance's menu for 25 Oct (4:46 / 7:53 / 9:16).
+   If tk changes Guidance's location or adjustments, copy them here.
    Pure — no I/O — so node --test can run it. */
 
 export type Leader = 'tk' | 'an' | 'try';
@@ -23,7 +26,9 @@ const SURAHS: [number, string][] = [[78, 'An-Naba'], [79, "An-Nazi'at"], [80, "'
 const EXTRAS: Record<string, string> = { kursi: 'Ayat al-Kursi', r1: 'Amana ar-Rasul 285', r2: 'Amana ar-Rasul 286', k1: 'Al-Kahf 1–5', k2: 'Al-Kahf 6–10', s32: 'As-Sajdah', s76: 'Al-Insan' };
 export const suraName = (id: string) => EXTRAS[id] ?? SURAHS.find(s => String(s[0]) === id)?.[1] ?? '—';
 
-const LAT = -37.8136, LNG = 144.9631, TZ = 'Australia/Melbourne';
+const LAT = -37.71938916977013, LNG = 144.9128350675565, TZ = 'Australia/Melbourne';
+/** Guidance's kBAUserDefaultsAdjustment* values, in minutes. */
+const ADJUST: Record<PrayerId, number> = { fajr: -2, maghrib: 6, isha: -1 };
 const rad = Math.PI / 180;
 
 /** Local civil date (y, m, d) and weekday in Melbourne. */
@@ -32,16 +37,36 @@ function melDate(at: Date) {
   return { y: +p.year, m: +p.month, d: +p.day };
 }
 
-/** Fajr, sunset and Isha for one civil date, as instants. NOAA-style approximation. */
+/** Sun's declination (radians) and equation of time (minutes) at a Julian day — Meeus, low precision. */
+function sun(jd: number) {
+  const T = (jd - 2451545) / 36525;
+  const L0 = (280.46646 + 36000.76983 * T) * rad, M = (357.52911 + 35999.05029 * T) * rad;
+  const e = 0.016708634 - 0.000042037 * T;
+  const C = ((1.914602 - 0.004817 * T) * Math.sin(M) + 0.019993 * Math.sin(2 * M) + 0.000289 * Math.sin(3 * M)) * rad;
+  const om = (125.04 - 1934.136 * T) * rad;
+  const lambda = L0 + C - (0.00569 + 0.00478 * Math.sin(om)) * rad;
+  const eps = (23.439291 - 0.0130042 * T + 0.00256 * Math.cos(om)) * rad;
+  const y = Math.tan(eps / 2) ** 2;
+  const eqt = 4 / rad * (y * Math.sin(2 * L0) - 2 * e * Math.sin(M) + 4 * e * y * Math.sin(M) * Math.cos(2 * L0) - 0.5 * y * y * Math.sin(4 * L0) - 1.25 * e * e * Math.sin(2 * M));
+  return { dec: Math.asin(Math.sin(eps) * Math.sin(lambda)), eqt };
+}
+
+/** Fajr, sunset and Isha for one civil date, as instants. Each is solved at its own
+ *  moment (two passes), because the sun's declination drifts through the day. */
 export function prayerTimes(y: number, m: number, d: number): Record<PrayerId, Date> {
-  const n = Math.round((Date.UTC(y, m - 1, d) - Date.UTC(y, 0, 0)) / 864e5);
-  const g = (2 * Math.PI / 365) * (n - 1);
-  const eqt = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g) - 0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
-  const dec = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g) - 0.006758 * Math.cos(2 * g) + 0.000907 * Math.sin(2 * g) - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
-  const noon = 720 - 4 * LNG - eqt; // minutes after UTC midnight
-  const ha = (angle: number) => Math.acos((Math.sin(-angle * rad) - Math.sin(LAT * rad) * Math.sin(dec)) / (Math.cos(LAT * rad) * Math.cos(dec))) / rad * 4;
-  const at = (min: number) => new Date(Date.UTC(y, m - 1, d) + min * 60000);
-  return { fajr: at(noon - ha(18)), maghrib: at(noon + ha(0.833)), isha: at(noon + ha(17)) };
+  const jd0 = Date.UTC(y, m - 1, d) / 864e5 + 2440587.5; // Julian day at 0h UTC
+  const solve = (angle: number, side: -1 | 1) => {
+    let t = 720 - 4 * LNG; // minutes after 0h UTC, first guess = solar noon
+    for (let i = 0; i < 3; i++) {
+      const { dec, eqt } = sun(jd0 + t / 1440);
+      const cosH = (Math.sin(-angle * rad) - Math.sin(LAT * rad) * Math.sin(dec)) / (Math.cos(LAT * rad) * Math.cos(dec));
+      t = 720 - 4 * LNG - eqt + side * Math.acos(cosH) / rad * 4;
+    }
+    return t;
+  };
+  // Rounded to the minute, as Guidance shows them.
+  const at = (min: number, p: PrayerId) => new Date(Date.UTC(y, m - 1, d) + Math.round(min + ADJUST[p]) * 60000);
+  return { fajr: at(solve(18, -1), 'fajr'), maghrib: at(solve(0.833, 1), 'maghrib'), isha: at(solve(17, 1), 'isha') };
 }
 
 export interface NextPrayer { prayer: PrayerId; name: string; at: string; day: DayKey; leader: Leader; leaderName: string; suras: string[] }

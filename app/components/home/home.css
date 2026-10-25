@@ -2,11 +2,12 @@
 /* Home board — the "Climb" palette from the goals snapshot (goals.css, C).
    One screen, no scrolling on a TV: fills the viewport under the 40px nav. */
 .hb{
+  position:relative;isolation:isolate;
   --cream:#f6f1e8; --paper:#fbf8f2; --ink:#1d2322; --muted:#7a7468; --line:#e7dfd2;
-  --clay:#b8612f; --clay-soft:#f0dfd0; --teal:#1f4a45; --teal-2:#2b5d57; --teal-3:#557a75; --teal-soft:#dfe8e5;
+  --good:#2f8a57; --warn:#c98a1b; --bad:#c2412d; --clay:#b8612f; --clay-soft:#f0dfd0; --teal:#1f4a45; --teal-2:#2b5d57; --teal-3:#557a75; --teal-soft:#dfe8e5;
   --serif:Fraunces,Georgia,serif;
   height:100dvh;padding-top:calc(40px + 2.4vh)!important;background:var(--cream);color:var(--ink);font-family:Inter,system-ui,sans-serif;
-  display:grid;grid-template-rows:auto minmax(0,1.7fr) minmax(0,1fr) auto;gap:2vh;padding:0 3vw 1.6vh;box-sizing:border-box;overflow:hidden
+  display:grid;grid-template-rows:auto minmax(0,1.5fr) minmax(0,1.15fr) auto auto;gap:2vh;padding:0 3vw 1.6vh;box-sizing:border-box;overflow:hidden
 }
 .hb *{box-sizing:border-box}
 .hb h2,.hb h3,.hb p,.hb ul{margin:0;padding:0}
@@ -21,7 +22,7 @@
 .hb-ann.soon .hb-tag{background:#fff;color:var(--clay)}
 .hb-tag{text-decoration:none;flex:none;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;background:var(--teal);color:#fff;border-radius:999px;padding:6px 12px}
 .hb-msg{position:relative;flex:1;min-width:0;height:32px}
-.hb-msg span{position:absolute;inset:0;display:flex;align-items:center;font-size:clamp(17px,1.5vw,24px);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hb-msg > span{position:absolute;inset:0;display:flex;align-items:center;font-size:clamp(17px,1.5vw,24px);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hb-msg b{font-family:var(--serif);font-weight:800;margin-right:.4em}
 .hb-msg i{font-style:normal;opacity:.7;margin:0 .45em}
 .hb-dots{display:flex;gap:6px;flex:none}
@@ -87,8 +88,8 @@
 .hb-bars div:last-child i{background:var(--clay)}
 .hb-bars span{font-size:11px;color:var(--muted)}
 
-.hb-stairs{flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:.9vw;align-items:end;min-height:0;border-bottom:4px solid var(--ink);padding-top:1vh}
-.hb-step{position:relative;border-radius:12px 12px 0 0;padding:10px 12px;color:#fff;display:flex;flex-direction:column;justify-content:flex-start;overflow:hidden;animation:hb-rise 1.1s cubic-bezier(.2,.8,.2,1) both}
+.hb-stairs{flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:.9vw;align-items:end;min-height:120px;margin-top:14px;border-bottom:4px solid var(--ink);padding-top:1vh}
+.hb-step{position:relative;border-radius:12px 12px 0 0;padding:8px 12px;min-height:84px;color:#fff;display:flex;flex-direction:column;justify-content:flex-start;overflow:hidden;animation:hb-rise 1.1s cubic-bezier(.2,.8,.2,1) both}
 .hb-step:nth-child(1){background:#557a75;height:58%}
 .hb-step:nth-child(2){background:#3f6661;height:78%;animation-delay:.12s}
 .hb-step:nth-child(3){background:#264a46;height:100%;animation-delay:.24s}
@@ -102,7 +103,7 @@
 .hb-headline{font-size:14px;font-weight:600;color:var(--clay)}
 .hb-unlock{border:1px solid var(--line);background:var(--cream);border-radius:999px;padding:4px 12px;font:inherit;font-size:12px;font-weight:600;color:var(--teal);cursor:pointer}
 
-.hb-cal{display:flex;flex-direction:column;gap:0;overflow:hidden}
+.hb-cal{display:flex;flex-direction:column;gap:0;overflow:hidden;-webkit-mask-image:linear-gradient(#000 80%,transparent);mask-image:linear-gradient(#000 80%,transparent)}
 .hb-cal li{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:9px 0;border-bottom:1px solid var(--line)}
 .hb-cal li:last-child{border:0}
 .hb-cal b{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -125,16 +126,6 @@
 .hb-nowdot{position:absolute;top:17px;width:16px;height:16px;margin-left:-8px;border-radius:50%;background:var(--clay);box-shadow:0 0 0 0 rgba(184,97,47,.5);animation:hb-pulse-clay 2s infinite;transition:left 2s linear}
 .hb-rail-lbl{position:absolute;top:18px;transform:translateY(-100%);font-size:11px;color:var(--muted)}
 
-/* ── Toasts ── */
-.hb-toasts{position:fixed;right:3vw;bottom:10vh;display:flex;flex-direction:column;gap:10px;z-index:950;pointer-events:none}
-.hb-toast{background:var(--ink);color:#fff;border-radius:16px;padding:14px 20px;min-width:300px;max-width:440px;box-shadow:0 18px 40px rgba(29,35,34,.25);display:flex;gap:14px;align-items:center;animation:hb-in .6s cubic-bezier(.2,.8,.2,1) both}
-.hb-toast.out{animation:hb-out .5s ease-in both}
-.hb-toast span{font-size:24px}
-.hb-toast b{display:block;font-size:16px}
-.hb-toast small{font-size:13px;opacity:.75}
-.hb-toast.clay{background:var(--clay)}
-.hb-toast.teal{background:var(--teal)}
-
 .hb-stale{position:fixed;left:50%;transform:translateX(-50%);top:46px;font-size:11px;color:var(--muted)}
 
 @keyframes hb-pulse{70%{box-shadow:0 0 0 10px rgba(240,176,137,0)}100%{box-shadow:0 0 0 0 rgba(240,176,137,0)}}
@@ -144,12 +135,200 @@
 @keyframes hb-in{from{opacity:0;transform:translateY(24px) scale(.96)}to{opacity:1;transform:none}}
 @keyframes hb-out{to{opacity:0;transform:translateX(40px)}}
 @keyframes hb-msg-in{from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:none}}
-.hb-msg span{animation:hb-msg-in .7s cubic-bezier(.2,.8,.2,1) both}
+.hb-msg > span{animation:hb-msg-in .7s cubic-bezier(.2,.8,.2,1) both}
 
-@media (prefers-reduced-motion:reduce){.hb *,.hb-toast{animation:none!important;transition:none!important}}
+@media (prefers-reduced-motion:reduce){.hb *{animation:none!important;transition:none!important}}
 @media (max-width:900px){
   .hb{grid-template-rows:none;height:auto;min-height:100dvh;overflow:visible;padding:56px 16px 16px!important}
   .hb-people,.hb-band{grid-template-columns:1fr}
   .hb-bar{flex-wrap:wrap}.hb-clock{order:-1;width:100%;text-align:left}
   .hb-rail{display:none}
 }
+
+/* ════ 25 Oct round 2: colour codes, live + ambient motion, pop-ups ════ */
+.hb > :is(.hb-bar,.hb-people,.hb-band,.hb-ticker,.hb-rail){position:relative;z-index:1}
+/* Ambient: three soft colour fields drifting slowly behind everything. */
+.hb-amb{position:absolute;inset:0;overflow:hidden;z-index:0;pointer-events:none}
+.hb-amb i{position:absolute;width:46vw;height:46vw;border-radius:50%;filter:blur(90px);opacity:.22;animation:hb-drift 38s ease-in-out infinite alternate}
+.hb-amb i:nth-child(1){background:#f0b089;left:-10vw;top:-12vw}
+.hb-amb i:nth-child(2){background:#9cc3b9;right:-14vw;top:20vh;animation-duration:46s;animation-delay:-12s}
+.hb-amb i:nth-child(3){background:#e9c9a6;left:30vw;bottom:-22vw;animation-duration:52s;animation-delay:-24s}
+.hb.night .hb-amb i{opacity:.14}
+@keyframes hb-drift{to{transform:translate(8vw,6vh) scale(1.15)}}
+
+/* Colour codes */
+.rag-good{--rag:var(--good)} .rag-warn{--rag:var(--warn)} .rag-bad{--rag:var(--bad)}
+.hb-pill{display:inline-flex;align-items:center;gap:5px;margin-left:8px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--rag);background:color-mix(in srgb,var(--rag) 12%,transparent);border-radius:999px;padding:2px 8px;vertical-align:1px}
+.hb-pill i,.dot{width:7px;height:7px;border-radius:50%;background:var(--rag,#cfc5b5);display:inline-block;flex:none}
+.hb-pill i{animation:hb-blink 2.4s ease-in-out infinite}
+.hb-ring[class*="rag-"] .fg{stroke:var(--rag)}
+.hb-ring .orbit{fill:none;stroke:var(--rag,var(--teal-2));stroke-width:1.5;stroke-dasharray:3 9;opacity:0;transform-origin:32px 32px}
+.hb-ring.active .orbit{opacity:.55;animation:hb-spin 14s linear infinite}
+.hb-stats > div{border-radius:12px;padding:8px 10px;margin:-8px -10px;transition:background .6s}
+.hb-stats > div[class*="rag-"]{background:color-mix(in srgb,var(--rag) 8%,transparent)}
+.hb-stats > div[class*="rag-"] .hb-num{color:var(--rag)}
+.hb-stats span{display:flex;align-items:center;gap:6px}
+.hb-stats small{font-size:11px;color:var(--muted)}
+.hb-step em{display:flex;align-items:center;gap:6px}
+.hb-step[class*="rag-"] .dot{background:var(--rag);box-shadow:0 0 0 3px rgba(255,255,255,.25)}
+.hb-item.missed{color:var(--bad)} .hb-item.missed .hb-check{border-color:var(--bad)} .hb-item.missed .t{color:var(--bad);font-weight:600}
+.hb-money .neg b{color:var(--bad)}
+.hb-locked{font-size:13px;color:var(--muted)}
+
+/* Announcement bar: prayer chip, flow text, takeovers */
+.hb-chip{flex:none;display:grid;grid-template-columns:auto auto;grid-template-rows:auto auto;column-gap:10px;align-items:center;text-decoration:none;color:inherit;padding-right:18px;border-right:1px solid var(--line)}
+.hb-chip span{grid-row:1/3;font-size:24px;animation:hb-bob 4s ease-in-out infinite}
+.hb-chip b{font-family:var(--serif);font-weight:800;font-size:17px;line-height:1.1}
+.hb-chip small{font-size:12px;color:var(--muted)}
+.hb-flow{font-size:.72em;font-weight:500;color:var(--muted);margin:0 .7em}
+.hb-flow.done{color:var(--good);margin-left:0}
+.hb-ann.takeover{color:#fff;border:0;position:relative;overflow:hidden}
+.hb-ann.takeover.clay{background:var(--clay)} .hb-ann.takeover.teal{background:var(--teal)}
+.hb-ann.takeover .hb-tag{background:#fff;color:var(--ink);animation:hb-throb 1.6s ease-in-out infinite}
+.hb-ann.takeover::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.22) 50%,transparent 70%);transform:translateX(-100%);animation:hb-sweep 3s ease-in-out infinite}
+.hb-ann.takeover .hb-msg b{font-variant-numeric:tabular-nums}
+
+/* Clock: seconds line + live pill */
+.hb-sec{height:3px;background:var(--line);border-radius:3px;overflow:hidden;margin:6px 0 4px}
+.hb-sec i{display:block;height:100%;background:var(--clay);transition:width 1s linear}
+.hb-live{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;color:var(--good);margin-top:4px;letter-spacing:.04em}
+.hb-live i{width:7px;height:7px;border-radius:50%;background:currentColor;animation:hb-blink 1.6s ease-in-out infinite}
+.hb-live.off{color:var(--bad)}
+
+/* Ansar: done / now / next strip */
+.hb-flowrow{display:grid;grid-template-columns:1fr 1.2fr 1fr;gap:8px;font-size:12px}
+.hb-flowrow div{border-radius:10px;padding:6px 10px;background:var(--cream);display:grid;gap:1px;min-width:0}
+.hb-flowrow span{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.hb-flowrow b{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hb-flowrow .done span{color:var(--good)} .hb-flowrow .now{background:var(--clay-soft)} .hb-flowrow .now span{color:var(--clay)}
+
+/* Now cards: shimmer sweep + moving stripes in the progress bar */
+.hb-now{position:relative;overflow:hidden}
+.hb-now:not(.idle)::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 35%,rgba(255,255,255,.09) 50%,transparent 65%);transform:translateX(-100%);animation:hb-sweep 6s ease-in-out infinite}
+.hb-prog i{background:repeating-linear-gradient(135deg,#f0b089 0 10px,#e59a6c 10px 20px);background-size:28px 28px;animation:hb-stripes 1.2s linear infinite}
+
+/* Store: today's bar breathes */
+.hb-bars div.today i{animation:hb-rise 1.1s cubic-bezier(.2,.8,.2,1) both,hb-breathe 2.8s ease-in-out 1.2s infinite}
+
+/* Goals: flag on the next step, shimmer on the fill */
+.hb-flag{position:absolute;top:-30px;left:14px;font-size:22px;color:var(--clay);transform-origin:bottom left;animation:hb-wave 1.8s ease-in-out infinite;z-index:2}
+.hb-step{overflow:visible}
+.hb-step .fill{background:linear-gradient(0deg,rgba(255,255,255,.14),rgba(255,255,255,.04))}
+
+/* Calendar countdown */
+.hb-cd{color:var(--clay);font-weight:600;font-variant-numeric:tabular-nums}
+
+/* Ticker */
+.hb-ticker{overflow:hidden;white-space:nowrap;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:7px 0;-webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
+.hb-ticker div{display:inline-flex;gap:48px;animation:hb-marquee linear infinite}
+.hb-ticker span{font-size:13px;color:var(--muted);font-weight:500}
+
+/* Sky rail: sun by day, moon by night, travelling the track */
+.hb-track{background:linear-gradient(90deg,#e8d3bd,#f3e7c9 30%,#dfe8e5 70%,#c9cfd8)}
+.hb.night .hb-track{background:linear-gradient(90deg,#c9cfd8,#7b8794)}
+.hb-sun{position:absolute;top:12px;width:24px;height:24px;margin-left:-12px;border-radius:50%;background:radial-gradient(circle,#ffd89a 30%,#f0a85e 70%);box-shadow:0 0 18px 6px rgba(240,168,94,.45);transition:left 1s linear;animation:hb-glow 3s ease-in-out infinite}
+.hb-sun.moon{background:radial-gradient(circle at 35% 35%,#f4f1e8 40%,#c9c4b5);box-shadow:0 0 16px 4px rgba(200,210,230,.5)}
+.hb-sun::before{content:"";position:absolute;inset:-8px;border-radius:50%;border:1px dashed rgba(184,97,47,.45);animation:hb-spin 10s linear infinite}
+.hb-nowdot{display:none}
+
+/* ── Pop-ups ── */
+.pp{position:fixed;z-index:960;right:3vw;bottom:13vh;width:min(460px,92vw);background:var(--ink);color:#fff;border-radius:22px;padding:20px 22px;display:flex;gap:18px;align-items:center;box-shadow:0 24px 60px rgba(29,35,34,.35);animation:pp-in .7s cubic-bezier(.2,.9,.25,1.15) both}
+.pp.out{animation:pp-out .6s ease-in both}
+.pp b{display:block;font-size:19px;line-height:1.25}
+.pp small{display:block;font-size:13px;opacity:.75;margin-top:4px}
+.pp-eye{display:block;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;opacity:.7;margin-bottom:4px}
+.pp-more{position:absolute;top:-10px;right:16px;background:var(--clay);color:#fff;font-size:11px;font-weight:700;border-radius:999px;padding:3px 9px}
+.pp-grow{flex:1}
+
+/* tick: check draws itself, confetti bursts */
+.pp-tick{background:var(--teal)}
+.pp-icon{position:relative;width:52px;height:52px;flex:none}
+.pp-icon svg{width:52px;height:52px}
+.pp-icon circle{fill:none;stroke:#f0b089;stroke-width:3;stroke-dasharray:145;stroke-dashoffset:145;animation:pp-draw .6s .2s ease-out forwards}
+.pp-icon path{fill:none;stroke:#fff;stroke-width:4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:40;stroke-dashoffset:40;animation:pp-draw .4s .7s ease-out forwards}
+.pp-confetti{position:absolute;left:50%;top:50%}
+.pp-confetti b{position:absolute;width:7px;height:7px;border-radius:2px;background:var(--c);opacity:0;animation:pp-burst 1.1s .8s cubic-bezier(.1,.8,.3,1) forwards}
+
+/* block: emoji pops, the new segment fills */
+.pp-block{background:#24413d}
+.pp-emoji{font-size:44px;animation:pp-pop .8s .2s cubic-bezier(.3,1.6,.5,1) both}
+.pp-segs{display:flex;gap:5px;margin-top:10px}
+.pp-segs i{flex:1;height:8px;border-radius:4px;background:rgba(255,255,255,.18);overflow:hidden;position:relative}
+.pp-segs i.on{background:#7fb8a8}
+.pp-segs i.new::after{content:"";position:absolute;inset:0;background:#f0b089;transform-origin:left;animation:pp-fill 1.2s .6s ease-out both}
+
+/* complete: centre stage, rays spin, star pops */
+.pp-complete{left:50%;right:auto;top:50%;bottom:auto;transform:translate(-50%,-50%);flex-direction:column;text-align:center;gap:4px;background:var(--clay);width:min(420px,90vw);padding:30px;animation:pp-zoom .8s cubic-bezier(.2,.9,.25,1.2) both}
+.pp-complete.out{animation:pp-zoom-out .6s ease-in both}
+.pp-complete h3{font-family:var(--serif);font-size:30px;margin:0}
+.pp-burst{position:relative;width:110px;height:110px;display:grid;place-items:center;margin-bottom:6px}
+.pp-burst i{position:absolute;left:50%;top:50%;width:4px;height:44px;margin:-44px 0 0 -2px;background:linear-gradient(#fff,transparent);transform-origin:50% 44px;transform:rotate(var(--a));border-radius:2px;opacity:.7;animation:pp-rays 1.2s ease-out both}
+.pp-burst{animation:hb-spin 18s linear infinite}
+.pp-burst span{font-size:54px;color:#fff;animation:pp-pop .9s .3s cubic-bezier(.3,1.6,.5,1) both}
+
+/* order: bag drops and bounces, a coin floats up */
+.pp-order{background:#2a2420}
+.pp-bag{position:relative;font-size:44px;animation:pp-drop .9s cubic-bezier(.3,1.5,.5,1) both}
+.pp-coin{position:absolute;left:50%;top:-6px;transform:translateX(-50%);font-size:13px;font-weight:800;background:#f0b089;color:var(--ink);border-radius:999px;padding:2px 8px;opacity:0;animation:pp-float 1.6s .7s ease-out forwards}
+
+/* event: calendar page flips in */
+.pp-event{background:#1f3b4a}
+.pp-cal{flex:none;width:64px;border-radius:12px;background:#fff;color:var(--ink);text-align:center;overflow:hidden;transform-origin:top;animation:pp-flip .9s .1s cubic-bezier(.3,1.3,.5,1) both}
+.pp-cal span{display:block;background:var(--clay);color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;padding:3px 0}
+.pp-cal b{font-family:var(--serif);font-size:28px;line-height:1.1;padding-top:4px}
+.pp-cal small{font-size:11px;padding-bottom:5px;margin:0;opacity:.6}
+
+/* brief: wide banner, lines arrive one by one */
+.pp-brief{left:50%;right:auto;transform:translateX(-50%);bottom:14vh;width:min(760px,92vw);flex-direction:column;align-items:flex-start;gap:6px;background:rgba(29,35,34,.94);backdrop-filter:blur(6px);animation:pp-up .7s cubic-bezier(.2,.9,.25,1.1) both}
+.pp-brief.out{animation:pp-down .6s ease-in both}
+.pp-brief ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.pp-brief li{font-size:19px;font-weight:500;opacity:0;animation:pp-line .6s ease-out forwards}
+
+/* prayer: the whole room — veil, mihrab draws itself, crescent glows */
+.pp-veil{position:fixed;inset:0;z-index:970;display:grid;place-items:center;background:rgba(246,241,232,.55);backdrop-filter:blur(10px);animation:pp-fade .8s ease both}
+.pp-veil.out{animation:pp-fade-out .6s ease-in both}
+.pp-prayer{position:relative;inset:auto;width:min(880px,92vw);padding:40px 48px;background:linear-gradient(160deg,#1f4a45,#163532);border-radius:30px;gap:40px;animation:pp-grow .9s cubic-bezier(.2,.9,.25,1.15) both}
+.pp-prayer::before{content:"";position:absolute;inset:0;border-radius:inherit;background:radial-gradient(circle at 18% 40%,rgba(240,176,137,.35),transparent 55%);animation:hb-breathe 3s ease-in-out infinite}
+.pp-arch{position:relative;width:170px;flex:none}
+.pp-arch path{fill:none;stroke:#f0b089;stroke-width:3;stroke-dasharray:700;stroke-dashoffset:700;animation:pp-draw 2.2s .2s ease-in-out forwards}
+.pp-arch path + path{stroke:rgba(240,176,137,.45);animation-delay:.6s}
+.pp-arch .moon{fill:#f6e7c9;opacity:0;animation:pp-fade 1s 1.4s forwards,hb-glow 3s 2.4s ease-in-out infinite}
+.pp-arch .bite{fill:#1d4440;opacity:0;animation:pp-fade 1s 1.4s forwards}
+.pp-pray-body{position:relative}
+.pp-pray-body h2{font-family:var(--serif);font-size:clamp(54px,6vw,92px);line-height:1;margin:4px 0 8px;animation:pp-up .8s .3s both}
+.pp-lead{font-size:24px;margin:0 0 16px;opacity:.9}
+.pp-lead b{display:inline;font-size:inherit;color:#f0b089}
+.pp-suras{display:flex;flex-wrap:wrap;gap:8px}
+.pp-suras span{font-size:15px;font-weight:600;background:rgba(255,255,255,.12);border-radius:999px;padding:7px 14px;opacity:0;animation:pp-line .6s ease-out forwards}
+
+@keyframes hb-spin{to{transform:rotate(360deg)}}
+@keyframes hb-blink{50%{opacity:.35}}
+@keyframes hb-bob{50%{transform:translateY(-3px)}}
+@keyframes hb-throb{50%{transform:scale(1.06)}}
+@keyframes hb-sweep{60%,100%{transform:translateX(100%)}}
+@keyframes hb-stripes{to{background-position:28px 0}}
+@keyframes hb-breathe{50%{filter:brightness(1.12);opacity:.85}}
+@keyframes hb-wave{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(8deg)}}
+@keyframes hb-marquee{to{transform:translateX(-50%)}}
+@keyframes hb-glow{50%{box-shadow:0 0 26px 10px rgba(240,168,94,.6)}}
+@keyframes pp-in{from{opacity:0;transform:translateX(60px) scale(.92)}to{opacity:1;transform:none}}
+@keyframes pp-out{to{opacity:0;transform:translateX(60px) scale(.96)}}
+@keyframes pp-zoom{from{opacity:0;transform:translate(-50%,-50%) scale(.7)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+@keyframes pp-zoom-out{to{opacity:0;transform:translate(-50%,-50%) scale(.9)}}
+@keyframes pp-up{from{opacity:0;transform:translate(var(--tx,0),30px)}to{opacity:1;transform:translate(var(--tx,0),0)}}
+@keyframes pp-down{to{opacity:0;transform:translate(var(--tx,0),30px)}}
+@keyframes pp-grow{from{opacity:0;transform:scale(.75)}to{opacity:1;transform:none}}
+@keyframes pp-fade{from{opacity:0}to{opacity:1}}
+@keyframes pp-fade-out{to{opacity:0}}
+@keyframes pp-draw{to{stroke-dashoffset:0}}
+@keyframes pp-burst{0%{opacity:1;transform:rotate(var(--a)) translateY(0)}100%{opacity:0;transform:rotate(var(--a)) translateY(calc(var(--d) * -1)) rotate(200deg)}}
+@keyframes pp-pop{from{transform:scale(0) rotate(-20deg)}to{transform:scale(1)}}
+@keyframes pp-fill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes pp-rays{from{height:0;opacity:0}to{height:44px;opacity:.7}}
+@keyframes pp-drop{from{transform:translateY(-60px);opacity:0}to{transform:none;opacity:1}}
+@keyframes pp-float{0%{opacity:0;transform:translate(-50%,0)}30%{opacity:1}100%{opacity:0;transform:translate(-50%,-46px)}}
+@keyframes pp-flip{from{transform:rotateX(-90deg)}to{transform:none}}
+@keyframes pp-line{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:none}}
+.pp-brief{--tx:-50%}
+.pp-prayer.out{animation:pp-fade-out .5s both}
+@media (prefers-reduced-motion:reduce){.hb *,.pp,.pp *,.pp-veil{animation:none!important;transition:none!important}.pp-suras span,.pp-brief li,.pp-arch path,.pp-arch .moon,.pp-arch .bite,.pp-coin{opacity:1;stroke-dashoffset:0}}

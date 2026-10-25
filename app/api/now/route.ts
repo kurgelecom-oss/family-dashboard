@@ -51,7 +51,7 @@ export async function GET() {
   const [daily, calendar, shop, schedule, school, board] = await Promise.allSettled([
     json<DailyPayload>(dailyGET()),
     json<{ events: { id: string; subject: string; startISO: string; isAllDay: boolean; account: string }[] }>(calendarGET()),
-    json<{ days: { date: string; label: string; isToday: boolean; orders: number; revenue: number; sessions: number | null; conversion: number | null }[] }>(shopifyGET()),
+    json<{ timezone: string; days: { date: string; label: string; isToday: boolean; orders: number; revenue: number; sessions: number | null; conversion: number | null }[] }>(shopifyGET()),
     json<ScheduleRow[]>(scheduleGET()),
     fetch(`${ANSAR}/api/school-block`, { cache: 'no-store', signal: AbortSignal.timeout(10000) }).then(r => r.json() as Promise<SchoolBlocks>),
     readBoard(),
@@ -61,8 +61,18 @@ export async function GET() {
   const d = ok(daily), sb = ok(school), b = ok(board), cal = ok(calendar), s = ok(shop), sch = ok(schedule);
   const doneBlocks = new Set((sb?.blocks ?? []).filter(x => sb?.done.includes(x.rowId)).map(x => x.name.split('—')[0].trim()));
 
-  const ansarDay = (sch ?? [])
-    .filter(e => e.days?.includes(weekday))
+  const slotsFor = (wd: string) => (sch ?? []).filter(e => e.days?.includes(wd));
+  // Weekends: show the next school day's plan instead of an empty column.
+  const WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const nextWd = slotsFor(weekday).length ? null : [1, 2, 3, 4, 5, 6].map(i => WEEK[(WEEK.indexOf(weekday) + i) % 7]).find(wd => slotsFor(wd).length) ?? null;
+  const nextDay = nextWd ? {
+    weekday: nextWd,
+    slots: slotsFor(nextWd).filter(e => e.category === 'Learning' || e.category === 'Meal')
+      .sort((x, y) => (todayAt(x.start, now)?.getTime() ?? 0) - (todayAt(y.start, now)?.getTime() ?? 0))
+      .map(e => ({ title: e.entry, emoji: e.emoji, start: e.start })),
+  } : null;
+
+  const ansarDay = slotsFor(weekday)
     .map(e => {
       const start = todayAt(e.start, now), end = todayAt(e.end, now);
       const blockKey = e.entry.split('—')[0].trim();
@@ -79,19 +89,25 @@ export async function GET() {
   const store = s ? (() => {
     const today = s.days.find(x => x.isToday) ?? s.days[0];
     const week = s.days.slice(0, 7);
+    // Pace: the six full days before today, and how far through the store's day we are.
+    const prior = s.days.filter(x => !x.isToday).slice(0, 6);
+    const avg = (k: 'orders' | 'revenue') => prior.length ? prior.reduce((a, x) => a + x[k], 0) / prior.length : 0;
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: s.timezone || 'America/New_York', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(now).map(x => [x.type, x.value]));
     return {
       currency: 'USD',
       today: today ? { label: today.label, orders: today.orders, revenue: today.revenue, sessions: today.sessions, conversion: today.conversion } : null,
       week: week.map(x => ({ date: x.date, revenue: x.revenue, orders: x.orders })).reverse(),
       weekRevenue: week.reduce((a, x) => a + x.revenue, 0),
       weekOrders: week.reduce((a, x) => a + x.orders, 0),
+      avgOrders: avg('orders'), avgRevenue: avg('revenue'),
+      dayFraction: (+p.hour + +p.minute / 60) / 24,
     };
   })() : null;
 
   const body = {
     generatedAt: now.toISOString(),
     weekday,
-    ansar: { day: ansarDay, habits: tasks(person('ansar')), schoolTicks: sb ? { done: sb.done.length, total: sb.blocks.length } : null },
+    ansar: { day: ansarDay, nextDay, habits: tasks(person('ansar')), schoolTicks: sb ? { done: sb.done.length, total: sb.blocks.length } : null },
     nihal: tasks(person('nihal')),
     taylan: tasks(person('taylan')),
     prayer: b ? { next: nextPrayer(b, now), today: todaysPrayers(b, now) } : null,
