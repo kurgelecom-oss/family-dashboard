@@ -4,22 +4,6 @@ import {familyWrite} from "./FamilyEditGate";
 
 const LINKS: { label: string; href: string; external?: boolean }[] = [
   { label: "Family Dashboard",      href: "https://kurgel-dashboard.netlify.app/" },
-  // Second, not last: .topnav scrolls horizontally on a phone and only the
-  // first couple of entries are reachable without swiping, so the daily
-  // check-in has to sit where it is one tap from every screen. It points
-  // off-site now — the board lives on the manifesto page, and this origin's
-  // /mission is a 308 to exactly that, so linking direct saves the hop.
-  // Absolute like every other entry: the matcher below runs new URL(link.href)
-  // with no base, and a bare path would throw there and take active-state
-  // detection down for the whole nav, not just this link.
-  { label: "ECOM Launchpad",        href: "https://ecom-launchpad-mentor.netlify.app/" },
-  { label: "Calculator",            href: "https://kurgel-dashboard.netlify.app/profit.html" },
-  { label: "Time Allocation Board", href: "https://kurgel-dashboard.netlify.app/board" },
-  { label: "ORIGINS",               href: "https://kurgel-dashboard.netlify.app/origins" },
-  // Off-network surface, unlike every entry above it: opens in its own tab so
-  // the dashboard stays put on the TV. `external` is the only per-link flag —
-  // className and wrapper stay identical to the siblings.
-  { label: "kdgm",                  href: "https://dashboard.kdgm.com.au/", external: true },
 ];
 
 function normPath(p: string): string {
