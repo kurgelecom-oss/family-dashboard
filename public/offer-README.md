@@ -1,7 +1,7 @@
 # Offer Engine — how to read the ladder
 
-Live at `/offer.html`. You paste in your supplier's quote. Everything else on
-the page is solved from it.
+The `/offer.html` page was retired on 27 Oct 2026 (tk). The maths lives on for
+agents at `GET /api/offer`. The notes below describe the model it serves.
 
 ## Current Compare view
 

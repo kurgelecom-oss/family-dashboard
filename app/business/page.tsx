@@ -540,12 +540,6 @@ export default function BusinessPage() {
                 >
                   Open in Launchpad ↗
                 </a>
-                <a
-                  href={`/profit.html?test=${encodeURIComponent(selectedTest.id)}`}
-                  style={buttonStyle}
-                >
-                  Open in calculator ↗
-                </a>
               </div>
 
               {/* Cumulative spend. */}

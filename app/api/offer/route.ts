@@ -9,8 +9,8 @@ import {
 /* ════════════════════════════════════════════════════════════════════════════
    GET /api/offer?costs=9.4,12.4,15.9&prices=49.95,79.95,99.95
 
-   The Offer Engine for agents. /offer.html is the same maths for a person; this
-   is it as JSON, so a seat (CLEO at Offer Architecture, TARA at validation,
+   The Offer Engine for agents (the /offer.html page was retired 27 Oct 2026); this
+   is the maths as JSON, so a seat (CLEO at Offer Architecture, TARA at validation,
    GARY at the spend check-in) can grade an offer with one curl instead of
    re-deriving the formulas in prose and drifting from the page.
 
@@ -128,12 +128,6 @@ export async function GET(request: NextRequest) {
       )
     : null;
 
-  // Not request.nextUrl.origin: on Netlify that is the per-deploy hostname, which
-  // would pin the link to one build and to that build's own saved figures.
-  const link = new URL("https://kurgel-dashboard.netlify.app/offer.html");
-  link.searchParams.set("costs", (costs as number[]).join(","));
-  if (prices.length) link.searchParams.set("prices", prices.map((p) => p ?? "").join(","));
-
   return NextResponse.json(
     {
       ok: true,
@@ -154,7 +148,6 @@ export async function GET(request: NextRequest) {
       },
       tiers,
       mixes,
-      open_in_offer_engine: link.toString(),
     },
     { headers: HEADERS },
   );
