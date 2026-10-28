@@ -8,6 +8,8 @@ import type { OrderItem } from '../../lib/daily-order';
 /** Daily-order steps left off the board (tk 28 Oct 2026). They stay in Launchpad and Nihal OS,
     so the level-ups still open only once Nihal ticks them there. */
 const HIDDEN = new Set(['customer_emails']);
+/** Steps an agent ticks in Launchpad when it has done them (mission-control agents/daily_order.py). Still tappable by hand. */
+const AGENT: Record<string, string> = { competitor_check: 'NORA', pdp_check: 'VERA', make_ads: 'GARY' };
 
 export type June = { date: string; headline: string | null; worked: { ad: string; why: string }[]; lessons: string[]; next: string[] } | null;
 export type Order = { testId: string; product: string; date: string; items: OrderItem[] } | null;
@@ -40,7 +42,7 @@ export function tickerRows(nihal: Tasks | undefined, taylan: Tasks | undefined, 
       id: `lp-${o.key}`, title: o.label, who: 'Nihal', done: o.done || !!tw?.done,
       step: o.levelUp ? `+${o.levelUp}` : String(o.step),
       talk: talkFor(o.key) ?? (o.details.length ? o.details.join(' · ') : null),
-      hint: o.automated ? `auto · ${o.automated.split(' ')[0]}` : o.done || o.open ? undefined : o.levelUp ? 'after the six' : 'opens in order',
+      hint: o.automated ? `auto · ${o.automated.split(' ')[0]}` : AGENT[o.key] && !o.done ? `auto · ${AGENT[o.key]}` : o.done || o.open ? undefined : o.levelUp ? 'after the six' : 'opens in order',
       tick: o.automated ? null : { kind: 'order', key: o.key },
       locked: !o.automated && !o.open && !o.done,
     };

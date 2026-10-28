@@ -23,6 +23,7 @@ test('ticker merges twins, orders sections and locks unopened steps', () => {
   assert.equal(rows[1].tick, null);
   assert.equal(rows[1].talk, 'JUNE · Calm cards sold cheapest');
   assert.equal(rows[2].locked, true);
+  assert.equal(rows[2].hint, 'auto · VERA');
   assert.equal(rows[3].done, true, 'Origins done in its app ticks the level-up row');
   assert.match(rows[4].talk ?? '', /ad-1/);
   assert.equal(rows[5].who, 'TK');
