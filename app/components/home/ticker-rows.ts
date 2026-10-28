@@ -5,6 +5,10 @@
 import type { Item, Tasks } from './HomeBoard';
 import type { OrderItem } from '../../lib/daily-order';
 
+/** Daily-order steps left off the board (tk 28 Oct 2026). They stay in Launchpad and Nihal OS,
+    so the level-ups still open only once Nihal ticks them there. */
+const HIDDEN = new Set(['customer_emails']);
+
 export type June = { date: string; headline: string | null; worked: { ad: string; why: string }[]; lessons: string[]; next: string[] } | null;
 export type Order = { testId: string; product: string; date: string; items: OrderItem[] } | null;
 
@@ -30,7 +34,7 @@ export function tickerRows(nihal: Tasks | undefined, taylan: Tasks | undefined, 
     : key === 'make_ads' && june?.next[0] ? `Next batch · ${june.next[0]}`
     : key === 'pdp_check' && june?.lessons[0] ? `Lesson · ${june.lessons[0]}` : null;
 
-  const ord: Row[] = (order?.items ?? []).map(o => {
+  const ord: Row[] = (order?.items ?? []).filter(o => !HIDDEN.has(o.key)).map(o => {
     const tw = twin(o.key);
     return {
       id: `lp-${o.key}`, title: o.label, who: 'Nihal', done: o.done || !!tw?.done,
