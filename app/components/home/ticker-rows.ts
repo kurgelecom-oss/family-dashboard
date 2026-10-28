@@ -9,7 +9,7 @@ import type { OrderItem } from '../../lib/daily-order';
     so the level-ups still open only once Nihal ticks them there. */
 const HIDDEN = new Set(['customer_emails']);
 /** Steps an agent ticks in Launchpad when it has done them (mission-control agents/daily_order.py). Still tappable by hand. */
-export const AGENT: Record<string, string> = { meta_report: 'GARY', competitor_check: 'NORA', pdp_check: 'VERA', make_ads: 'GARY' };
+export const AGENT: Record<string, string> = { meta_report: 'GARY', competitor_check: 'NORA', pdp_check: 'VERA', make_ads: 'JUNE' };
 
 export type June = { date: string; headline: string | null; worked: { ad: string; why: string }[]; lessons: string[]; next: string[] } | null;
 export type Order = { testId: string; product: string; date: string; items: OrderItem[] } | null;
