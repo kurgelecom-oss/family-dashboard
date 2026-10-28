@@ -37,7 +37,6 @@ export function DayTicker({ rows, fresh, onTick, title, sub }: { rows: Row[]; fr
         <span className="dt-title">{r.step && <em>{r.step}</em>}{r.title}</span>
         {r.talk && <span className="dt-talk">{r.talk}</span>}
       </span>
-      <span className={'dt-who ' + r.who.toLowerCase()}>{r.who}</span>
       <span className="dt-hint">{r.hint ?? ''}</span>
     </li>
   );
