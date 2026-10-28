@@ -247,6 +247,7 @@
 
 /* tick: check draws itself, confetti bursts */
 .pp-tick{background:var(--teal)}
+.pp-tick.warn{background:var(--warn)}
 .pp-icon{position:relative;width:52px;height:52px;flex:none}
 .pp-icon svg{width:52px;height:52px}
 .pp-icon circle{fill:none;stroke:#f0b089;stroke-width:3;stroke-dasharray:145;stroke-dashoffset:145;animation:pp-draw .6s .2s ease-out forwards}

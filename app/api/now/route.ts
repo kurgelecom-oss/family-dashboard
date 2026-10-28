@@ -7,6 +7,7 @@ import { readBoard } from '../../lib/prayer-store';
 import { nextPrayer, todaysPrayers } from '../../lib/prayer';
 import type { DailyPayload, DailyPerson } from '../../lib/daily/model';
 import { readDailyOrder } from '../../lib/daily-order';
+import { agentActions, jobsQuery, type JuneStep } from '../../lib/agent-feed';
 
 /* /api/now — the home board's one feed. Everything public the board shows, in
    one request, so a TV polling once a minute costs one function call, not six.
@@ -58,6 +59,16 @@ async function adsLive() {
 
 /** JUNE's latest "what worked and why" (mission-control june_study.py publishes it after each study). */
 type JuneEmail = { date: string; headline?: string; worked?: { ad: string; why: string }[]; flopped?: { ad: string; why: string }[]; lessons?: string[]; next?: string[] };
+/** June's step ticks and what the agents did (app/lib/agent-feed.ts). */
+async function agentFeed(now: Date) {
+  const url = process.env.MC_SUPABASE_URL, key = process.env.MC_SUPABASE_SERVICE_KEY;
+  if (!url || !key) throw new Error('MC Supabase not set');
+  const get = (q: string) => fetch(`${url}/rest/v1/${q}`, { headers: { apikey: key, Authorization: `Bearer ${key}` }, cache: 'no-store', signal: AbortSignal.timeout(8000) }).then(r => { if (!r.ok) throw new Error(`mc ${r.status}`); return r.json(); });
+  const [auto, jobs] = await Promise.all([get('cos_mission_control?id=eq.automations&select=june:doc->june'), get(jobsQuery(now))]);
+  const june = (auto as { june?: { date: string; steps: JuneStep[] } }[])[0]?.june ?? null;
+  return { june: june ? { date: june.date, steps: june.steps.map(x => ({ id: x.id, label: x.label, due: x.due, state: x.state ?? null, at: x.at ?? null })) } : null, actions: agentActions(jobs) };
+}
+
 async function juneEmail(): Promise<JuneEmail> {
   const url = process.env.MC_SUPABASE_URL, key = process.env.MC_SUPABASE_SERVICE_KEY;
   if (!url || !key) throw new Error('MC Supabase not set');
@@ -79,7 +90,7 @@ const tasks = (p: DailyPerson | undefined) => p ? {
 export async function GET() {
   const now = new Date();
   const weekday = new Intl.DateTimeFormat('en-AU', { timeZone: TZ, weekday: 'short' }).format(now);
-  const [daily, calendar, shop, schedule, school, board, adsRes, orderRes, juneRes] = await Promise.allSettled([
+  const [daily, calendar, shop, schedule, school, board, adsRes, orderRes, juneRes, agentsRes] = await Promise.allSettled([
     json<DailyPayload>(dailyGET()),
     json<{ events: { id: string; subject: string; startISO: string; isAllDay: boolean; account: string }[] }>(calendarGET()),
     json<{ timezone: string; days: { date: string; label: string; isToday: boolean; orders: number; revenue: number; sessions: number | null; conversion: number | null }[] }>(shopifyGET()),
@@ -89,6 +100,7 @@ export async function GET() {
     adsLive(),
     readDailyOrder(now),
     juneEmail(),
+    agentFeed(now),
   ]);
   const ok = <T,>(r: PromiseSettledResult<T>) => r.status === 'fulfilled' ? r.value : null;
 
@@ -157,8 +169,11 @@ export async function GET() {
     ads: ok(adsRes),
     // Nihal's daily order of priority (Launchpad, shared with Nihal OS) and JUNE's talk points for the ticker.
     order: ok(orderRes),
+    // June's steps and the agents' actions: the board pops a card for each new one.
+    agents: ok(agentsRes),
     june: juneRes.status === 'fulfilled' ? (({ date, headline, worked, lessons, next }) => ({ date, headline: headline ?? null, worked: (worked ?? []).slice(0, 3), lessons: (lessons ?? []).slice(0, 4), next: (next ?? []).slice(0, 4) }))(juneRes.value) : null,
   };
+  if (agentsRes.status === 'rejected') console.error('agent feed', agentsRes.reason);
   if (orderRes.status === 'rejected') console.error('daily order', orderRes.reason);
   if (adsRes.status === 'rejected') console.error('ads status', adsRes.reason);
   return NextResponse.json(body, { headers: { 'Cache-Control': 'public, max-age=0, s-maxage=60, stale-while-revalidate=30' } });

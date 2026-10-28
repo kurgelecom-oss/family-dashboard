@@ -7,7 +7,8 @@ import { chime, soundReady, unlockSound } from './sound';
 import { familyWrite } from '../FamilyEditGate';
 import { RAG_LABEL, conversionRag, goalRag, listRag, paceRag, type Rag } from './rag';
 import { DayTicker } from './DayTicker';
-import { tickerRows, type June, type Order, type Row } from './ticker-rows';
+import { AGENT, tickerRows, type June, type Order, type Row } from './ticker-rows';
+import type { AgentAction, JuneStep } from '../../lib/agent-feed';
 
 /* The family home board. One screen: an announcement bar, a column per person,
    a shared band (store · goals · calendar), a ticker and a sky rail.
@@ -33,6 +34,7 @@ export type NowFeed = {
   store: { currency: string; today: { label: string; orders: number; revenue: number; sessions: number | null; conversion: number | null } | null; week: { date: string; revenue: number; orders: number }[]; weekRevenue: number; weekOrders: number; avgOrders: number; avgRevenue: number; dayFraction: number } | null;
   ads?: { live: boolean; activeAds: number; reason: string | null } | null;
   order?: Order; june?: June;
+  agents?: { june: { date: string; steps: (Pick<JuneStep, 'id' | 'label' | 'due'> & { state: string | null; at: string | null })[] } | null; actions: AgentAction[] } | null;
 };
 export type Money = {
   unlocked: boolean; asOf: string;
@@ -182,7 +184,12 @@ export default function HomeBoard() {
       if (p && p.total && p.done === p.total && (pick(a)?.done ?? 0) < p.total) push({ kind: 'complete', who, total: p.total });
     }
     const beforeOrder = new Set(a.order?.items.filter(i => i.done).map(i => i.key));
-    for (const o of b.order?.items ?? []) if (o.done && !beforeOrder.has(o.key) && !mine.current.delete(`lp-${o.key}`)) { newly.push(`lp-${o.key}`); push({ kind: 'tick', who: 'Nihal', title: o.label }); }
+    for (const o of b.order?.items ?? []) if (o.done && !beforeOrder.has(o.key) && !mine.current.delete(`lp-${o.key}`)) { newly.push(`lp-${o.key}`); push({ kind: 'tick', who: AGENT[o.key] ?? 'Nihal', title: o.label }); }
+    // The agents: each June step the code ticks, and every action GARY, JUNE and the other seats finish.
+    const juneBefore = new Map(a.agents?.june?.steps.map(x => [x.id, x.state]));
+    for (const x of b.agents?.june?.steps ?? []) if ((x.state === 'done' || x.state === 'fail') && juneBefore.get(x.id) !== x.state && a.agents?.june) push({ kind: 'tick', who: 'JUNE', title: x.label, warn: x.state === 'fail' });
+    const seen = new Set(a.agents?.actions.map(x => x.id));
+    if (a.agents) for (const x of [...(b.agents?.actions ?? [])].reverse()) if (!seen.has(x.id)) push({ kind: 'tick', who: x.who, title: x.text, warn: x.warn });
     const beforeBlocks = new Set(a.ansar.day.filter(s => s.ticked).map(s => s.title));
     const blocks = b.ansar.day.filter(s => s.ticked !== null);
     for (const s of blocks) if (s.ticked && !beforeBlocks.has(s.title)) { newly.push(s.title); push({ kind: 'block', emoji: s.emoji, title: s.title, done: blocks.filter(x => x.ticked).length, total: blocks.length }); }

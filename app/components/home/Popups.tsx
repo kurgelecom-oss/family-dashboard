@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type Popup =
   | { kind: 'prayer'; name: string; minutes: number; leader: string; suras: string[]; now?: boolean }
-  | { kind: 'tick'; who: string; title: string }
+  | { kind: 'tick'; who: string; title: string; warn?: boolean }
   | { kind: 'block'; emoji: string; title: string; done: number; total: number }
   | { kind: 'complete'; who: string; total: number }
   | { kind: 'order'; added: number; orders: number; revenue: number }
@@ -93,9 +93,9 @@ function PopupView({ p, waiting, done, onShow }: { p: Popup; waiting: number; do
   );
 
   if (p.kind === 'tick') return (
-    <div className={cls} role="status">
-      <div className="pp-icon"><svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="23" /><path d="M15 27 l7 7 l15 -16" /></svg><Confetti /></div>
-      <div><span className="pp-eye">{p.who} · just done</span><b>{p.title}</b></div>{more}
+    <div className={cls + (p.warn ? ' warn' : '')} role="status">
+      <div className="pp-icon"><svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="23" />{p.warn ? <path d="M26 14 v15 M26 36 v1" /> : <path d="M15 27 l7 7 l15 -16" />}</svg>{!p.warn && <Confetti />}</div>
+      <div><span className="pp-eye">{p.who} · {p.warn ? 'needs a look' : 'just done'}</span><b>{p.title}</b></div>{more}
     </div>
   );
 
