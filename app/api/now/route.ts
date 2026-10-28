@@ -6,6 +6,7 @@ import { GET as scheduleGET } from '../schedule/route';
 import { readBoard } from '../../lib/prayer-store';
 import { nextPrayer, todaysPrayers } from '../../lib/prayer';
 import type { DailyPayload, DailyPerson } from '../../lib/daily/model';
+import { readDailyOrder } from '../../lib/daily-order';
 
 /* /api/now — the home board's one feed. Everything public the board shows, in
    one request, so a TV polling once a minute costs one function call, not six.
@@ -55,18 +56,30 @@ async function adsLive() {
   return { live: accountOk && active > 0, activeAds: active, reason: !accountOk ? ACCOUNT_STATUS[d.account_status] ?? `account status ${d.account_status}` : active ? null : 'no ads delivering' };
 }
 
+/** JUNE's latest "what worked and why" (mission-control june_study.py publishes it after each study). */
+type JuneEmail = { date: string; headline?: string; worked?: { ad: string; why: string }[]; flopped?: { ad: string; why: string }[]; lessons?: string[]; next?: string[] };
+async function juneEmail(): Promise<JuneEmail> {
+  const url = process.env.MC_SUPABASE_URL, key = process.env.MC_SUPABASE_SERVICE_KEY;
+  if (!url || !key) throw new Error('MC Supabase not set');
+  const r = await fetch(`${url}/rest/v1/cos_mission_control?id=eq.june-email&select=doc`, { headers: { apikey: key, Authorization: `Bearer ${key}` }, cache: 'no-store', signal: AbortSignal.timeout(8000) });
+  if (!r.ok) throw new Error(`june ${r.status}`);
+  const doc = ((await r.json()) as { doc: JuneEmail }[])[0]?.doc;
+  if (!doc) throw new Error('no june row');
+  return doc;
+}
+
 type ScheduleRow = { entry: string; days: string[] | null; date: string | null; start: string; end: string; category: string; emoji: string };
 type SchoolBlocks = { blocks: { rowId: string; name: string }[]; done: string[] };
 
 const tasks = (p: DailyPerson | undefined) => p ? {
   done: p.done, total: p.total,
-  items: p.groups.flatMap(g => g.tasks).map(t => ({ id: t.id, title: t.title, done: t.done, auto: t.auto, source: t.source, count: t.count ?? null })),
+  items: p.groups.flatMap(g => g.tasks).map(t => ({ id: t.id, title: t.title, done: t.done, auto: t.auto, source: t.source, count: t.count ?? null, feeds: t.feeds ?? null })),
 } : null;
 
 export async function GET() {
   const now = new Date();
   const weekday = new Intl.DateTimeFormat('en-AU', { timeZone: TZ, weekday: 'short' }).format(now);
-  const [daily, calendar, shop, schedule, school, board, adsRes] = await Promise.allSettled([
+  const [daily, calendar, shop, schedule, school, board, adsRes, orderRes, juneRes] = await Promise.allSettled([
     json<DailyPayload>(dailyGET()),
     json<{ events: { id: string; subject: string; startISO: string; isAllDay: boolean; account: string }[] }>(calendarGET()),
     json<{ timezone: string; days: { date: string; label: string; isToday: boolean; orders: number; revenue: number; sessions: number | null; conversion: number | null }[] }>(shopifyGET()),
@@ -74,6 +87,8 @@ export async function GET() {
     fetch(`${ANSAR}/api/school-block`, { cache: 'no-store', signal: AbortSignal.timeout(10000) }).then(r => r.json() as Promise<SchoolBlocks>),
     readBoard(),
     adsLive(),
+    readDailyOrder(now),
+    juneEmail(),
   ]);
   const ok = <T,>(r: PromiseSettledResult<T>) => r.status === 'fulfilled' ? r.value : null;
 
@@ -140,7 +155,11 @@ export async function GET() {
     store,
     // null = Meta could not be read; the board treats that as not confirmed live.
     ads: ok(adsRes),
+    // Nihal's daily order of priority (Launchpad, shared with Nihal OS) and JUNE's talk points for the ticker.
+    order: ok(orderRes),
+    june: juneRes.status === 'fulfilled' ? (({ date, headline, worked, lessons, next }) => ({ date, headline: headline ?? null, worked: (worked ?? []).slice(0, 3), lessons: (lessons ?? []).slice(0, 4), next: (next ?? []).slice(0, 4) }))(juneRes.value) : null,
   };
+  if (orderRes.status === 'rejected') console.error('daily order', orderRes.reason);
   if (adsRes.status === 'rejected') console.error('ads status', adsRes.reason);
   return NextResponse.json(body, { headers: { 'Cache-Control': 'public, max-age=0, s-maxage=60, stale-while-revalidate=30' } });
 }

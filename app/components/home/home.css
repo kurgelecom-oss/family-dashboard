@@ -36,7 +36,7 @@
 .hb-clock div:last-child{font-size:14px;color:var(--muted);margin-top:4px}
 
 /* ── People ── */
-.hb-people{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:1.6vw;min-height:0}
+.hb-people{display:grid;grid-template-columns:1.25fr 2fr;gap:1.6vw;min-height:0}
 .hb-card{background:var(--paper);border:1px solid var(--line);border-radius:22px;padding:2.2vh 1.6vw;display:flex;flex-direction:column;gap:1.4vh;min-height:0;overflow:hidden}
 .hb-head{display:flex;align-items:center;gap:14px}
 .hb-head h2{font-family:var(--serif);font-weight:800;font-size:clamp(26px,2.2vw,38px);letter-spacing:-.02em;line-height:1}
@@ -427,3 +427,45 @@
 .hb-fit{display:grid;grid-template-rows:repeat(5,max-content);gap:1.4vh;transform-origin:top left;position:relative;z-index:1}
 .hb-fit > *{position:relative;z-index:1}
 @media (max-width:900px){.hb{overflow-y:auto}}
+
+/* Today's list: one rolling ticker in place of the Nihal and TK columns (DayTicker.tsx).
+   The view takes the row's height (set by Ansar's card) and never its content's,
+   so the list can be any length without growing the board. */
+.dt{--row:62px}
+.dt-count{margin-left:auto;display:grid;grid-template-columns:auto auto;align-items:baseline;gap:2px 8px;min-width:120px}
+.dt-count b{font-size:34px;color:var(--teal);line-height:1}
+.dt-count span{font-size:13px;color:var(--muted);font-weight:600}
+.dt-bar{grid-column:1/3;height:6px;border-radius:99px;background:var(--line);overflow:hidden}
+.dt-bar i{display:block;height:100%;background:var(--good);border-radius:inherit;transition:width 1s cubic-bezier(.2,.8,.2,1)}
+.dt-view{position:relative;flex:1 1 0;height:0;min-height:calc(var(--row) * 4);overflow:hidden}
+.dt-view.roll{-webkit-mask-image:linear-gradient(180deg,transparent,#000 9%,#000 91%,transparent);mask-image:linear-gradient(180deg,transparent,#000 9%,#000 91%,transparent)}
+.dt-track{list-style:none;margin:0;padding:0}
+.dt-view.roll .dt-track{animation:dt-roll linear infinite}
+.dt-track.held{animation-play-state:paused!important}
+@keyframes dt-roll{from{transform:translateY(0)}to{transform:translateY(-50%)}}
+.dt-row{height:var(--row);display:grid;grid-template-columns:34px 1fr auto 104px;align-items:center;gap:12px;padding:0 10px;border-bottom:1px solid var(--line);border-radius:10px;transition:background .3s,opacity .5s}
+.dt-row.tap{cursor:pointer}
+.dt-row.tap:hover{background:color-mix(in srgb,var(--good) 7%,transparent)}
+.dt-circle{width:28px;height:28px;border-radius:50%;border:2.5px solid #cfc5b5;display:grid;place-items:center;transition:background .35s,border-color .35s,transform .15s}
+.dt-circle svg{width:18px;height:18px;fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:22;stroke-dashoffset:22;transition:stroke-dashoffset .45s .1s ease-out}
+.dt-row.tap:active .dt-circle{transform:scale(.85)}
+.dt-row.done .dt-circle{background:var(--good);border-color:var(--good)}
+.dt-row.done .dt-circle svg{stroke-dashoffset:0}
+.dt-row.fresh .dt-circle{animation:dt-pop .6s cubic-bezier(.2,.9,.25,1.4)}
+.dt-row.fresh{animation:dt-glow 2.4s ease-out}
+@keyframes dt-pop{0%{transform:scale(.6)}60%{transform:scale(1.25)}100%{transform:scale(1)}}
+@keyframes dt-glow{0%{background:color-mix(in srgb,var(--good) 18%,transparent)}100%{background:transparent}}
+.dt-row.nudge{animation:dt-nudge .5s}
+@keyframes dt-nudge{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.dt-body{display:grid;gap:3px;min-width:0}
+.dt-title{font-size:17px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-title em{font-style:normal;display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 5px;margin-right:8px;border-radius:99px;background:var(--teal-soft);color:var(--teal);font-size:12px;font-weight:700;vertical-align:2px}
+.dt-talk{font-size:13px;color:var(--clay);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dt-row.done .dt-title{color:var(--muted);font-weight:500}
+.dt-row.done .dt-talk{opacity:.6}
+.dt-row.locked .dt-circle{border-style:dashed}.dt-row.locked .dt-title{color:color-mix(in srgb,var(--ink) 70%,transparent)}
+.dt-who{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;border-radius:99px;padding:4px 9px;background:var(--teal-soft);color:var(--teal)}
+.dt-who.nihal{background:var(--clay-soft);color:var(--clay)}
+.dt-hint{font-size:12px;color:var(--muted);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (prefers-reduced-motion:reduce){.dt-view{overflow-y:auto}.dt-view.roll .dt-track{animation:none}.dt-circle svg{stroke-dashoffset:0}.dt-row:not(.done) .dt-circle svg{opacity:0}}
+@media (max-width:900px){.dt-view{flex:none;height:calc(var(--row) * 6)}.dt-row{grid-template-columns:30px 1fr auto}.dt-hint{display:none}}

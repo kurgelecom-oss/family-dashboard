@@ -6,6 +6,8 @@ import { PopupStage, usePopups, type Popup } from './Popups';
 import { chime, soundReady, unlockSound } from './sound';
 import { familyWrite } from '../FamilyEditGate';
 import { RAG_LABEL, conversionRag, goalRag, listRag, paceRag, type Rag } from './rag';
+import { DayTicker } from './DayTicker';
+import { tickerRows, type June, type Order, type Row } from './ticker-rows';
 
 /* The family home board. One screen: an announcement bar, a column per person,
    a shared band (store · goals · calendar), a ticker and a sky rail.
@@ -18,7 +20,7 @@ import { RAG_LABEL, conversionRag, goalRag, listRag, paceRag, type Rag } from '.
    Polling pauses while the tab is hidden (Netlify bills per request).
    ?demo=1 renders a weekday fixture so the layout can be judged on a weekend. */
 
-export type Item = { id: string; title: string; done: boolean; count: string | null; auto?: boolean; source?: string };
+export type Item = { id: string; title: string; done: boolean; count: string | null; auto?: boolean; source?: string; feeds?: string | null };
 export type Tasks = { done: number; total: number; items: Item[] } | null;
 export type Slot = { title: string; emoji: string; category: string; start: string; end: string; ticked: boolean | null };
 export type NowFeed = {
@@ -30,6 +32,7 @@ export type NowFeed = {
   calendar: { id: string; subject: string; startISO: string; isAllDay: boolean; who: string }[] | null;
   store: { currency: string; today: { label: string; orders: number; revenue: number; sessions: number | null; conversion: number | null } | null; week: { date: string; revenue: number; orders: number }[]; weekRevenue: number; weekOrders: number; avgOrders: number; avgRevenue: number; dayFraction: number } | null;
   ads?: { live: boolean; activeAds: number; reason: string | null } | null;
+  order?: Order; june?: June;
 };
 export type Money = {
   unlocked: boolean; asOf: string;
@@ -178,6 +181,8 @@ export default function HomeBoard() {
       const p = pick(b);
       if (p && p.total && p.done === p.total && (pick(a)?.done ?? 0) < p.total) push({ kind: 'complete', who, total: p.total });
     }
+    const beforeOrder = new Set(a.order?.items.filter(i => i.done).map(i => i.key));
+    for (const o of b.order?.items ?? []) if (o.done && !beforeOrder.has(o.key) && !mine.current.delete(`lp-${o.key}`)) { newly.push(`lp-${o.key}`); push({ kind: 'tick', who: 'Nihal', title: o.label }); }
     const beforeBlocks = new Set(a.ansar.day.filter(s => s.ticked).map(s => s.title));
     const blocks = b.ansar.day.filter(s => s.ticked !== null);
     for (const s of blocks) if (s.ticked && !beforeBlocks.has(s.title)) { newly.push(s.title); push({ kind: 'block', emoji: s.emoji, title: s.title, done: blocks.filter(x => x.ticked).length, total: blocks.length }); }
@@ -243,14 +248,19 @@ export default function HomeBoard() {
   }
   const onShow = useCallback((p: Popup) => { if (sound && (p.kind === 'prayer' || p.kind === 'goal')) chime(); }, [sound]);
 
-  /** Tap a hand-ticked task to tick or untick it (family PIN, same as before). */
-  async function toggle(item: Item, done: boolean) {
-    if (item.auto) return;
-    setTicks(t => ({ ...t, [item.id]: { done: !done, at: Date.now() } }));
-    if (!done) mine.current.add(item.id);
-    const r = await familyWrite('/api/daily', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ taskId: item.id, done: !done }) }).catch(() => null);
-    if (!r?.ok) { mine.current.delete(item.id); setTicks(t => { const c = { ...t }; delete c[item.id]; return c; }); return; }
-    if (!done) push({ kind: 'tick', who: 'You', title: item.title });
+  /** Tap a ticker row to tick or untick it (family PIN). Hand tasks write /api/daily;
+      the daily order writes Launchpad through /api/daily-order, so Nihal OS sees it too. */
+  async function tickRow(row: Row) {
+    if (!row.tick) return;
+    const done = row.done;
+    setTicks(t => ({ ...t, [row.id]: { done: !done, at: Date.now() } }));
+    if (!done) mine.current.add(row.id);
+    const req = row.tick.kind === 'order'
+      ? familyWrite('/api/daily-order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: row.tick.key, checked: !done }) })
+      : familyWrite('/api/daily', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ taskId: row.tick.id, done: !done }) });
+    const r = await req.catch(() => null);
+    if (!r?.ok) { mine.current.delete(row.id); setTicks(t => { const c = { ...t }; delete c[row.id]; return c; }); return; }
+    if (!done) { push({ kind: 'tick', who: 'You', title: row.title }); setFresh(new Set([row.id])); setTimeout(() => setFresh(new Set()), 2600); }
   }
 
   const day = useMemo(() => feed?.ansar.day ?? [], [feed]);
@@ -333,12 +343,8 @@ export default function HomeBoard() {
 
   const hour = melHour(now);
   const isSunday = feed?.weekday === 'Sun';
-  // A tap shows at once; the CDN-cached feed catches up within ~90 s.
-  const withTicks = (t: Tasks | undefined): Tasks | undefined => {
-    if (!t) return t;
-    const items = t.items.map(i => { const o = ticks[i.id]; return o && now.getTime() - o.at < 90_000 ? { ...i, done: o.done } : i; });
-    return { ...t, items, done: items.filter(i => i.done).length };
-  };
+  // The ticker: a tap shows at once; the CDN-cached feed catches up within ~90 s.
+  const rows = feed ? tickerRows(feed.nihal, feed.taylan, feed.order, feed.june).map(r => { const o = ticks[r.id]; return o && now.getTime() - o.at < 90_000 ? { ...r, done: o.done } : r; }) : [];
   const weekView = (id: string, keys: string[]) => {
     const w = feed?.week, days = w?.people.find(p => p.id === id)?.days.filter(d => d.pct !== null) ?? [];
     const avg = days.length ? Math.round(days.reduce((a, d) => a + (d.pct ?? 0), 0) / days.length * 100) : null;
@@ -349,26 +355,6 @@ export default function HomeBoard() {
         <div className="hb-week-bars">{days.map((d, i) => <div key={d.date} className={ragCls(goalRag(Math.round((d.pct ?? 0) * 100)))}><i style={{ height: `${Math.max(4, (d.pct ?? 0) * 100)}%`, animationDelay: `${i * 0.08}s` }} /><span>{new Intl.DateTimeFormat('en-AU', { weekday: 'narrow', timeZone: 'UTC' }).format(new Date(d.date + 'T12:00:00Z'))}</span></div>)}</div>
         <ul className="hb-week-tiles">{(w?.pace ?? []).filter(x => keys.includes(x.key)).map(x => <li key={x.key} className={ragCls(x.state === 'good' ? 'good' : x.state === 'warn' ? 'bad' : null)}><span>{x.label}</span><b>{x.value}{x.of ? <small> {x.of}</small> : null}</b><em>{x.stateLabel}</em></li>)}</ul>
       </div>
-    );
-  };
-
-  const personCard = (name: string, sub: string, raw: Tasks | undefined, id: string, keys: string[]) => {
-    const t = withTicks(raw);
-    const n = nextTask(t), rag = t ? listRag(t.done, t.total, hour) : null;
-    if (isSunday && t !== undefined) return (
-      <section className="hb-card">
-        <div className="hb-head"><div><h2>{name}</h2><p>{sub} · week in review</p></div></div>
-        {weekView(id, keys)}
-      </section>
-    );
-    return (
-      <section className="hb-card">
-        <div className="hb-head"><div><h2>{name}</h2><p>{sub} <Pill rag={rag} /></p></div><Ring done={t?.done ?? 0} total={t?.total ?? 0} rag={rag} active={!!n} /></div>
-        {t === undefined ? <p className="hb-empty">Loading…</p> : t === null ? <p className="hb-empty">Not available right now.</p> : !t.total ? <div className="hb-now idle"><span className="hb-eye">Today</span><strong>Rest day — nothing scheduled</strong></div> : <>
-          <div className={'hb-now' + (n ? '' : ' idle')}><span className="hb-eye">{n ? <><i className="hb-pulse" />Up next</> : 'Today'}</span><strong>{n ? n.title : 'All done today ✓'}</strong>{n && <small>{t.total - t.done} left of {t.total}</small>}</div>
-          <ul className="hb-list">{t.items.map(i => <li key={i.id} className={'hb-item' + (i.done ? ' done' : '') + (i === n ? ' now' : '') + (fresh.has(i.id) ? ' fresh' : '') + (i.auto ? '' : ' tap')} onClick={() => toggle(i, i.done)} title={i.auto ? `Ticks itself from ${i.source ?? 'its app'}` : 'Tap to tick'}><span className="hb-check" /><span>{i.title}</span><span className="t">{i.count ?? (i.auto ? 'auto' : '')}</span></li>)}</ul>
-        </>}
-      </section>
     );
   };
 
@@ -463,8 +449,7 @@ export default function HomeBoard() {
             })}{list.length > 4 && <li className="hb-more">then {list.slice(4).map(s => short(s.title)).join(' · ')}</li>}</ul>
           </>}
         </section>
-        {personCard('Nihal', 'Find & learn', feed?.nihal, 'nihal', ['discoveries', 'quran'])}
-        {personCard('TK', 'Build & launch', feed?.taylan, 'taylan', ['validated', 'launched'])}
+        <DayTicker rows={rows} fresh={fresh} onTick={tickRow} title="Today's list" sub={`Nihal & TK${feed?.order ? ` · ${feed.order.product}` : ''}${feed?.june ? ` · JUNE ${feed.june.date.slice(8)}/${feed.june.date.slice(5, 7)}` : ''}`} />
       </div>
 
       <div className="hb-band">
