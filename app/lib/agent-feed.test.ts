@@ -13,7 +13,10 @@ test('GARY and JUNE reports pop; other seats only for real jobs; non-actions dro
     job('5', 'nora', 'Daily order: Check competitor ad counts · Omega X', 'Done 2026-10-28'),
     job('6', 'june', 'STUDY ADS (daily)', 'JUNE finished “STUDY ADS”.'),
     job('7', 'gary', 'STATUS REPORT', 'x', 'running'),
+    job('8', 'bob', 'Sonny relay', 'sent to a@b.com'),
+    job('9', 'gary', 'Upload', 'emailed tk@example.com on 0412 345 678'),
   ]);
-  assert.deepEqual(out.map(x => [x.id, x.who, x.warn]), [['1', 'GARY', false], ['3', 'JUNE', true], ['6', 'JUNE', false]]);
+  assert.deepEqual(out.map(x => [x.id, x.who, x.warn]), [['1', 'GARY', false], ['3', 'JUNE', true], ['6', 'JUNE', false], ['9', 'GARY', false]]);
+  assert.equal(out[3].text, 'emailed [email] on [number]');
   assert.equal(out[0].text, 'Daily ads (Omega X · Nihal): 26 Oct uploaded live, 6 ad(s)');
 });

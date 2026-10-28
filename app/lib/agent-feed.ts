@@ -13,18 +13,23 @@ export type AgentAction = { id: string; who: string; text: string; warn: boolean
 type JobRow = { id: string; updated_at: string; doc: { agent?: string; status?: string; action?: string; result?: string } };
 
 const LOUD = new Set(['gary', 'june']);
+/** The board is public (anyone with the URL), so only seats whose work is ads, store and product show. BOB relays
+    people's emails, SARA answers customers and CLEO handles money: their reports never reach this feed. */
+const SHOWN = new Set(['gary', 'june', 'nora', 'vera', 'tara']);
+/** Belt and braces: no email address or phone number survives into a card. */
+const scrub = (s: string) => s.replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, '[email]').replace(/\+?\d[\d\s-]{7,}\d/g, '[number]');
 const NOT_AN_ACTION = /already (written|uploaded|ticked)|waiting for the next folder|nothing to (do|guard|upload)|no new ad folder/i;
 const WARN = /could not|couldn't|failed|blocked|stopped|error|not proven|alert/i;
 const NAME: Record<string, string> = { gary: 'GARY', june: 'JUNE', nora: 'NORA', vera: 'VERA', sara: 'SARA', bob: 'BOB', cleo: 'CLEO', tara: 'TARA' };
 
 /** One line a person can read on a TV: the first line of the result, without the VERDICT tail. */
-const line = (s: string) => s.split('\n')[0].split(' | ')[0].trim().slice(0, 140);
+const line = (s: string) => scrub(s.split('\n')[0].split(' | ')[0].trim()).slice(0, 140);
 
 export function agentActions(rows: JobRow[]): AgentAction[] {
   const out: AgentAction[] = [];
   for (const r of rows) {
     const { agent = '', status, action = '', result = '' } = r.doc ?? {};
-    if (status !== 'done' || action.startsWith('Daily order:')) continue;
+    if (!SHOWN.has(agent) || status !== 'done' || action.startsWith('Daily order:')) continue;
     if (action === 'STATUS REPORT' && !LOUD.has(agent)) continue;
     const text = line(result || action);
     if (!text || NOT_AN_ACTION.test(text)) continue;
@@ -36,5 +41,5 @@ export function agentActions(rows: JobRow[]): AgentAction[] {
 /** The PostgREST query for the last 18 hours of jobs worth reading. */
 export function jobsQuery(now: Date) {
   const since = new Date(now.getTime() - 18 * 3600e3).toISOString();
-  return `cos_mission_control?kind=eq.job&updated_at=gte.${since}&or=(doc->>agent.in.(gary,june),doc->>action.neq.STATUS%20REPORT)&select=id,doc,updated_at&order=updated_at.desc&limit=40`;
+  return `cos_mission_control?kind=eq.job&updated_at=gte.${since}&doc->>agent=in.(gary,june,nora,vera,tara)&or=(doc->>agent.in.(gary,june),doc->>action.neq.STATUS%20REPORT)&select=id,doc,updated_at&order=updated_at.desc&limit=40`;
 }
