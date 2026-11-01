@@ -87,7 +87,7 @@ export default function EventAlerts() {
 
   useEffect(() => {
     load();
-    const a = setInterval(load, 3 * 60_000), b = setInterval(() => setNow(Date.now()), 1000);
+    const a = setInterval(load, 60_000), b = setInterval(() => setNow(Date.now()), 1000);
     const onPrev = (e: Event) => setPreview((e as CustomEvent<Live>).detail);
     const onChange = () => load();
     const unlock = () => unlockSound();

@@ -62,7 +62,7 @@ export async function GET(request: Request) {
   const unique = events.sort((a, b) => a.startISO.localeCompare(b.startISO)).filter(e => { const k = `${e.title.toLowerCase()}|${e.startISO}`; if (seen.has(k)) return false; seen.add(k); return true; });
 
   return NextResponse.json({ events: unique, errors, missing }, { headers: {
-    'Cache-Control': errors.length && !unique.length ? 'no-store' : 'public, s-maxage=120, stale-while-revalidate=120',
+    'Cache-Control': errors.length && !unique.length ? 'no-store' : 'public, s-maxage=50, stale-while-revalidate=10',
     // Netlify keys its edge cache without query strings unless told; without this every week would share one entry.
     'Netlify-Vary': 'query=from|to',
   } });

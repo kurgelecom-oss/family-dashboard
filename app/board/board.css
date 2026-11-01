@@ -86,6 +86,11 @@
 .cal-ev span{font-size:13px;opacity:.85}
 .cal-ev.short{flex-direction:row;align-items:center;padding-top:0;padding-bottom:0}
 .cal-ev.short b{-webkit-line-clamp:1;white-space:nowrap;font-size:14px}
+.cal-ev{border-left-color:var(--who,var(--ev))}
+.cal-ev.d-solid{background:var(--ev);color:#fff}
+.cal-ev.d-stripe{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--ev) 20%,var(--paper)) 0 10px,color-mix(in srgb,var(--ev) 9%,var(--paper)) 10px 20px)}
+.cal-ev.d-outline{background:var(--paper);box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--ev) 70%,transparent)}
+.cal-ev.d-glow{background:linear-gradient(160deg,color-mix(in srgb,var(--ev) 32%,var(--paper)),color-mix(in srgb,var(--ev) 8%,var(--paper)));color:color-mix(in srgb,var(--ev) 85%,#000)}
 .cal-ev.sel,.cal-ev.dragging{background:var(--ev);color:#fff;box-shadow:0 8px 24px rgba(29,35,34,.25);z-index:5}
 .cal-ev.dragging{opacity:.92}
 .cal-grip{position:absolute;left:0;right:0;bottom:0;height:12px}
@@ -128,7 +133,7 @@
 .cal-mnum{align-self:flex-end;font-size:19px;min-width:36px;height:34px;padding:0 8px;border-radius:17px;flex:none;font-variant-numeric:tabular-nums}
 .cal-mnum.today{background:var(--bad);color:#fff;font-weight:700}
 .cal-mline{display:flex;align-items:center;gap:6px;width:100%;text-align:left;font-size:14px;height:24px;white-space:nowrap;overflow:hidden;flex:none}
-.cal-mline i{width:9px;height:9px;border-radius:50%;background:var(--ev);flex:none}
+.cal-mline i{width:9px;height:9px;border-radius:50%;background:var(--ev);flex:none;box-shadow:0 0 0 2px color-mix(in srgb,var(--who,var(--ev)) 45%,transparent)}
 .cal-mline small{margin-left:auto;color:var(--muted);font-size:13px;padding-left:6px}
 .cal-mcell .cal-chip{flex:none;height:24px;line-height:24px;font-size:13px}
 .cal-more{align-self:flex-start;font-size:13px;color:var(--muted);font-weight:600;height:22px;flex:none}

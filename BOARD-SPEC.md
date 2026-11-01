@@ -44,7 +44,10 @@ Nihal x/y · TK x/y · Store today vs pace · Ads live · next goal %. Read from
 | Routines (Notion) | `/api/board`, placed on real dates; **off by default** (~140 a week) | no |
 
 - Colours from the Climb palette: Family clay, TK teal, Nihal rose, Ansar amber, Kurgel plum,
-  Routines muted. Show/hide per calendar, remembered per screen.
+  Routines muted.
+  Amended 1 Nov (tk: "randomise the colors and designs for distinction"): each event's body
+  colour (12 hues) and finish (tint / solid / stripe / outline / glow) come from a hash of its
+  title — same title, same look, every week. The person's colour stays as the left spine. Show/hide per calendar, remembered per screen.
 - Outlook and Google are read-only here because the Graph tokens are `Calendars.Read`.
   Write-back needs `Calendars.ReadWrite` consent per account — a deliberate follow-up.
 
@@ -98,7 +101,7 @@ Nihal x/y · TK x/y · Store today vs pace · Ads live · next goal %. Read from
 
 ## RULES
 
-- Outlook/Google/Notion reads: `/api/cal?from&to` (≤ 45 days), CDN `s-maxage=120` with
+- Outlook/Google/Notion reads: `/api/cal?from&to` (≤ 45 days), polled every 60 s (tk 1 Nov), CDN `s-maxage=50` with
   `Netlify-Vary: query=from|to` (without it Netlify serves every week from one entry).
 - Family events and ink: `/api/cal/events`, `/api/cal/ink`, always `no-store`.
 - Time maths in `app/lib/cal-time.ts` via Intl (`Australia/Melbourne`), never fixed offsets.

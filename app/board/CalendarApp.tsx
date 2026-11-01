@@ -33,6 +33,17 @@ export const CALS: { id: string; label: string; writable: boolean }[] = [
 const SOURCE_NAME: Record<Source, string> = { board: 'Family calendar', outlook: 'Outlook', google: 'Google Calendar', routine: 'Notion routine' };
 const HOUR = 64, SNAP = 15, HOLD_MS = 350;
 const VIEWS: View[] = ['day', 'week', 'month', 'year'];
+/* Each event gets its own colour and finish so a busy day is easy to tell apart.
+   Picked from the title, so "Making ads" looks the same every day and two
+   "Check on Ansar" blocks match. The person still shows as the left spine. */
+const HUES = ['#b8612f', '#1f4a45', '#2a6f97', '#a8456b', '#6b4f9e', '#c98a1b', '#557a75', '#6b7d2a', '#c2412d', '#3d5a80', '#8a5a44', '#2f8a57'];
+const DESIGNS = ['tint', 'solid', 'stripe', 'outline', 'glow'] as const;
+function eventLook(title: string) {
+  let h = 2166136261; for (const c of title.trim().toLowerCase()) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); }
+  h ^= h >>> 13; h = Math.imul(h, 0x5bd1e995); h ^= h >>> 15; h >>>= 0;
+  return { hue: HUES[h % HUES.length], design: DESIGNS[Math.floor(h / HUES.length) % DESIGNS.length] };
+}
+const evStyle = (ev: { title: string; cal: string }) => ({ '--ev': eventLook(ev.title).hue, '--who': color(ev.cal) }) as React.CSSProperties;
 const color = (cal: string) => `var(--c-${CALS.some(c => c.id === cal) ? cal : 'routine'})`;
 
 function normalise(r: Raw, source: Source): Ev {
@@ -135,7 +146,7 @@ export default function CalendarApp() {
   useEffect(() => { setOwn([]); setExt([]); loadOwn(); loadExt(); }, [loadOwn, loadExt]);
   // Polling pauses while hidden (Netlify bills per request).
   useEffect(() => {
-    const a = setInterval(() => { if (!document.hidden) loadOwn(); }, 60_000), b = setInterval(() => { if (!document.hidden) loadExt(); }, 5 * 60_000);
+    const a = setInterval(() => { if (!document.hidden) loadOwn(); }, 60_000), b = setInterval(() => { if (!document.hidden) loadExt(); }, 60_000);
     return () => { clearInterval(a); clearInterval(b); };
   }, [loadOwn, loadExt]);
 
@@ -288,7 +299,7 @@ export default function CalendarApp() {
         <div className="cal-allday" style={{ gridTemplateColumns: `var(--gutter) repeat(${days.length}, 1fr)`, minHeight: 10 + bandRows * 30 }}>
           <span className="cal-gut">all-day</span>
           {days.map((d, i) => <div key={d} className="cal-adcell" onClick={e => { if (e.target === e.currentTarget) newAt(d, 9 * 60, true); }}>
-            {bands[i].map(ev => <button key={ev.id} className={'cal-chip' + (selected === ev.id ? ' sel' : '')} style={{ '--ev': color(ev.cal) } as React.CSSProperties} onClick={() => openEvent(ev)}>{ev.title}</button>)}
+            {bands[i].map(ev => <button key={ev.id} className={'cal-chip' + (selected === ev.id ? ' sel' : '')} style={evStyle(ev)} onClick={() => openEvent(ev)}>{ev.title}</button>)}
           </div>)}
         </div>
         <div className="cal-scroll" ref={scroller} onPointerDown={bodyDown} onPointerMove={bodyMove} onPointerUp={bodyUp} onPointerCancel={() => { gesture.current = null; if (dragRef.current) { clearTimeout(dragRef.current.timer); dragRef.current = null; setDrag(null); } }}>
@@ -307,8 +318,8 @@ export default function CalendarApp() {
                     const dr = drag?.id === ev.id ? drag : null;
                     const t = top + (dr?.dTop ?? 0), b = Math.max(t + SNAP, bot + (dr?.dBot ?? 0));
                     const short = b - t < 45;
-                    return <div key={ev.id} className={'cal-ev' + (selected === ev.id ? ' sel' : '') + (dr ? ' dragging' : '') + (ev.source === 'board' ? ' own' : '') + (short ? ' short' : '')}
-                      style={{ '--ev': color(ev.cal), top: t / 60 * HOUR, height: Math.max(18, (b - t) / 60 * HOUR - 2), left: `calc(${(col / cols) * 100}% + 2px)`, width: `calc(${100 / cols}% - 4px)`, transform: dr?.dDay ? `translateX(${dr.dDay * 100 * cols}%)` : undefined } as React.CSSProperties}
+                    return <div key={ev.id} className={`cal-ev d-${eventLook(ev.title).design}` + (selected === ev.id ? ' sel' : '') + (dr ? ' dragging' : '') + (ev.source === 'board' ? ' own' : '') + (short ? ' short' : '')}
+                      style={{ ...evStyle(ev), top: t / 60 * HOUR, height: Math.max(18, (b - t) / 60 * HOUR - 2), left: `calc(${(col / cols) * 100}% + 2px)`, width: `calc(${100 / cols}% - 4px)`, transform: dr?.dDay ? `translateX(${dr.dDay * 100 * cols}%)` : undefined } as React.CSSProperties}
                       onPointerDown={e => evDown(e, ev, di)} onClick={e => clickEvent(e, ev)}>
                       <b>{alerts[ev.key] && <em className="cal-bell" aria-label="pops up">🔔 </em>}{ev.title}</b>{!short && <span>{clock(wall(new Date(ev.s)).min)}</span>}
                       {ev.source === 'board' && <i className="cal-grip" aria-hidden="true" />}
@@ -341,8 +352,8 @@ export default function CalendarApp() {
               {d === today && <i className="cal-mnow" style={{ top: `${nowPct}%` }} aria-hidden="true" />}
               <button className={'cal-mnum' + (d === today ? ' today' : '')} onClick={() => { setAnchor(d); setView('day'); }}>{dayNum(d) === 1 ? `${dayNum(d)} ${monthAbbr(d)}` : dayNum(d)}</button>
               {show.map(ev => ev.band
-                ? <button key={ev.id} className="cal-chip" style={{ '--ev': color(ev.cal) } as React.CSSProperties} onClick={() => openEvent(ev)}>{ev.title}</button>
-                : <button key={ev.id} className="cal-mline" style={{ '--ev': color(ev.cal) } as React.CSSProperties} onClick={() => openEvent(ev)}><i />{ev.title}<small>{clock(wall(new Date(ev.s)).min)}</small></button>)}
+                ? <button key={ev.id} className="cal-chip" style={evStyle(ev)} onClick={() => openEvent(ev)}>{ev.title}</button>
+                : <button key={ev.id} className="cal-mline" style={evStyle(ev)} onClick={() => openEvent(ev)}><i />{ev.title}<small>{clock(wall(new Date(ev.s)).min)}</small></button>)}
               {evs.length > show.length && <button className="cal-more" onClick={() => { setAnchor(d); setView('day'); }}>{evs.length - show.length} more</button>}
             </div>;
           })}
@@ -393,7 +404,7 @@ export default function CalendarApp() {
           <aside className="cal-side">
             <MiniMonth month={startOfMonth(anchor)} today={today} selected={anchor} onDay={d => setAnchor(d)} onMonth={() => setView('month')} nav={n => setAnchor(a => addMonths(a, n))} />
             <h3>{anchor === today ? 'Today' : `${weekdayLong(anchor)} ${dayNum(anchor)} ${monthAbbr(anchor)}`}</h3>
-            {dayList.length ? <ul className="cal-agenda">{dayList.map(ev => <li key={ev.id}><button style={{ '--ev': color(ev.cal) } as React.CSSProperties} onClick={() => openEvent(ev)}><i /><b>{ev.title}</b><small>{ev.band ? 'all-day' : `${clock(wall(new Date(ev.s)).min)} – ${clock(wall(new Date(ev.e)).min)}`}</small></button></li>)}</ul>
+            {dayList.length ? <ul className="cal-agenda">{dayList.map(ev => <li key={ev.id}><button style={evStyle(ev)} onClick={() => openEvent(ev)}><i /><b>{ev.title}</b><small>{ev.band ? 'all-day' : `${clock(wall(new Date(ev.s)).min)} – ${clock(wall(new Date(ev.e)).min)}`}</small></button></li>)}</ul>
               : <p className="cal-empty">Nothing booked. Tap the grid to add something.</p>}
           </aside></div>}
         {view === 'month' && MonthView()}
@@ -409,7 +420,7 @@ export default function CalendarApp() {
       </div>}
 
       {detail && <Modal onClose={() => { setDetail(null); setSelected(null); }}>
-        <div className="cal-detail" style={{ '--ev': color(detail.cal) } as React.CSSProperties}>
+        <div className="cal-detail" style={evStyle(detail)}>
           <h2><i />{detail.title}</h2>
           <p>{detail.band ? `${weekdayLong(detail.sd)} ${dayNum(detail.sd)} ${monthName(detail.sd)} · all-day` : `${weekdayLong(wall(new Date(detail.s)).day)} ${dayNum(wall(new Date(detail.s)).day)} ${monthName(wall(new Date(detail.s)).day)} · ${clock(wall(new Date(detail.s)).min)} – ${clock(wall(new Date(detail.e)).min)}`}</p>
           <p className="muted">{CALS.find(c => c.id === detail.cal)?.label ?? detail.cal} · {SOURCE_NAME[detail.source]} · read-only here{detail.source === 'outlook' ? ' · pop-up applies to every repeat' : ''}</p>
