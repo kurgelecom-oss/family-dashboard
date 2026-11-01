@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import TopNav from "./components/TopNav";
 import FamilyEditGate from "./components/FamilyEditGate";
+import HourlyShift from "./components/HourlyShift";
 
 export const metadata: Metadata = {
   title: "Kurgel Family Dashboard",
@@ -30,6 +31,7 @@ export default function RootLayout({
             is zeroed at the end of globals.css so every surface that subtracts
             it reclaims the height without touching its own math. */}
         {children}
+        <HourlyShift />
       </body>
     </html>
   );

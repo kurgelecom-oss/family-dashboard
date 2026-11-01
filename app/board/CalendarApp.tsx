@@ -297,6 +297,7 @@ export default function CalendarApp() {
               {days.includes(today) && <span className="cal-nowlbl" style={{ top: nowMin / 60 * HOUR }}>{clock(nowMin)}</span>}</div>
             <div className="cal-cols" ref={grid} style={{ gridTemplateColumns: `repeat(${days.length}, 1fr)` }}>
               {Array.from({ length: 23 }, (_, h) => <i key={h} className="cal-line" style={{ top: (h + 1) * HOUR }} />)}
+              {days.includes(today) && <i className="cal-nowline" style={{ top: nowMin / 60 * HOUR }} />}
               {days.map((day, di) => {
                 const d0 = Date.parse(zonedToISO(day, 0)), d1 = Date.parse(zonedToISO(addDays(day, 1), 0));
                 const items = layout(events.filter(e => !e.band && e.s < d1 && e.e > d0 || (!e.band && e.s === e.e && e.s >= d0 && e.s < d1)).map(ev => ({ ev, top: Math.max(0, (ev.s - d0) / 6e4), bot: Math.min(1440, Math.max((Math.min(ev.e, d1) - d0) / 6e4, (ev.s - d0) / 6e4 + 20)) })));
@@ -335,7 +336,9 @@ export default function CalendarApp() {
             const wk = (new Date(d + 'T12:00:00Z').getUTCDay() + 6) % 7 >= 5;
             const fit = Math.max(1, Math.floor((mgridH / 6 - 46) / 27));
             const show = evs.length > fit ? evs.slice(0, Math.max(0, fit - 1)) : evs;
+            const nowPct = wall(now).min / 1440 * 100;
             return <div key={d} className={'cal-mcell' + (d.slice(0, 7) !== cur ? ' out' : '') + (wk ? ' wkend' : '')} onClick={e => { if (e.target === e.currentTarget) newAt(d); }}>
+              {d === today && <i className="cal-mnow" style={{ top: `${nowPct}%` }} aria-hidden="true" />}
               <button className={'cal-mnum' + (d === today ? ' today' : '')} onClick={() => { setAnchor(d); setView('day'); }}>{dayNum(d) === 1 ? `${dayNum(d)} ${monthAbbr(d)}` : dayNum(d)}</button>
               {show.map(ev => ev.band
                 ? <button key={ev.id} className="cal-chip" style={{ '--ev': color(ev.cal) } as React.CSSProperties} onClick={() => openEvent(ev)}>{ev.title}</button>

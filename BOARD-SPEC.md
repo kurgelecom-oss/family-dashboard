@@ -80,6 +80,17 @@ Nihal x/y · TK x/y · Store today vs pace · Ads live · next goal %. Read from
   only. Calendar colour drives the base. Reduced-motion respected. Chime if sound unlocked.
 - Mounted on `/` and `/board` (`components/EventAlerts.tsx`), so it fires on either view.
 
+## NOW-LINE + HOURLY SHIFT (amended 2026-11-01, tk: "thin red line right across the calendar … the main family dashboard needs to fade into … the calendar every hour, stay there for 30 seconds then move back")
+
+- Week/Day: a thin red line runs across every day column at the current time, with the
+  stronger dot-and-line in today's column and the time in the gutter. Month: a red marker
+  crosses today's cell at the share of the day gone.
+- On the hour, "/" wipes to `/board` (three Climb-palette discs bloom, "Calendar" rises,
+  discs collapse to reveal), stays 30 s with a countdown pill, then wipes back. A tap on
+  the calendar during those 30 s keeps it there. Only "/" starts it; `/?shift=now` tests it.
+  `components/HourlyShift.tsx`, mounted in the root layout so the overlay spans the route change.
+- Pop-ups already fire on "/" as well as `/board` (EventAlerts on both).
+
 ## RULES
 
 - Outlook/Google/Notion reads: `/api/cal?from&to` (≤ 45 days), CDN `s-maxage=120` with
