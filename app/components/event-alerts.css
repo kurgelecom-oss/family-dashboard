@@ -7,7 +7,9 @@
   background:radial-gradient(120% 90% at 20% 10%,color-mix(in srgb,var(--hue,#1f4a45) 75%,#fff 10%),color-mix(in srgb,var(--hue,#1f4a45) 70%,#000) 70%)}
 .ea-card.popup{left:12.5vw;top:12.5vh;width:75vw;height:75vh;border-radius:36px;box-shadow:0 40px 120px rgba(0,0,0,.45);animation:ea-in 1.1s cubic-bezier(.22,1,.36,1) both;will-change:transform,opacity}
 .ea-card.popout{right:2vw;bottom:3vh;width:min(34vw,620px);height:min(34vh,340px);border-radius:26px;box-shadow:0 24px 60px rgba(0,0,0,.35);animation:ea-slide 1s cubic-bezier(.22,1,.36,1) both;will-change:transform,opacity}
-.ea-scene{position:absolute;inset:0;z-index:-1;background:radial-gradient(120% 90% at 20% 10%,color-mix(in srgb,var(--hue) 80%,#fff 12%),color-mix(in srgb,var(--hue) 75%,#000) 75%);overflow:hidden}
+.ea-scene{position:absolute;inset:0;z-index:-1;overflow:hidden;background:radial-gradient(120% 95% at var(--light,20% 10%),color-mix(in srgb,var(--hue) 78%,#fff 14%),color-mix(in srgb,var(--hue) 72%,#000) 78%)}
+.ea-scene.f-diagonal{background:linear-gradient(135deg,color-mix(in srgb,var(--hue) 70%,#fff 18%) 0%,var(--hue) 45%,color-mix(in srgb,var(--hue) 60%,#000) 100%)}
+.ea-scene.f-duotone{background:linear-gradient(115deg,color-mix(in srgb,var(--hue) 85%,#000) 0 52%,color-mix(in srgb,var(--hue) 55%,var(--acc) 45%) 52% 100%)}
 
 /* orbit */
 .ea-orbit{position:absolute;left:50%;top:50%;width:120%;height:120%;transform:translate(-50%,-50%) rotate(var(--tilt))}
@@ -89,3 +91,12 @@
 .ea-demo-grid button{flex:1;font:600 16px Inter,system-ui,sans-serif;min-height:52px;border-radius:26px;border:1px solid #e7dfd2;background:#f3ede2;cursor:pointer}
 .ea-demo-note{color:#7a7468;font-size:15px}
 @media (max-width:1100px){.ea-demo-grid{grid-template-columns:repeat(2,1fr)}}
+
+/* Per-event layouts (pop-up only): centred, left-aligned editorial, or framed. */
+.ea-card.popup.l-left .ea-content{align-items:flex-start;text-align:left;padding-left:8%;padding-right:30%}
+.ea-card.popup.l-left .ea-icon{width:min(15vh,150px)}
+.ea-card.popup.l-left .ea-icon span{font-size:min(7vh,72px)}
+.ea-card.popup.l-frame::after{content:'';position:absolute;inset:22px;border:1.5px solid color-mix(in srgb,var(--acc) 70%,transparent);border-radius:24px;pointer-events:none}
+.ea-card.popup.l-frame .ea-title{letter-spacing:-.01em}
+/* The person's colour as a thin edge, so who it's for is still clear. */
+.ea-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:10px;background:var(--who,transparent);z-index:2}

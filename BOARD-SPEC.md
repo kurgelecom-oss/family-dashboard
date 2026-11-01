@@ -81,6 +81,11 @@ Nihal x/y · TK x/y · Store today vs pace · Ads live · next goal %. Read from
 - Unique look per series from a hash: one of five motion scenes (orbit, burst, waves,
   tiles, aurora), accent colour, particle field, tilt; keyword icon; kinetic title. CSS/SVG
   only. Calendar colour drives the base. Reduced-motion respected. Chime if sound unlocked.
+- Amended 1 Nov (tk: "pop-outs and pop-ups … need unique designs and colors"): each series also
+  gets its own base colour (12), finish (radial / diagonal / duotone), layout (centred / left /
+  framed) and light position; the person's colour is a thin left edge.
+- Dashboard strip on /board is a dark "night band" (teal-ink, cream type, gold accents) so it
+  reads as a separate layer above the light calendar (tk 1 Nov).
 - Mounted on `/` and `/board` (`components/EventAlerts.tsx`), so it fires on either view.
 - Rules in `app/lib/alerts-model.ts`, tested by `alerts-model.test.ts`. `/alerts-demo` previews
   every scene as Pop-up and Pop-out, with a Play-all reel; previews save nothing.

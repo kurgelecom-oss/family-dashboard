@@ -26,11 +26,11 @@ export function previewAlert(e: AlertEvent, mode: AlertMode) { window.dispatchEv
 
 function Scene({ ev }: { ev: Live }) {
   const seed = hash(ev.key), r = useMemo(() => rng(seed), [seed]);
-  const { scene, accent } = look(ev.key, ev.scene);
+  const lk = look(ev.key, ev.scene), { scene, accent } = lk;
   const parts = useMemo(() => Array.from({ length: 18 }, () => ({ x: r() * 100, y: r() * 100, s: 4 + r() * 10, d: 6 + r() * 10, delay: -r() * 10 })), [r]);
   const spin = 14 + (seed % 12);
   return (
-    <div className={`ea-scene ${scene}`} style={{ '--hue': CAL_HUE[ev.cal] ?? CAL_HUE.routine, '--acc': accent, '--spin': `${spin}s`, '--tilt': `${(seed % 60) - 30}deg` } as React.CSSProperties} aria-hidden="true">
+    <div className={`ea-scene ${scene} f-${lk.finish}`} style={{ '--hue': lk.base, '--light': lk.light, '--acc': accent, '--spin': `${spin}s`, '--tilt': `${(seed % 60) - 30}deg` } as React.CSSProperties} aria-hidden="true">
       {scene === 'orbit' && <svg viewBox="-100 -100 200 200" className="ea-orbit">{[38, 62, 86].map((rad, i) => <g key={rad} style={{ animationDuration: `${spin * (i + 1) / 2}s`, animationDirection: i % 2 ? 'reverse' : 'normal' }}><circle r={rad} /><circle className="moon" cx={rad} r={3 + i * 1.5} /></g>)}</svg>}
       {scene === 'burst' && <><i className="ea-rays" />{[0, 1, 2].map(i => <i key={i} className="ea-ring" style={{ animationDelay: `${i * 1.1}s` }} />)}</>}
       {scene === 'waves' && <svg viewBox="0 0 1200 300" preserveAspectRatio="none" className="ea-waves">{[0, 1, 2].map(i => <path key={i} style={{ animationDuration: `${7 + i * 3}s`, opacity: 0.25 + i * 0.2 }} d={`M0 ${150 + i * 30} Q150 ${80 + i * 30} 300 ${150 + i * 30} T600 ${150 + i * 30} T900 ${150 + i * 30} T1200 ${150 + i * 30} T1500 ${150 + i * 30} T1800 ${150 + i * 30} T2100 ${150 + i * 30} T2400 ${150 + i * 30} V300 H0Z`} />)}</svg>}
@@ -48,7 +48,7 @@ function Card({ ev, now, onClear }: { ev: Live; now: number; onClear: () => void
   const words = ev.title.trim().split(/\s+/);
   const ws = wall(ev.startISO), we = wall(ev.endISO);
   return (
-    <div className={`ea-card ${ev.mode}`} style={{ '--hue': CAL_HUE[ev.cal] ?? CAL_HUE.routine, '--acc': look(ev.key, ev.scene).accent } as React.CSSProperties} role="alertdialog" aria-label={`${ev.title} ${live ? 'is starting' : 'starts soon'}`}>
+    <div className={`ea-card ${ev.mode} l-${look(ev.key, ev.scene).layout}`} style={{ '--hue': look(ev.key, ev.scene).base, '--who': CAL_HUE[ev.cal] ?? CAL_HUE.routine, '--acc': look(ev.key, ev.scene).accent } as React.CSSProperties} role="alertdialog" aria-label={`${ev.title} ${live ? 'is starting' : 'starts soon'}`}>
       <Scene ev={ev} />
       <div className="ea-content">
         <div className="ea-top"><span className="ea-chip">{CAL_LABEL[ev.cal] ?? ev.cal}</span>{ev.preview && <span className="ea-chip ghost">Preview</span>}</div>

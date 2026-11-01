@@ -49,5 +49,8 @@ test('icons follow the title', () => {
   assert.equal(iconFor('Ansar Indoor Football'), '⚽');
   assert.equal(iconFor('Seera | Yasir Qadhi'), '🕌');
   assert.equal(iconFor('Call Adam'), '📞');
+  assert.equal(iconFor('Making ads'), '🎬');
+  assert.equal(iconFor('Product research'), '🔎');
+  assert.equal(iconFor('Nick mentorship call'), '🎓');
   assert.equal(iconFor('Something else'), '📅');
 });

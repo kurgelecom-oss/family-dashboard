@@ -13,6 +13,7 @@ export const SCENES = ['orbit', 'burst', 'waves', 'tiles', 'aurora'] as const;
 export type Scene = typeof SCENES[number];
 
 const ICONS: [RegExp, string][] = [
+  [/\bads?\b|creative|video/i, '🎬'], [/research|product/i, '🔎'], [/check (on|in)/i, '👀'], [/mentor|nick|coach/i, '🎓'],
   [/football|soccer|futsal/i, '⚽'], [/swim/i, '🏊'], [/gym|train|run\b|walk/i, '🏃'], [/birthday|🎂/i, '🎂'],
   [/call|phone|zoom|meet/i, '📞'], [/doctor|dentist|gp\b|clinic|hospital/i, '🩺'], [/school|homeschool|vrqa|class|lesson/i, '🎒'],
   [/seera|barzakh|qur|quran|halaqa|masjid|salah|prayer|jumu/i, '🕌'], [/dinner|lunch|breakfast|eat|bbq/i, '🍽️'],
@@ -25,7 +26,16 @@ export function hash(s: string) { let h = 2166136261; for (let i = 0; i < s.leng
 export function rng(seed: number) { return () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
 /** Scene and accent for an event: the raw hash's low bits cluster for similar keys, so mix first. */
-export function look(key: string, scene?: Scene) { const r = rng(hash(key)); const picked = SCENES[Math.floor(r() * SCENES.length)]; return { scene: scene ?? picked, accent: ACCENTS[Math.floor(r() * ACCENTS.length)] }; }
+/* Every event series gets its own base colour, finish and layout as well as its scene,
+   so no two alerts look alike even on the same person's calendar. */
+export const BASES = ['#1f4a45', '#b8612f', '#2a6f97', '#a8456b', '#6b4f9e', '#9a6a12', '#3d5a80', '#5b6b23', '#8a5a44', '#2f7a57', '#7a2e3b', '#264653'];
+export const LAYOUTS = ['center', 'left', 'frame'] as const;
+export const FINISHES = ['radial', 'diagonal', 'duotone'] as const;
+export function look(key: string, scene?: Scene) {
+  const r = rng(hash(key));
+  const picked = SCENES[Math.floor(r() * SCENES.length)], accent = ACCENTS[Math.floor(r() * ACCENTS.length)];
+  return { scene: scene ?? picked, accent, base: BASES[Math.floor(r() * BASES.length)], layout: LAYOUTS[Math.floor(r() * LAYOUTS.length)], finish: FINISHES[Math.floor(r() * FINISHES.length)], light: `${Math.round(10 + r() * 80)}% ${Math.round(5 + r() * 40)}%` };
+}
 
 /** Due = switched on, timed, inside [start − 10 min, max(end, start + 15 min)), not cleared.
     Pop-ups before pop-outs, then soonest first. */
