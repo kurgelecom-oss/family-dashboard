@@ -1,0 +1,44 @@
+/* Night theme (Maghrib → Fajr), driven by <html data-theme="night"> from NightMode.tsx.
+   Deep teal-ink surfaces, warm cream type, gold accents — the Climb palette after dark.
+   Only variables and a handful of hard-coded light surfaces are overridden. */
+html.theme-fade *,html.theme-fade *::before,html.theme-fade *::after{transition:background-color 2.4s ease,color 2.4s ease,border-color 2.4s ease!important}
+
+/* ── Home board ── */
+html[data-theme=night] .hb{
+  --cream:#141c1b; --paper:#1b2523; --ink:#ece6da; --muted:#9c968a; --line:#2b3633;
+  --teal:#6fb3a6; --teal-2:#5aa093; --teal-3:#8ab3ab; --teal-soft:#1f3532; --clay-soft:#3a2a20;
+  background:#0f1615!important; color:var(--ink); transition:background-color 2.4s ease}
+html[data-theme=night] .hb-amb i{opacity:.08}
+html[data-theme=night] .hb-now{background:#1f4a45;color:#f6f1e8}
+html[data-theme=night] .hb-now.idle{background:var(--teal-soft);color:var(--teal)}
+html[data-theme=night] .hb-tag{background:#1f4a45;color:#f6f1e8}
+html[data-theme=night] .pp{background:#0b1110;color:#f6f1e8;box-shadow:0 24px 60px rgba(0,0,0,.6)}
+html[data-theme=night] .hb-clock .hb-num{color:#d9bf8c}
+html[data-theme=night] .hb-track{background:linear-gradient(90deg,#2b3633,#3d4a47)}
+html[data-theme=night] .hb-ticker{border-color:var(--line);color:var(--muted)}
+
+/* ── Calendar ── */
+html[data-theme=night] .cal{
+  --cream:#141c1b; --paper:#111817; --ink:#ece6da; --muted:#8f8a80; --line:#263130; --line-2:#1c2524; --shade:#1d2726;
+  --teal:#2f6b62; --bad:#e2574a; --c-taylan:#5aa093}
+html[data-theme=night] :is(.cal-pillgrp,.cal-round,.cal-seg,.cal-pop,.cal-calpick button,.cal-editor textarea,.cal-inkbar){background:#1a2322;border-color:#2b3634;box-shadow:none;color:var(--ink)}
+html[data-theme=night] .cal-pillgrp button{color:var(--ink)}
+html[data-theme=night] .cal-ev{color:color-mix(in srgb,var(--ev) 45%,#fff)}
+html[data-theme=night] .cal-ev.d-solid,html[data-theme=night] .cal-ev.sel,html[data-theme=night] .cal-ev.dragging{color:#fff}
+html[data-theme=night] .cal-mini-grid button.sel{background:var(--ink);color:#111817}
+html[data-theme=night] .cal-mini-grid button.out,html[data-theme=night] .cal-mcell.out .cal-mnum{color:#4a5452}
+html[data-theme=night] .cal-toast{background:#ece6da;color:#111817}
+html[data-theme=night] .cal-inkbar .wd span{background:var(--ink)}
+html[data-theme=night] .cal-gutcol .cal-nowlbl{background:var(--paper)}
+html[data-theme=night] .cal-strip{background:linear-gradient(180deg,#0a0f0e,#111817)}
+
+/* ── Hourly cross-dissolve after dark: a night veil instead of ivory ── */
+html[data-theme=night] .hs-veil{background:radial-gradient(120% 90% at 50% 45%,#1b2523 0%,#121a19 55%,#0a0f0e 100%)}
+html[data-theme=night] .hs-word{color:#ece6da}
+html[data-theme=night] .hs-word b{background-image:linear-gradient(100deg,#ece6da 0%,#ece6da 42%,#d9bf8c 50%,#ece6da 58%,#ece6da 100%)}
+html[data-theme=night] .hs-word em{color:#8f8a80}
+
+/* ── Demo page ── */
+html[data-theme=night] .ea-demo{background:#111817;color:#ece6da}
+html[data-theme=night] .ea-demo-grid section{background:#1a2322;border-color:#2b3634}
+html[data-theme=night] .ea-demo-grid button{background:#22302e;border-color:#2b3634;color:#ece6da}

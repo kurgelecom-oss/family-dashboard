@@ -3,6 +3,7 @@ import "./globals.css";
 import TopNav from "./components/TopNav";
 import FamilyEditGate from "./components/FamilyEditGate";
 import HourlyShift from "./components/HourlyShift";
+import NightMode from "./components/NightMode";
 
 export const metadata: Metadata = {
   title: "Kurgel Family Dashboard",
@@ -15,7 +16,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       {/* Fraunces is the boards' display face. A CSS @import of it is dropped once
           bundled after globals.css, so it is linked here, once, for every route. */}
       <head>
@@ -32,6 +33,7 @@ export default function RootLayout({
             it reclaims the height without touching its own math. */}
         {children}
         <HourlyShift />
+        <NightMode />
       </body>
     </html>
   );

@@ -104,6 +104,15 @@ Nihal x/y · TK x/y · Store today vs pace · Ads live · next goal %. Read from
   `components/HourlyShift.tsx`, mounted in the root layout so the overlay spans the route change.
 - Pop-ups already fire on "/" as well as `/board` (EventAlerts on both).
 
+## NIGHT MODE (tk 1 Nov 2026: "dark mode … auto switches at maghrib each day")
+
+- `components/NightMode.tsx` in the root layout sets `<html data-theme="night">` from Maghrib to
+  Fajr, using `lib/prayer.ts` (the same calculated times as the prayer board). Checks every 20 s;
+  a real switch cross-fades over ~2.4 s; a page load at night starts dark with no fade.
+- `components/night.css` re-colours the home board, the calendar, the hourly veil and
+  /alerts-demo (deep teal-ink, cream type, gold). Pop-ups keep their own colours.
+- `?theme=night` / `?theme=day` forces a theme for testing.
+
 ## RULES
 
 - Outlook/Google/Notion reads: `/api/cal?from&to` (≤ 45 days), polled every 60 s (tk 1 Nov), CDN `s-maxage=50` with
