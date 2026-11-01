@@ -1,5 +1,86 @@
 # BOARD-SPEC
 
+**Status: FROZEN — v2, 2026-11-01.** `/board` is now the **family calendar**. tk's instruction
+(1 Nov 2026): "rebuild this entire page … scrap what in there completely … a complete
+replica of Apple Calendar … switch day, week, month … keep the key points from the main
+dashboard across the top … use the family dashboard's theme … link it with Nihal's calendar
+and the kurgel calendar … edit on just taps … write directly on it with the Flip pen."
+Everything in the v1 section below (the per-person Notion time-block board) is
+**superseded**; it is kept as history only. `/api/board` is unchanged and still served —
+the calendar reads it as the optional "Routines (Notion)" calendar.
+
+## ROUTE
+
+- `/board` = the family calendar. `/week` still 308s to it.
+- The home board (`/`) links to it (📅 Calendar, under the clock); it links back from the
+  dashboard strip and the Dashboard button.
+
+## VIEWS (Apple Calendar, macOS)
+
+- Toolbar: calendars toggle + pen (one pill), `+` new event, Day / Week / Month / Year
+  segmented control centred, Dashboard on the right. Title row: **Month** Year, ‹ Today ›.
+- Week: Monday first, header "Mon 26", today's number in a red circle, weekends shaded,
+  all-day row, 24-hour scrolling grid ("Noon"), red now-line with the time in the gutter,
+  overlapping events side by side. Opens scrolled to 7 am (today: 90 min before now).
+- Day: one wide column + side panel with a mini month and the day's list.
+- Month: 6×7 grid, as many event lines as fit each cell, the rest "N more" — never clipped.
+- Year: 12 mini months; tap a month → Month, a day → Day.
+- The page never scrolls; only the time grid does. After 10 idle minutes it returns to today.
+
+## DASHBOARD STRIP (top)
+
+Clock · next prayer (leader, countdown; red inside 20 min) · Ansar now/next · Today's list
+Nihal x/y · TK x/y · Store today vs pace · Ads live · next goal %. Read from `/api/now` and
+`/api/money-board` (same feeds as `/`, so the two screens agree). RAG rules from
+`components/home/rag.ts`. Tap → `/`.
+
+## CALENDARS
+
+| Calendar | Source | Editable here |
+|---|---|---|
+| Family | `fds_cal_events` (Supabase, `db/006`) | yes |
+| TK / Nihal / Ansar | Outlook via Graph (existing refresh tokens) **plus** events made here and tagged to them | only the ones made here |
+| Kurgel (Google) | secret iCal URLs in `FAMILY_ICS_FEEDS` (`kurgel|url,family|url`) | no |
+| Routines (Notion) | `/api/board`, placed on real dates; **off by default** (~140 a week) | no |
+
+- Colours from the Climb palette: Family clay, TK teal, Nihal rose, Ansar amber, Kurgel plum,
+  Routines muted. Show/hide per calendar, remembered per screen.
+- Outlook and Google are read-only here because the Graph tokens are `Calendars.Read`.
+  Write-back needs `Calendars.ReadWrite` consent per account — a deliberate follow-up.
+
+## EDITING (touch first, 65" Flip)
+
+- Tap empty slot → new event at that half hour (1 h). Tap all-day row / month cell → new
+  event that day. `+` → next whole hour today.
+- Sheet: title, calendar chips, day ‹ ›, all-day switch, start/end ±15 / ±1 h, length
+  presets, notes, Delete (two taps), Cancel, Add/Save. Every control ≥ 48 px.
+- Hold an event 350 ms → drag to move (snaps 15 min, across days in Week); hold its bottom
+  edge → resize. Mouse drags at once.
+- Swipe sideways → previous / next. Keys: ← → t d w m y.
+- Writes need the family PIN session (`canEditFamily`); the PIN is asked once per device.
+
+## PEN INK
+
+- Pen button → ink layer over the current page; colours, three widths, eraser (whole
+  strokes), undo, clear (two taps). Strokes stored as page fractions in `fds_cal_ink`, one
+  row per page (`day:`, `week:`, `month:`, `year:`), saved 1.2 s after the last stroke,
+  re-read every minute so other screens see it.
+- Palm rejection: once a pen (`pointerType: "pen"`) touches, fingers stop drawing.
+
+## RULES
+
+- Outlook/Google/Notion reads: `/api/cal?from&to` (≤ 45 days), CDN `s-maxage=120` with
+  `Netlify-Vary: query=from|to` (without it Netlify serves every week from one entry).
+- Family events and ink: `/api/cal/events`, `/api/cal/ink`, always `no-store`.
+- Time maths in `app/lib/cal-time.ts` via Intl (`Australia/Melbourne`), never fixed offsets.
+  Checked by `app/lib/cal.test.ts` (in `npm test`).
+- Polling pauses while the tab is hidden.
+
+---
+
+# v1 (SUPERSEDED 2026-11-01) — kept as history
+
+
 **Status: FROZEN.** Authored 2026-07-26. This file is the definition of done for the
 `/board` work. It is the authority: where code, habit or convenience disagrees with
 this document, this document wins. Do not amend it as a side effect of implementation —

@@ -422,6 +422,7 @@ export default function HomeBoard() {
           <div className="hb-sec"><i style={{ width: `${now.getSeconds() / 59 * 100}%` }} /></div>
           <div>{new Intl.DateTimeFormat('en-AU', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long' }).format(now)}</div>
           <div>
+          <a className="hb-sound" href="/board" title="Open the family calendar">📅 Calendar</a>
           <button className={'hb-sound' + (sound ? ' on' : '') + (sound && soundBlocked ? ' blocked' : '')} onClick={toggleSound} title={sound && soundBlocked ? 'Tap anywhere to allow sound' : 'Chime for prayers and goals'}>{sound ? (soundBlocked ? '🔈 Tap for sound' : '🔔 Sound on') : '🔕 Sound off'}</button>
           <div className={'hb-live' + (failed ? ' off' : '')}><i />{failed ? 'Reconnecting' : demo ? 'Demo' : ago === null ? 'Connecting' : `Live · ${ago < 60 ? `${ago}s` : `${Math.round(ago / 60)}m`} ago`}</div>
           </div>
