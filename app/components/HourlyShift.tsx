@@ -5,14 +5,14 @@ import './hourly-shift.css';
 import { TZ } from '../lib/cal-time';
 
 /* Every hour, on the hour, the home board hands the TV to the calendar for 30
-   seconds and takes it back — with a motion wipe each way. Lives in the root
+   seconds and takes it back — with a slow ivory cross-dissolve each way. Lives in the root
    layout, which survives client navigation, so one overlay covers the old page,
    the route changes underneath it, and the same overlay reveals the new page.
    If someone touches the calendar during its 30 s, it stays (they're using it).
    Test it any time with /?shift=now. Only "/" starts it; other routes never move. */
 
 type Phase = 'idle' | 'cover' | 'reveal';
-const COVER_MS = 1100, REVEAL_MS = 1000, STAY_MS = 30_000;
+const COVER_MS = 2300, REVEAL_MS = 1900, STAY_MS = 30_000;
 const hourKey = () => new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' }).format(new Date());
 const minuteNow = () => Number(new Intl.DateTimeFormat('en-AU', { timeZone: TZ, minute: 'numeric' }).format(new Date()));
 const clockNow = () => new Intl.DateTimeFormat('en-AU', { timeZone: TZ, hour: 'numeric', minute: '2-digit' }).format(new Date()).replace(' ', '').toLowerCase();
@@ -38,12 +38,19 @@ export default function HourlyShift() {
   useEffect(() => {
     const t = trip.current;
     if (!t || (t.to === '/board' ? !path.startsWith('/board') : path !== '/')) return;
-    const r = setTimeout(() => {
+    // Reveal only once the new page has rendered and the main thread is quiet, so the
+    // wipe never competes with the page's first paint (that was the stutter).
+    let live = true, idle = 0;
+    const reveal = () => {
+      if (!live) return;
       setPhase('reveal');
       setTimeout(() => { setPhase('idle'); trip.current = null; }, REVEAL_MS);
       if (t.to === '/board') { away.current = true; setLeft(STAY_MS / 1000); } else { away.current = false; setLeft(null); }
-    }, 600);
-    return () => clearTimeout(r);
+    };
+    const r = setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+      idle = 'requestIdleCallback' in window ? window.requestIdleCallback(reveal, { timeout: 1200 }) : setTimeout(reveal, 300) as unknown as number;
+    })), 900);
+    return () => { live = false; clearTimeout(r); if (idle && 'cancelIdleCallback' in window) window.cancelIdleCallback(idle); };
   }, [path]);
 
   // On the hour from "/" (and /?shift=now for a test).
@@ -74,9 +81,8 @@ export default function HourlyShift() {
 
   return <>
     {phase !== 'idle' && <div className={`hs-layer ${phase}`} aria-hidden="true">
-      <i className="hs-disc d1" /><i className="hs-disc d2" /><i className="hs-disc d3" />
-      <div className="hs-word"><small>{clockNow()}</small><b>{label}</b></div>
-      <div className="hs-sweep" />
+      <i className="hs-veil" />
+      <div className="hs-word"><small>{clockNow()}</small><b>{label}</b><i className="hs-line" /><em>Kurgel family</em></div>
     </div>}
     {left !== null && left > 0 && phase === 'idle' && <div className="hs-pill" role="status"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" /><circle className="fg" cx="18" cy="18" r="15" style={{ strokeDashoffset: 94.25 * (1 - left / (STAY_MS / 1000)) }} /></svg>Back to the dashboard in {left}s · tap anywhere to stay</div>}
   </>;

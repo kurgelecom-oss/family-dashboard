@@ -15,30 +15,9 @@ import { addDays, clock, today as todayDay, wall } from '../lib/cal-time';
    stale alert. Cleared alerts are remembered per screen.
    Mounted on "/" and "/board", so it fires whichever view the TV is on. */
 
-export type AlertMode = 'popup' | 'popout';
-export type AlertEvent = { key: string; title: string; startISO: string; endISO: string; cal: string; allDay?: boolean };
+import { ACCENTS, CAL_HUE, CAL_LABEL, LEAD_MS, dueAlerts, hash, iconFor, look, rng, type AlertEvent, type AlertMode } from '../lib/alerts-model';
+export type { AlertEvent, AlertMode } from '../lib/alerts-model';
 type Live = AlertEvent & { mode: AlertMode; preview?: boolean };
-
-const LEAD_MS = 10 * 60_000;
-const CAL_LABEL: Record<string, string> = { family: 'Family', taylan: 'TK', nihal: 'Nihal', ansar: 'Ansar', kurgel: 'Kurgel', routine: 'Routine' };
-const CAL_HUE: Record<string, string> = { family: '#b8612f', taylan: '#1f4a45', nihal: '#a8456b', ansar: '#c98a1b', kurgel: '#6b4f9e', routine: '#7a7468' };
-const ACCENTS = ['#f0b089', '#7fd1c2', '#ffd36e', '#c9b6ff', '#ff9aa8', '#9fd47e'];
-const SCENES = ['orbit', 'burst', 'waves', 'tiles', 'aurora'] as const;
-
-const ICONS: [RegExp, string][] = [
-  [/football|soccer|futsal/i, '⚽'], [/swim/i, '🏊'], [/gym|train|run\b|walk/i, '🏃'], [/birthday|🎂/i, '🎂'],
-  [/call|phone|zoom|meet/i, '📞'], [/doctor|dentist|gp\b|clinic|hospital/i, '🩺'], [/school|homeschool|vrqa|class|lesson/i, '🎒'],
-  [/seera|barzakh|qur|quran|halaqa|masjid|salah|prayer|jumu/i, '🕌'], [/dinner|lunch|breakfast|eat|bbq/i, '🍽️'],
-  [/flight|airport|travel/i, '✈️'], [/shop|groceries|market/i, '🛒'], [/pay|bill|bank|card|tax|revolut/i, '💳'],
-  [/export|file|notion|report/i, '📁'], [/family|alignment/i, '🏡'], [/drive|depot|pick ?up|drop/i, '🚗'],
-];
-const iconFor = (t: string) => ICONS.find(([re]) => re.test(t))?.[1] ?? '📅';
-
-function hash(s: string) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
-function rng(seed: number) { return () => { seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
-
-/** Scene and accent for an event: the raw hash's low bits cluster for similar keys, so mix first. */
-function look(key: string) { const r = rng(hash(key)); return { scene: SCENES[Math.floor(r() * SCENES.length)], accent: ACCENTS[Math.floor(r() * ACCENTS.length)] }; }
 
 const clearedKey = (e: AlertEvent) => `ea-cleared:${e.key}@${e.startISO}`;
 
@@ -47,7 +26,7 @@ export function previewAlert(e: AlertEvent, mode: AlertMode) { window.dispatchEv
 
 function Scene({ ev }: { ev: Live }) {
   const seed = hash(ev.key), r = useMemo(() => rng(seed), [seed]);
-  const { scene, accent } = look(ev.key);
+  const { scene, accent } = look(ev.key, ev.scene);
   const parts = useMemo(() => Array.from({ length: 18 }, () => ({ x: r() * 100, y: r() * 100, s: 4 + r() * 10, d: 6 + r() * 10, delay: -r() * 10 })), [r]);
   const spin = 14 + (seed % 12);
   return (
@@ -69,7 +48,7 @@ function Card({ ev, now, onClear }: { ev: Live; now: number; onClear: () => void
   const words = ev.title.trim().split(/\s+/);
   const ws = wall(ev.startISO), we = wall(ev.endISO);
   return (
-    <div className={`ea-card ${ev.mode}`} style={{ '--hue': CAL_HUE[ev.cal] ?? CAL_HUE.routine, '--acc': look(ev.key).accent } as React.CSSProperties} role="alertdialog" aria-label={`${ev.title} ${live ? 'is starting' : 'starts soon'}`}>
+    <div className={`ea-card ${ev.mode}`} style={{ '--hue': CAL_HUE[ev.cal] ?? CAL_HUE.routine, '--acc': look(ev.key, ev.scene).accent } as React.CSSProperties} role="alertdialog" aria-label={`${ev.title} ${live ? 'is starting' : 'starts soon'}`}>
       <Scene ev={ev} />
       <div className="ea-content">
         <div className="ea-top"><span className="ea-chip">{CAL_LABEL[ev.cal] ?? ev.cal}</span>{ev.preview && <span className="ea-chip ghost">Preview</span>}</div>
@@ -119,9 +98,7 @@ export default function EventAlerts() {
   // Due = switched on, inside [start − 10 min, end), not cleared on this screen. Pop-ups before pop-outs, soonest first.
   const due = useMemo(() => {
     void cleared;
-    return events.filter(e => alerts[e.key] && !e.allDay && now >= Date.parse(e.startISO) - LEAD_MS && now < Math.max(Date.parse(e.endISO), Date.parse(e.startISO) + 15 * 60_000) && !localStorage.getItem(clearedKey(e)))
-      .map(e => ({ ...e, mode: alerts[e.key] }))
-      .sort((a, b) => Number(a.mode === 'popout') - Number(b.mode === 'popout') || a.startISO.localeCompare(b.startISO));
+    return dueAlerts(events, alerts, now, e => !!localStorage.getItem(clearedKey(e)));
   }, [events, alerts, now, cleared]);
   const current: Live | null = preview ?? due[0] ?? null;
 
