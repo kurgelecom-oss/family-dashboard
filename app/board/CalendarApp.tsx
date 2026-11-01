@@ -9,6 +9,7 @@ import {
 } from '../lib/cal-time';
 import Strip from './Strip';
 import Ink from './Ink';
+import EventAlerts, { previewAlert, type AlertMode } from '../components/EventAlerts';
 
 /* The family calendar. Apple Calendar's layout and gestures, the home board's
    "Climb" palette. Everything is reachable by a single tap on a 65" Flip:
@@ -17,9 +18,9 @@ import Ink from './Ink';
 
 type View = 'day' | 'week' | 'month' | 'year';
 type Source = 'board' | 'outlook' | 'google' | 'routine';
-type Raw = { id: string; cal: string; title: string; startISO: string; endISO: string; allDay: boolean; source?: Source; link?: string; notes?: string };
-type Ev = Raw & { source: Source; s: number; e: number; sd: string; ed: string; band: boolean };
-type Draft = { id?: string; cal: string; title: string; day: string; startMin: number; endMin: number; allDay: boolean; notes: string };
+type Raw = { id: string; key?: string; cal: string; title: string; startISO: string; endISO: string; allDay: boolean; source?: Source; link?: string; notes?: string };
+type Ev = Raw & { key: string; source: Source; s: number; e: number; sd: string; ed: string; band: boolean };
+type Draft = { id?: string; cal: string; title: string; day: string; startMin: number; endMin: number; allDay: boolean; notes: string; alert: AlertMode | 'off' };
 
 export const CALS: { id: string; label: string; writable: boolean }[] = [
   { id: 'family', label: 'Family', writable: true },
@@ -42,7 +43,7 @@ function normalise(r: Raw, source: Source): Ev {
   let ed = r.allDay ? dayOf(r.endISO) : wall(new Date(Math.max(s, e - 1))).day;
   if (r.allDay && ed <= sd) ed = addDays(sd, 1);
   if (!r.allDay) ed = addDays(ed, 1);
-  return { ...r, source, s, e, sd, ed, band: r.allDay || e - s >= 864e5 };
+  return { ...r, key: r.key ?? `board-${r.id}`, source, s, e, sd, ed, band: r.allDay || e - s >= 864e5 };
 }
 
 /** Columns for overlapping timed events in one day: Apple's side-by-side split. */
@@ -82,6 +83,9 @@ export default function CalendarApp() {
   const [selected, setSelected] = useState<string | null>(null);
   const [ink, setInk] = useState(false);
   const [toast, setToast] = useState('');
+  const [alerts, setAlerts] = useState<Record<string, AlertMode>>({});
+  const loadAlerts = useCallback(() => fetch('/api/cal/alerts', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(b => b?.alerts && setAlerts(b.alerts)).catch(() => {}), []);
+  useEffect(() => { loadAlerts(); }, [loadAlerts]);
   const [drag, setDrag] = useState<{ id: string; dDay: number; dTop: number; dBot: number } | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const grid = useRef<HTMLDivElement>(null);
@@ -165,9 +169,9 @@ export default function CalendarApp() {
     setSelected(ev.id);
     if (ev.source !== 'board') { setDetail(ev); return; }
     const sw = wall(new Date(ev.s)), ew = wall(new Date(ev.e));
-    setDraft({ id: ev.id, cal: ev.cal, title: ev.title, notes: ev.notes ?? '', allDay: ev.allDay, day: ev.allDay ? ev.sd : sw.day, startMin: ev.allDay ? 9 * 60 : sw.min, endMin: ev.allDay ? 10 * 60 : ew.day === sw.day ? ew.min : 24 * 60 });
+    setDraft({ id: ev.id, alert: alerts[ev.key] ?? 'off', cal: ev.cal, title: ev.title, notes: ev.notes ?? '', allDay: ev.allDay, day: ev.allDay ? ev.sd : sw.day, startMin: ev.allDay ? 9 * 60 : sw.min, endMin: ev.allDay ? 10 * 60 : ew.day === sw.day ? ew.min : 24 * 60 });
   }
-  const newAt = (day: string, startMin = 9 * 60, allDay = false) => setDraft({ cal: 'family', title: '', notes: '', day, startMin, endMin: Math.min(24 * 60, startMin + 60), allDay });
+  const newAt = (day: string, startMin = 9 * 60, allDay = false) => setDraft({ alert: 'off', cal: 'family', title: '', notes: '', day, startMin, endMin: Math.min(24 * 60, startMin + 60), allDay });
 
   async function save(d: Draft) {
     const body = { id: d.id, cal: d.cal, title: d.title, notes: d.notes, allDay: d.allDay,
@@ -177,7 +181,15 @@ export default function CalendarApp() {
     if (!r.ok) return b.error ?? 'Could not save';
     const ev = normalise(b.event, 'board');
     setOwn(list => [...list.filter(x => x.id !== ev.id), ev]);
+    if ((alerts[ev.key] ?? 'off') !== d.alert) { const err = await setAlert(ev.key, d.alert); if (err) flash(err); }
     setDraft(null); flash(d.id ? 'Saved' : `Added “${ev.title}”`);
+    return null;
+  }
+  async function setAlert(key: string, mode: AlertMode | 'off') {
+    const r = await familyWrite('/api/cal/alerts', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, mode }) });
+    if (!r.ok) return 'Pop-up not saved — unlock editing';
+    setAlerts(a => { const n = { ...a }; if (mode === 'off') delete n[key]; else n[key] = mode; return n; });
+    window.dispatchEvent(new Event('event-alerts-changed'));
     return null;
   }
   async function remove(id: string) {
@@ -297,7 +309,7 @@ export default function CalendarApp() {
                     return <div key={ev.id} className={'cal-ev' + (selected === ev.id ? ' sel' : '') + (dr ? ' dragging' : '') + (ev.source === 'board' ? ' own' : '') + (short ? ' short' : '')}
                       style={{ '--ev': color(ev.cal), top: t / 60 * HOUR, height: Math.max(18, (b - t) / 60 * HOUR - 2), left: `calc(${(col / cols) * 100}% + 2px)`, width: `calc(${100 / cols}% - 4px)`, transform: dr?.dDay ? `translateX(${dr.dDay * 100 * cols}%)` : undefined } as React.CSSProperties}
                       onPointerDown={e => evDown(e, ev, di)} onClick={e => clickEvent(e, ev)}>
-                      <b>{ev.title}</b>{!short && <span>{clock(wall(new Date(ev.s)).min)}</span>}
+                      <b>{alerts[ev.key] && <em className="cal-bell" aria-label="pops up">🔔 </em>}{ev.title}</b>{!short && <span>{clock(wall(new Date(ev.s)).min)}</span>}
                       {ev.source === 'board' && <i className="cal-grip" aria-hidden="true" />}
                     </div>;
                   })}
@@ -351,6 +363,7 @@ export default function CalendarApp() {
   const dayList = view === 'day' ? events.filter(e => e.sd <= anchor && e.ed > anchor).sort((a, b) => Number(b.band) - Number(a.band) || a.s - b.s) : [];
 
   return (
+    <>
     <main className={'cal' + (ink ? ' inking' : '')}>
       <Strip />
       <header className="cal-bar">
@@ -396,7 +409,9 @@ export default function CalendarApp() {
         <div className="cal-detail" style={{ '--ev': color(detail.cal) } as React.CSSProperties}>
           <h2><i />{detail.title}</h2>
           <p>{detail.band ? `${weekdayLong(detail.sd)} ${dayNum(detail.sd)} ${monthName(detail.sd)} · all-day` : `${weekdayLong(wall(new Date(detail.s)).day)} ${dayNum(wall(new Date(detail.s)).day)} ${monthName(wall(new Date(detail.s)).day)} · ${clock(wall(new Date(detail.s)).min)} – ${clock(wall(new Date(detail.e)).min)}`}</p>
-          <p className="muted">{CALS.find(c => c.id === detail.cal)?.label ?? detail.cal} · {SOURCE_NAME[detail.source]} · read-only here</p>
+          <p className="muted">{CALS.find(c => c.id === detail.cal)?.label ?? detail.cal} · {SOURCE_NAME[detail.source]} · read-only here{detail.source === 'outlook' ? ' · pop-up applies to every repeat' : ''}</p>
+          <AlertPicker value={alerts[detail.key] ?? 'off'} onChange={async m => { const err = await setAlert(detail.key, m); flash(err ?? (m === 'off' ? 'Pop-up off' : `${m === 'popup' ? 'Pop-up' : 'Pop-out'} on — fires 10 min before`)); }}
+            onPreview={m => previewAlert({ key: detail.key, title: detail.title, startISO: new Date(Date.now() + 9 * 60_000 + 42_000).toISOString(), endISO: new Date(Date.now() + 9 * 60_000 + 42_000 + (detail.e - detail.s)).toISOString(), cal: detail.cal }, m)} />
           <div className="cal-actions">{detail.link && <a className="cal-btn" href={detail.link} target="_blank" rel="noreferrer">Open in Outlook</a>}<button className="cal-btn primary" onClick={() => { setDetail(null); setSelected(null); }}>Done</button></div>
         </div>
       </Modal>}
@@ -404,6 +419,18 @@ export default function CalendarApp() {
       {draft && <Editor draft={draft} onCancel={() => { setDraft(null); setSelected(null); }} onSave={save} onDelete={remove} />}
       {toast && <div className="cal-toast" role="status">{toast}</div>}
     </main>
+    <EventAlerts />
+    </>
+  );
+}
+
+/** Off / Pop-out / Pop-up for one event series, with a Preview. */
+function AlertPicker({ value, onChange, onPreview }: { value: AlertMode | 'off'; onChange: (m: AlertMode | 'off') => void; onPreview: (m: AlertMode) => void }) {
+  return (
+    <div className="cal-row"><span>Alert</span>
+      <div className="cal-quick">{(['off', 'popout', 'popup'] as const).map(m => <button type="button" key={m} className={value === m ? 'on' : ''} onClick={() => onChange(m)}>{m === 'off' ? 'Off' : m === 'popout' ? 'Pop-out' : 'Pop-up'}</button>)}
+        <button type="button" className="ghost" onClick={() => onPreview(value === 'off' ? 'popup' : value)}>▶ Preview</button></div>
+    </div>
   );
 }
 
@@ -451,6 +478,7 @@ function Editor({ draft, onCancel, onSave, onDelete }: { draft: Draft; onCancel:
           <div className="cal-row"><span>Ends</span><div className="cal-step"><button type="button" onClick={() => moveEnd(-60)}>−1h</button><button type="button" onClick={() => moveEnd(-SNAP)}>−15</button><b>{d.endMin >= 1440 ? 'Midnight' : clock(d.endMin)}</b><button type="button" onClick={() => moveEnd(SNAP)}>+15</button><button type="button" onClick={() => moveEnd(60)}>+1h</button></div></div>
           <div className="cal-row"><span>Length</span><div className="cal-quick">{[30, 60, 90, 120, 180].map(m => <button type="button" key={m} className={dur === m ? 'on' : ''} onClick={() => set({ endMin: Math.min(1440, d.startMin + m) })}>{m < 60 ? `${m} min` : `${m / 60} h`}</button>)}</div></div>
         </>}
+        <AlertPicker value={d.alert} onChange={m => set({ alert: m })} onPreview={m => previewAlert({ key: d.id ? `board-${d.id}` : `draft-${d.title}`, title: d.title || 'New event', startISO: new Date(Date.now() + 9 * 60_000 + 42_000).toISOString(), endISO: new Date(Date.now() + (9 * 60 + 42) * 1000 + (d.endMin - d.startMin) * 60_000).toISOString(), cal: d.cal }, m)} />
         <textarea placeholder="Notes" value={d.notes} maxLength={2000} rows={2} onChange={e => set({ notes: e.target.value })} aria-label="Notes" />
         {err && <p className="cal-err" role="alert">{err}</p>}
         <div className="cal-actions">

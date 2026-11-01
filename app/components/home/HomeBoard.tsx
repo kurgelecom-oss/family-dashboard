@@ -1,4 +1,5 @@
 'use client';
+import EventAlerts from '../EventAlerts';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import './home.css';
 import { demoMoney, demoNow } from './demo';
@@ -511,6 +512,7 @@ export default function HomeBoard() {
 
       </div>
 
+      <EventAlerts />
       <PopupStage current={popups.current} waiting={popups.waiting} done={popups.done} onShow={onShow} />
       {demo && <p className="hb-stale">Demo data — remove ?demo to see the live board.</p>}
     </main>

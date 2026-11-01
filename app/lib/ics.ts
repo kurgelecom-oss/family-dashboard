@@ -5,7 +5,7 @@
    RECURRENCE-ID overrides — a moved single occurrence shows at its old time too. */
 import { addDays, zonedToISO } from './cal-time.ts';
 
-export type IcsEvent = { uid: string; title: string; startISO: string; endISO: string; allDay: boolean };
+export type IcsEvent = { uid: string; series: string; title: string; startISO: string; endISO: string; allDay: boolean };
 
 type Prop = { value: string; params: Record<string, string> };
 
@@ -48,7 +48,7 @@ export function parseIcs(text: string, fromISO: string, toISO: string): IcsEvent
     const dur = de ? Date.parse(when(de)[0]) - start : allDay ? 864e5 : 0;
     if (!Number.isFinite(start)) continue;
     const title = unescape(props.get('SUMMARY')?.value ?? '(No title)'), uid = props.get('UID')?.value ?? title + startISO;
-    const push = (s: number) => { if (s < to && s + dur > from && !ex.has(s)) out.push({ uid: `${uid}-${s}`, title, startISO: new Date(s).toISOString(), endISO: new Date(s + dur).toISOString(), allDay }); };
+    const push = (s: number) => { if (s < to && s + dur > from && !ex.has(s)) out.push({ uid: `${uid}-${s}`, series: uid, title, startISO: new Date(s).toISOString(), endISO: new Date(s + dur).toISOString(), allDay }); };
     const rule = props.get('RRULE')?.value;
     if (!rule) { push(start); continue; }
     const r = Object.fromEntries(rule.split(';').map(kv => kv.split('=')));

@@ -67,6 +67,19 @@ Nihal x/y · TK x/y · Store today vs pace · Ads live · next goal %. Read from
   re-read every minute so other screens see it.
 - Palm rejection: once a pen (`pointerType: "pen"`) touches, fingers stop drawing.
 
+## POP-UPS (amended 2026-11-01, tk: "motion graphic pop-ups when events trigger … 75% of the screen … press me to clear … choose which events")
+
+- Per event SERIES (Outlook `seriesMasterId`, iCal UID, routine slot, board event id): Off
+  (default) / Pop-out (corner card) / Pop-up (75vw × 75vh over a blurred scrim). Set in
+  the event sheet or the read-only detail sheet, with ▶ Preview. Stored in `fds_cal_alerts`
+  (`db/007`), `/api/cal/alerts`, PIN-gated writes. 🔔 marks switched-on events in the grid.
+- Fires 10 min before start with a live countdown ring, becomes "Happening now", stays until
+  "Press me to clear" is pressed; clears itself when the event ends. Clears are per screen.
+- Unique look per series from a hash: one of five motion scenes (orbit, burst, waves,
+  tiles, aurora), accent colour, particle field, tilt; keyword icon; kinetic title. CSS/SVG
+  only. Calendar colour drives the base. Reduced-motion respected. Chime if sound unlocked.
+- Mounted on `/` and `/board` (`components/EventAlerts.tsx`), so it fires on either view.
+
 ## RULES
 
 - Outlook/Google/Notion reads: `/api/cal?from&to` (≤ 45 days), CDN `s-maxage=120` with

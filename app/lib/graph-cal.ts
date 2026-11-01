@@ -16,6 +16,8 @@ export type CalEvent = {
   isAllDay?: boolean;
   isOrganizer?: boolean;
   isCancelled?: boolean;
+  /** Set on occurrences of a recurring event; the pop-up choice is keyed on it. */
+  seriesMasterId?: string | null;
   responseStatus?: { response?: string };
   /** Outlook web URL for the event — what "tap → the event" opens. */
   webLink?: string;
@@ -63,7 +65,7 @@ export async function fetchEvents(accessToken: string, startISO: string, endISO:
   const url = new URL("https://graph.microsoft.com/v1.0/me/calendarView");
   url.searchParams.set("startDateTime", startISO);
   url.searchParams.set("endDateTime", endISO);
-  url.searchParams.set("$select", "id,subject,start,end,isAllDay,isOrganizer,isCancelled,responseStatus,webLink");
+  url.searchParams.set("$select", "id,seriesMasterId,subject,start,end,isAllDay,isOrganizer,isCancelled,responseStatus,webLink");
   url.searchParams.set("$orderby", "start/dateTime");
   url.searchParams.set("$top", String(top));
 

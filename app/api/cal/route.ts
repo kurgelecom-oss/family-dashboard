@@ -15,7 +15,7 @@ import { addDays, range, weekdayShort, zonedToISO } from '../../lib/cal-time';
 
 export const dynamic = 'force-dynamic';
 
-export type ExtEvent = { id: string; cal: string; title: string; startISO: string; endISO: string; allDay: boolean; source: 'outlook' | 'google' | 'routine'; link?: string };
+export type ExtEvent = { id: string; key: string; cal: string; title: string; startISO: string; endISO: string; allDay: boolean; source: 'outlook' | 'google' | 'routine'; link?: string };
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -30,14 +30,14 @@ export async function GET(request: Request) {
     if (!refresh) { missing.push(a.email); return; }
     const raw = await fetchEvents(await getAccessToken(refresh), fromISO, toISO_, 250);
     for (const e of raw) if (!e.isCancelled && e.responseStatus?.response !== 'declined')
-      events.push({ id: `${a.key}-${e.id}`, cal: a.key.toLowerCase(), title: e.subject?.trim() || '(No title)', startISO: toISO(e.start.dateTime), endISO: toISO(e.end.dateTime), allDay: !!e.isAllDay, source: 'outlook', link: e.webLink });
+      events.push({ id: `${a.key}-${e.id}`, key: `outlook-${a.key}-${e.seriesMasterId || e.id}`, cal: a.key.toLowerCase(), title: e.subject?.trim() || '(No title)', startISO: toISO(e.start.dateTime), endISO: toISO(e.end.dateTime), allDay: !!e.isAllDay, source: 'outlook', link: e.webLink });
   });
 
   const feeds = (process.env.FAMILY_ICS_FEEDS ?? '').split(',').map(s => s.trim()).filter(Boolean).map(async spec => {
     const [label, url] = spec.split('|');
     const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
     if (!res.ok) throw new Error(`${label} feed ${res.status}`);
-    for (const e of parseIcs(await res.text(), fromISO, toISO_)) events.push({ id: `${label}-${e.uid}`, cal: label === 'family' ? 'family' : 'kurgel', title: e.title, startISO: e.startISO, endISO: e.endISO, allDay: e.allDay, source: 'google' });
+    for (const e of parseIcs(await res.text(), fromISO, toISO_)) events.push({ id: `${label}-${e.uid}`, key: `google-${label}-${e.series}`, cal: label === 'family' ? 'family' : 'kurgel', title: e.title, startISO: e.startISO, endISO: e.endISO, allDay: e.allDay, source: 'google' });
   });
   if (!process.env.FAMILY_ICS_FEEDS) missing.push('Google (FAMILY_ICS_FEEDS)');
 
@@ -50,7 +50,7 @@ export async function GET(request: Request) {
       for (const b of blocks) {
         if (b.startMin === null || !(b.date ? b.date === day : b.day === wd)) continue;
         const end = b.endMin !== null && b.endMin > b.startMin ? b.endMin : b.startMin + 30;
-        events.push({ id: `routine-${b.person}-${b.layer}-${day}-${b.startMin}-${b.title}`, cal: 'routine', title: `${b.person[0].toUpperCase()}${b.person.slice(1)} · ${b.title}`, startISO: zonedToISO(day, b.startMin), endISO: zonedToISO(day, end), allDay: false, source: 'routine' });
+        events.push({ id: `routine-${b.person}-${b.layer}-${day}-${b.startMin}-${b.title}`, key: `routine-${b.person}-${b.layer}-${b.date ?? b.day}-${b.startMin}-${b.title}`, cal: 'routine', title: `${b.person[0].toUpperCase()}${b.person.slice(1)} · ${b.title}`, startISO: zonedToISO(day, b.startMin), endISO: zonedToISO(day, end), allDay: false, source: 'routine' });
       }
     }
   })();
