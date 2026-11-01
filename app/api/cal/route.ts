@@ -35,7 +35,7 @@ export async function GET(request: Request) {
 
   const feeds = (process.env.FAMILY_ICS_FEEDS ?? '').split(',').map(s => s.trim()).filter(Boolean).map(async spec => {
     const [label, url] = spec.split('|');
-    const res = await fetch(url, { cache: 'no-store' });
+    const res = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
     if (!res.ok) throw new Error(`${label} feed ${res.status}`);
     for (const e of parseIcs(await res.text(), fromISO, toISO_)) events.push({ id: `${label}-${e.uid}`, cal: label === 'family' ? 'family' : 'kurgel', title: e.title, startISO: e.startISO, endISO: e.endISO, allDay: e.allDay, source: 'google' });
   });

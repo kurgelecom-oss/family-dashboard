@@ -53,7 +53,8 @@ export function parseIcs(text: string, fromISO: string, toISO: string): IcsEvent
     if (!rule) { push(start); continue; }
     const r = Object.fromEntries(rule.split(';').map(kv => kv.split('=')));
     const interval = Math.max(1, Number(r.INTERVAL) || 1), count = Number(r.COUNT) || Infinity;
-    const until = r.UNTIL ? Date.parse(when({ value: r.UNTIL, params: {} })[0]) : Infinity;
+    // A date-only UNTIL includes that whole day.
+    const until = r.UNTIL ? Date.parse(when({ value: r.UNTIL, params: {} })[0]) + (/^\d{8}$/.test(r.UNTIL) ? 864e5 - 1 : 0) : Infinity;
     // Step by wall-clock day in the event's own zone so DST never shifts the time of day.
     const tz = ds.params.TZID;
     const base = new Intl.DateTimeFormat('en-CA', { timeZone: tz || 'Australia/Melbourne', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(start));
@@ -62,7 +63,7 @@ export function parseIcs(text: string, fromISO: string, toISO: string): IcsEvent
     const at = (day: string) => ds.value.endsWith('Z') && !tz ? Date.parse(zonedToISO(day, baseMin, 'UTC')) : Date.parse(zonedToISO(day, baseMin, tz));
     const byday: string[] = r.FREQ === 'WEEKLY' && r.BYDAY ? r.BYDAY.split(',') : [];
     let n = 0;
-    for (let i = 0; n < count && i < 2000; i++) {
+    for (let i = 0; n < count && i < 5000; i++) {
       let days: string[];
       if (r.FREQ === 'DAILY') days = [addDays(baseDay, i * interval)];
       else if (r.FREQ === 'WEEKLY') {

@@ -151,7 +151,7 @@ export default function CalendarApp() {
   }
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (draft || (e.target as HTMLElement)?.closest?.('input,textarea')) return;
+      if (draft || detail || calsOpen || (e.target as HTMLElement)?.closest?.('input,textarea')) return;
       if (e.key === 'ArrowLeft') step(-1); else if (e.key === 'ArrowRight') step(1); else if (e.key === 't') setAnchor(todayDay());
       else { const v = VIEWS.find(x => x[0] === e.key); if (v) setView(v); }
     };
@@ -360,7 +360,7 @@ export default function CalendarApp() {
             <i />
             <button aria-label="Pen" className={ink ? 'on' : ''} onClick={() => setInk(v => !v)}><svg viewBox="0 0 24 24"><path d="M4 20l1.2-4.6L16 4.6a2 2 0 012.8 0l.6.6a2 2 0 010 2.8L8.6 18.8z" /><path d="M14 6.5l3.5 3.5" /></svg></button>
           </div>
-          <button className="cal-round" aria-label="New event" onClick={() => newAt(view === 'day' || view === 'week' ? (days.includes(today) ? today : days[0]) : today, Math.min(22 * 60, Math.ceil(wall(new Date()).min / 60) * 60))}><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg></button>
+          <button className="cal-round" aria-label="New event" onClick={() => newAt(today, Math.min(23 * 60, Math.ceil(wall(new Date()).min / 60) * 60))}><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg></button>
         </div>
         <nav className="cal-seg">{VIEWS.map(v => <button key={v} className={v === view ? 'on' : ''} onClick={() => setView(v)}>{v[0].toUpperCase() + v.slice(1)}</button>)}</nav>
         <Link className="cal-round wide" href="/" aria-label="Family dashboard"><svg viewBox="0 0 24 24"><path d="M4 11l8-6.5 8 6.5M6.5 9.5V19h11V9.5" /></svg><span>Dashboard</span></Link>
