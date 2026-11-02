@@ -53,7 +53,7 @@ function sun(jd: number) {
 
 /** Fajr, sunset and Isha for one civil date, as instants. Each is solved at its own
  *  moment (two passes), because the sun's declination drifts through the day. */
-export function prayerTimes(y: number, m: number, d: number): Record<PrayerId, Date> {
+export function prayerTimes(y: number, m: number, d: number): Record<PrayerId | 'sunrise', Date> {
   const jd0 = Date.UTC(y, m - 1, d) / 864e5 + 2440587.5; // Julian day at 0h UTC
   const solve = (angle: number, side: -1 | 1) => {
     let t = 720 - 4 * LNG; // minutes after 0h UTC, first guess = solar noon
@@ -66,7 +66,7 @@ export function prayerTimes(y: number, m: number, d: number): Record<PrayerId, D
   };
   // Rounded to the minute, as Guidance shows them.
   const at = (min: number, p: PrayerId) => new Date(Date.UTC(y, m - 1, d) + Math.round(min + ADJUST[p]) * 60000);
-  return { fajr: at(solve(18, -1), 'fajr'), maghrib: at(solve(0.833, 1), 'maghrib'), isha: at(solve(17, 1), 'isha') };
+  return { fajr: at(solve(18, -1), 'fajr'), sunrise: new Date(Date.UTC(y, m - 1, d) + Math.round(solve(0.833, -1)) * 60000), maghrib: at(solve(0.833, 1), 'maghrib'), isha: at(solve(17, 1), 'isha') };
 }
 
 export interface NextPrayer { prayer: PrayerId; name: string; at: string; day: DayKey; leader: Leader; leaderName: string; suras: string[] }

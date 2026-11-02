@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import './night.css';
 import { prayerTimes } from '../lib/prayer';
 
-/* Dark mode from Maghrib to Fajr, every day, on every route. Uses the same
+/* Dark mode from Maghrib to sunrise, every day, on every route. Uses the same
    calculated prayer times as the prayer board (tk's Guidance settings), so the
    house goes dark exactly as Maghrib comes in. Sets <html data-theme="night">;
    night.css re-colours the home board and the calendar from that.
@@ -14,7 +14,7 @@ const melDay = (at: Date) => Object.fromEntries(new Intl.DateTimeFormat('en-CA',
 
 export function isNight(now = new Date()) {
   const d = melDay(now), t = prayerTimes(d.year, d.month, d.day);
-  return now >= t.maghrib || now < t.fajr;
+  return now >= t.maghrib || now < t.sunrise;
 }
 
 export default function NightMode() {
@@ -24,7 +24,7 @@ export default function NightMode() {
     const apply = () => {
       const night = forced === 'night' || (forced !== 'day' && isNight());
       if ((root.dataset.theme === 'night') !== night) {
-        // Fade only on a real switch (Maghrib / Fajr), not on the first paint after a load.
+        // Fade only on a real switch (Maghrib / sunrise), not on the first paint after a load.
         const switching = !!root.dataset.theme;
         if (switching) root.classList.add('theme-fade');
         root.dataset.theme = night ? 'night' : 'day';
