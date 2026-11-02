@@ -11,7 +11,7 @@ import { familyWrite } from '../components/FamilyEditGate';
 type Spin = { topic: string; kind: Kind; spunAt?: string };
 type State = { week: string; current: Record<string, Spin>; history: Record<string, { week: string; topic: string; kind: Kind }[]> };
 
-const N = 28, STEP = 360 / N, R = 470, HUB = 118;
+const N = PEOPLE[0].slices.length, STEP = 360 / N, R = 470, HUB = 118;
 const COLORS = ['#1f4a45', '#b8612f', '#d9a441', '#6b4a7a', '#2b5d57', '#c2412d', '#4f6f8f', '#7d8b4e', '#8a5a3b'];
 const INKY = new Set(['#d9a441']);
 

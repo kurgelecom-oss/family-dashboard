@@ -1,5 +1,5 @@
 /* Present — the weekly presentation wheel (tk, 2 Nov 2026). One wheel per person,
-   28 slices: 24 topics from their life, 3 ⚡ shocks (things nobody here knows yet)
+   32 slices: 24 topics from their life, 4 🎁 gifts (a topic that serves one of the other two), 3 ⚡ shocks (things nobody here knows yet)
    and 1 black WILD card (the other two choose the topic). Edit freely; the server
    reads this same list, so a slice can only be drawn once per person, ever.
    Ansar's list follows the faith filter: no magic or fantasy, no "Christmas". */
@@ -43,6 +43,10 @@ export const PEOPLE: Person[] = [
       T('💤', 'Sleep: what happens at night'),
       S('⚡', 'The fungal network under every forest'),
       T('📦', 'How a product is made in China and shipped here'),
+      T('🎁', 'For Ansar: how to start a tiny business'),
+      T('🎁', 'For Nihal: reading our ad numbers in five minutes'),
+      T('🎁', 'For Ansar: the maths inside football'),
+      T('🎁', 'For Nihal: getting AI to do the boring jobs'),
     ],
   },
   {
@@ -75,6 +79,10 @@ export const PEOPLE: Person[] = [
       T('🌸', 'Maryam: the woman chosen above all'),
       S('⚡', 'How the stock market really works'),
       T('🎞️', 'Telling a story in 60 seconds'),
+      T('🎁', 'For Ansar: cooking a whole meal by yourself'),
+      T('🎁', 'For Taylan: how to switch off after work'),
+      T('🎁', 'For Ansar: drawing in 3D with perspective'),
+      T('🎁', 'For Taylan: ad copy that sounds human'),
     ],
   },
   {
@@ -107,6 +115,10 @@ export const PEOPLE: Person[] = [
       T('🐝', 'Bees and honey (Surah An-Nahl)'),
       S('⚡', 'How glass is made from sand'),
       T('💵', 'How money works'),
+      T('🎁', 'For Mum: the best ways to help me learn'),
+      T('🎁', 'For Dad: how a barcode tracks a parcel'),
+      T('🎁', 'For Mum: plants that clean the air at home'),
+      T('🎁', 'For Dad: five games we can play without screens'),
     ],
   },
 ];

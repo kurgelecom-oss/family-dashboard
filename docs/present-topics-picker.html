@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Present wheel — topic picker</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F7F3FA;--ink:#24123A;--gold:#E0A526;--mute:#6d6280;--line:#e4dcec;--card:#fff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 Inter,system-ui,sans-serif}
+header{background:var(--ink);color:#fff;padding:28px 20px 22px}header h1{font:800 28px/1.1 Fraunces,serif;margin:0 0 6px}
+header p{margin:0;color:#d9cfe6;max-width:760px}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px 60px}
+nav{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line);justify-content:center}
+nav a{text-decoration:none;color:var(--ink);font-weight:600;padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:#fff}
+nav a .n{color:var(--mute);font-weight:400;margin-left:6px}
+section{margin-top:28px}section h2{font:800 24px Fraunces,serif;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+section h2 i{width:14px;height:14px;border-radius:50%;display:inline-block}
+.sub{color:var(--mute);margin:0 0 12px}
+.row{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:8px}
+.row.changed{border-color:var(--gold);box-shadow:inset 4px 0 0 var(--gold)}
+.row.gift .cur::after{content:"gift";font-size:11px;font-weight:600;background:#fdf2d9;color:#8a5a00;border-radius:4px;padding:1px 6px;margin-left:8px}
+.row.shock .cur::after{content:"shock";font-size:11px;font-weight:600;background:#eee6f6;color:var(--ink);border-radius:4px;padding:1px 6px;margin-left:8px}
+.head{display:flex;gap:10px;align-items:baseline}.num{color:var(--mute);font-size:12px;min-width:22px}
+.opts{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0 32px}
+.opts label{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:14px}
+.opts label:has(input:checked){border-color:var(--ink);background:#efe8f6;font-weight:600}
+.opts input{accent-color:var(--ink);margin:0}
+.opts label.keep{color:var(--mute)}
+.note{margin:8px 0 0 32px;width:calc(100% - 32px);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:inherit;font-size:14px;resize:vertical;min-height:34px}
+.secnote{width:100%;min-height:60px;border:1px dashed var(--gold);border-radius:10px;padding:10px;font:inherit;margin:4px 0 14px;background:#fffdf6}
+.status{position:fixed;right:14px;bottom:14px;background:var(--ink);color:#fff;border-radius:8px;padding:8px 12px;font-size:13px}
+.wild{color:var(--mute);font-style:italic}
+</style></head><body>
+<header><div class="wrap" style="padding:0">
+<h1>🎤 Present wheel: pick the topics</h1>
+<p>Every slice on each person's wheel, with three alternatives. Keep it, pick an alternative, or write what you want in the note box. Choices save as you click. Tell Claude "apply the picker" and the wheel gets updated. 🎁 gift slices are topics that serve one of the other two people.</p>
+</div></header>
+<nav id="nav"></nav>
+<div class="wrap" id="root"></div>
+<div class="status" id="status">Loading…</div>
+<script>
+const P=[
+{id:'taylan',name:'Taylan',hue:'#1f4a45',rows:[
+['🎯',"How Meta's ad auction picks a winner","Why one ad gets cheap clicks and another doesn't","How Google made money from search","The psychology of a scroll-stopping hook"],
+['🚚','The last mile: how a parcel reaches a door','How Amazon delivers in one day','Why the last mile is the most expensive part','A day in the life of a courier route'],
+['🕌','The golden age of Islamic science','Al-Khwarizmi and the birth of algebra','Ibn al-Haytham: the first scientist','Baghdad\'s House of Wisdom'],
+['📈','Compound interest and the first $10k','Why time beats talent in investing','Index funds vs picking stocks','How debt compounds against you'],
+['🤖','AI agents: can a business run itself?','How a large language model works','Jobs AI will create, not kill','Building a team of AI workers'],
+['🏙️','Istanbul: 2,700 years of one city','Constantinople 1453: the conquest','The Hagia Sophia through history','How the Bosphorus shaped the world'],
+['🧠','How habits are built in the brain','Dopamine: the motivation molecule','Breaking a bad habit for good','Willpower: is it real?'],
+['🛒','How Shopify ended up behind millions of stores','How Amazon became the everything store','The rise and fall of dropshipping','Why Etsy works for makers'],
+['⚡','Nuclear fusion: making a star on Earth','How a nuclear power plant works','Black holes: where physics breaks','Quantum computers explained'],
+['🗡️','Salahuddin: the life of a just leader','Umar ibn al-Khattab: justice in power','Sultan Mehmed II: the young conqueror','Ertuğrul and the birth of the Ottomans'],
+['🤝','Negotiation: getting to yes','How to win an argument without a fight','The art of the hard conversation','How hostage negotiators work'],
+['🚢','How a container crosses the world','The Suez Canal: one ditch, global trade','Why one stuck ship stopped the world','How ports run 24/7'],
+['✍️','Persuasion: why people actually buy','Cialdini\'s six principles of influence','Why price endings like .99 work','Storytelling that sells'],
+['👨‍👦','What great fathers do differently','Raising a confident son','The Prophet ﷺ as a father','Fathers and screen time'],
+['🌙','Fasting: what science says about Ramadan','Intermittent fasting vs Ramadan','What the body does in 24 hours without food','The spiritual side of hunger'],
+['🏛️','The Ottoman Empire at its peak','Suleiman the Magnificent','Why the Ottoman Empire fell','Mimar Sinan: the master architect'],
+['💥','Five famous business failures and why','Kodak: inventing the future and losing it','Blockbuster vs Netflix','Why most startups die'],
+['🧑‍✈️','Hiring and keeping great people','How to run a great team meeting','What makes people quit','Building a culture people want'],
+['⚡','How the pyramids were really built','Stonehenge: who and why','The lost city of Petra','How the Romans built roads that last'],
+['🔋','How an electric car works','How batteries store energy','Solar power: sunlight to plug','Will hydrogen cars win?'],
+['🌏','Melbourne: how our city grew','The gold rush that built Victoria','How Australia was federated','Melbourne\'s laneways and trams'],
+['🧾','Family trusts: how tax actually works','How GST works for a small business','Super: Australia\'s retirement system','How the ATO decides what\'s deductible'],
+['📚','How the brain learns (for homeschool)','Spaced repetition: learning that sticks','Why play is serious learning','The best age to learn a language'],
+['🕰️','Sabr: patience in the Quran','Shukr: gratitude that changes you','Tawakkul: trust after effort','The story of Prophet Ayyub'],
+['💤','Sleep: what happens at night','Why we dream','Caffeine and the body clock','How elite athletes sleep'],
+['⚡','The fungal network under every forest','The deepest point in the ocean','Tardigrades: animals that survive space','Why the sky is blue'],
+['📦','How a product is made in China and shipped here','How Yiwu became the world\'s market','How a factory quality-checks a product','From idea to prototype in 30 days'],
+['🎁','For Ansar: how to start a tiny business','For Ansar: what a CEO actually does','For Ansar: how a shop decides its prices','For Ansar: saving vs spending'],
+['🎁','For Nihal: reading our ad numbers in five minutes','For Nihal: what makes a customer come back','For Nihal: our business in one picture','For Nihal: how to pick the next product'],
+['🎁','For Ansar: the maths inside football','For Ansar: how a footballer\'s body works','For Ansar: the physics of a perfect free kick','For Ansar: World Cup history'],
+['🎁','For Nihal: getting AI to do the boring jobs','For Nihal: five AI tools for homeschool','For Nihal: how to write a great AI prompt','For Nihal: automating the family calendar'],
+]},
+{id:'nihal',name:'Nihal',hue:'#b8612f',rows:[
+['🎬','What makes an ad stop the scroll','The first three seconds of a video','Why UGC beats polished ads','Faces vs products in ads'],
+['🎨','Colour psychology: why colours sell','Why every fast-food logo is red','Colour in Islamic art and tiles','Choosing a palette for a brand'],
+['🔎','How to spot a winning product','Reading reviews to find what buyers want','Trends: fad or here to stay?','Products that solve a real pain'],
+['🏫','Homeschooling around the world','A day at a Finnish school','Unschooling: learning without lessons','Famous people who were homeschooled'],
+['📖','How children learn to read','Phonics vs whole words','Building a reading habit at home','Why read-alouds matter at every age'],
+['🧩','Montessori vs classical education','Charlotte Mason: living books','Waldorf: learning with hands','The Islamic tradition of learning'],
+['🥗','What a growing child needs to eat','Sugar: what it really does','Protein for kids: how much?','Healthy lunchbox ideas that get eaten'],
+['🏛️','Fatima al-Fihri and the first university','Women scholars of Islam','Al-Azhar: 1,000 years of learning','Rufaida al-Aslamia: the first nurse'],
+['⚡','How rockets reach orbit','How the James Webb telescope sees the past','Living on the space station','Could we live on Mars?'],
+['🐪','Khadijah: the businesswoman','Aisha: the teacher of the Ummah','Asiya: faith in Pharaoh\'s palace','Sumayyah: the first martyr'],
+['📱','How the TikTok algorithm picks videos','How Instagram decides your feed','Why YouTube Shorts took off','Screen time: what the research says'],
+['📷','Light and angles: taking a great photo','Phone photography tricks','Product photos that sell','Golden hour and why it works'],
+['⏰','Designing a day that works','Time blocking for a busy mum','Morning routines of busy people','The 80/20 rule at home'],
+['🍳','Turkish breakfast: history on a table','The story of Turkish coffee','Baklava: who really invented it?','Spices that changed history'],
+['🧭','The Silk Road','The spice trade','Andalusia: Muslim Spain','Timbuktu: city of books'],
+['🦠','Gut health: the second brain','Probiotics: hype or help?','Fermented foods around the world','How stress affects the body'],
+['🛋️','Making a home feel calm','Decluttering: the KonMari method','Lighting that changes a room','Designing a kids\' learning corner'],
+['🖋️','Islamic calligraphy','Iznik tiles and Turkish ceramics','Ebru: Turkish marbling art','Geometric patterns in Islamic art'],
+['⚡','Sharks: 400 million years of design','Octopuses: the ocean\'s geniuses','Deep-sea creatures that glow','Coral reefs: cities under the sea'],
+['🧠','How to remember anything','Memory palaces','Why we forget','Hafiz: how people memorise the Quran'],
+['🌱','Growing food at home','Composting: turning scraps to soil','A herb garden on a balcony','How seeds know when to grow'],
+['😊','The science of happiness','Gratitude journals: do they work?','Why kindness is good for you','What makes friendships last'],
+['💬','Who buys from us, and why','What our customers say in reviews','Why people leave a cart','Turning a buyer into a fan'],
+['💰','A household budget that works','Saving on groceries without cutting quality','Teaching kids about money','Planning a family holiday on budget'],
+['🌸','Maryam: the woman chosen above all','Hajar and the well of Zamzam','Umm Salamah: wise counsel','Nusaybah: the shield of the Prophet ﷺ'],
+['⚡','How the stock market really works','How banks create money','What causes inflation','Bitcoin explained simply'],
+['🎞️','Telling a story in 60 seconds','How Pixar builds a story','Editing tricks that keep people watching','Writing a great caption'],
+['🎁','For Ansar: cooking a whole meal by yourself','For Ansar: baking bread from scratch','For Ansar: kitchen science','For Ansar: a picnic you plan yourself'],
+['🎁','For Taylan: how to switch off after work','For Taylan: rest days that actually rest','For Taylan: a phone-free evening routine','For Taylan: walking as thinking time'],
+['🎁','For Ansar: drawing in 3D with perspective','For Ansar: how cartoons are animated','For Ansar: drawing faces step by step','For Ansar: comic strips that tell a story'],
+['🎁','For Taylan: ad copy that sounds human','For Taylan: what mums notice in an ad','For Taylan: photos that make a product look real','For Taylan: one week of creative ideas'],
+]},
+{id:'ansar',name:'Ansar',hue:'#6b4a7a',rows:[
+['🌋',"Volcanoes: Earth's hot heart",'Earthquakes: when the ground moves','How mountains are made','Geysers and hot springs'],
+['🦖','What fossils tell us about dinosaurs','How a fossil forms','The biggest dinosaurs ever found','Why the dinosaurs disappeared'],
+['✈️','How planes fly','How helicopters hover','Gliders: flying with no engine','How an airport works'],
+['🪐','A tour of the solar system','Why Saturn has rings','The Sun: our star','Comets and asteroids'],
+['❤️','The human heart','The lungs: how we breathe','The brain: our control centre','Bones: the body\'s frame'],
+['🌾','Prophet Yusuf and the seven years','Prophet Musa and the sea','Prophet Ibrahim and the fire','Prophet Sulayman and the ants'],
+['🛶','Prophet Nuh and the ark','Prophet Yunus and the whale','Prophet Dawud and the iron','Prophet Isa: a sign for people'],
+['🐜','Ants: tiny engineers','Termites: builders of towers','Spiders and their silk','Butterflies: from egg to wing'],
+['⚡','The cables that carry the internet under the sea','How Wi-Fi travels through walls','How a phone call reaches someone','Satellites: how GPS finds you'],
+['⚽','How a pro footballer trains','What footballers eat','How a football is made','Goalkeepers: the hardest job'],
+['🐋','Whales: the biggest animals ever','Dolphins: smart and playful','Penguins: birds that swim','Sea turtles\' long journey'],
+['🤖','How robots work','Robots on Mars','How a drone flies','Build a robot from cardboard'],
+['🕋','The Kaaba and Hajj','The story of Zamzam','Masjid al-Aqsa','The first masjid in Madinah'],
+['🏺','Ancient Egypt','Mummies: how and why','Hieroglyphs: picture writing','The Nile: river of life'],
+['🌳','The rainforest','Deserts: life with no rain','Coral reefs','Antarctica: the frozen continent'],
+['🚗','How a car engine works','How brakes stop a car','How tyres grip the road','Trains: how they run on rails'],
+['🦘',"Australia's amazing animals",'Platypus: the strangest animal','Koalas and eucalyptus','The Great Barrier Reef'],
+['🌉','How bridges hold up','How skyscrapers stand tall','Tunnels under the sea','The tallest towers in the world'],
+['⚡','Microbes: the invisible world','How a microscope works','Why we get sick, and how we get better','Mould: friend or foe?'],
+['⛈️','Where storms come from','Lightning and thunder','How rainbows form','Cyclones: giant spinning storms'],
+['🦷','Teeth: why we brush','How our eyes see','How our ears hear','Why we need water'],
+['🔐','Codes and secret messages','Morse code','How passwords keep us safe','Breaking a code with maths'],
+['🚀','The Moon landing','Why the Moon changes shape','The first person in space','How astronauts eat and sleep'],
+['🧭','Ibn Battuta: the great traveller','Al-Idrisi: the map maker','Zheng He: the treasure fleet','Captain Cook\'s voyage'],
+['🐝','Bees and honey (Surah An-Nahl)','Birds and migration','Camels: built for the desert','Spiders in the Quran (Surah Al-Ankabut)'],
+['⚡','How glass is made from sand','How paper is made from trees','How chocolate is made','How a pencil gets its lead'],
+['💵','How money works','Why we save','How a bank keeps money','Zakat: sharing what we have'],
+['🎁','For Mum: the best ways to help me learn','For Mum: what I love learning most','For Mum: a lesson I want to teach you','For Mum: my perfect school day'],
+['🎁','For Dad: how a barcode tracks a parcel','For Dad: how a delivery truck is packed','For Dad: how traffic lights decide','For Dad: maps and the fastest route'],
+['🎁','For Mum: plants that clean the air at home','For Mum: how to grow a plant from a seed','For Mum: why flowers smell','For Mum: herbs we can grow'],
+['🎁','For Dad: five games we can play without screens','For Dad: a family quiz I wrote','For Dad: how chess began','For Dad: a treasure hunt I designed'],
+]},
+];
+const $=s=>document.querySelector(s), esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let db=null, state={};
+function render(){
+ $('#nav').innerHTML=P.map(p=>`<a href="#${p.id}"><span style="color:${p.hue}">●</span> ${p.name}<span class="n" id="c-${p.id}"></span></a>`).join('');
+ $('#root').innerHTML=P.map(p=>`<section id="${p.id}"><h2><i style="background:${p.hue}"></i>${p.name}</h2>
+ <p class="sub">${p.rows.length} topics + 🃏 wild card (the other two choose — no alternatives needed).</p>
+ <textarea class="secnote" data-k="${p.id}-section" placeholder="Anything for ${p.name}'s whole wheel (add, remove, a theme to lean into)…"></textarea>
+ ${p.rows.map((r,i)=>{const k=p.id+'-'+i, kind=r[0]==='🎁'?'gift':r[0]==='⚡'?'shock':'';return `<div class="row ${kind}" id="r-${k}">
+  <div class="head"><span class="num">${i+1}</span><span class="cur">${r[0]} ${esc(r[1])}</span></div>
+  <div class="opts">${[1,2,3,4].map(j=>`<label class="${j===1?'keep':''}"><input type="radio" name="${k}" value="${j}" ${j===1?'checked':''}>${j===1?'Keep':esc(r[j])}</label>`).join('')}</div>
+  <textarea class="note" data-k="${k}" placeholder="Or write your own / a tweak…" rows="1"></textarea></div>`}).join('')}
+ </section>`).join('');
+ document.addEventListener('change',e=>{if(e.target.type==='radio')save(e.target.name,{choice:+e.target.value})});
+ document.addEventListener('input',e=>{if(e.target.dataset.k){clearTimeout(e.target._t);e.target._t=setTimeout(()=>save(e.target.dataset.k,{note:e.target.value}),600)}});
+}
+function paint(){
+ for(const [k,v] of Object.entries(state)){
+  if(v.choice){const el=document.querySelector(`input[name="${k}"][value="${v.choice}"]`); if(el) el.checked=true}
+  const ta=document.querySelector(`textarea[data-k="${k}"]`); if(ta&&document.activeElement!==ta&&v.note!=null) ta.value=v.note;
+ }
+ for(const p of P){let n=0;p.rows.forEach((_,i)=>{const v=state[p.id+'-'+i]||{};const ch=(v.choice&&v.choice>1)||(v.note||'').trim();document.getElementById('r-'+p.id+'-'+i).classList.toggle('changed',!!ch);if(ch)n++});$('#c-'+p.id).textContent=n?n+' changed':''}
+}
+async function save(k,patch){
+ state[k]={...(state[k]||{}),...patch};paint();
+ if(!db){$('#status').textContent='Not saved: sign in to claude.ai to save';return}
+ try{$('#status').textContent='Saving…';await db.doc('picks/'+k).set({...state[k],at:new Date().toISOString()});$('#status').textContent='Saved ✓'}
+ catch(e){$('#status').textContent='Save failed: '+(e.message||e)}
+}
+render();
+(async()=>{
+ const t=setTimeout(()=>{$('#status').textContent='Offline: choices will not save'},10000);
+ try{db=window.claude?await claude.use('db'):null}catch{db=null}
+ if(!db){clearTimeout(t);$('#status').textContent='Not signed in: choices will not save';return}
+ db.collection('picks').onSnapshot(snap=>{clearTimeout(t);snap.docs.forEach(d=>state[d.id]={...(state[d.id]||{}),...d.data()});paint();$('#status').textContent='Saved choices loaded ✓'},err=>{clearTimeout(t);$('#status').textContent='Load failed: '+(err.message||err)});
+})();
+</script></body></html>
