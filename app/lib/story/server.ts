@@ -34,7 +34,7 @@ export function reminderRecipients(raw=process.env.FAMILY_REMINDER_TO||''){
  return raw.split(',').map(x=>x.trim().split(':')).filter(([m,e])=>isMember(m)&&/^[^\s@]+@[^\s@]+$/.test(e||'')).map(([m,e])=>({member:m as MemberId,email:e}));
 }
 
-async function gmail(to:string,subject:string,html:string){
+export async function gmail(to:string,subject:string,html:string){
  const key=process.env.FAMILY_COMPOSIO_API_KEY,account=process.env.FAMILY_GMAIL_ACCOUNT_ID;
  if(!key||!account)throw new Error('Email is not configured: set FAMILY_COMPOSIO_API_KEY and FAMILY_GMAIL_ACCOUNT_ID');
  const r=await fetch('https://backend.composio.dev/api/v3/tools/execute/GMAIL_SEND_EMAIL',{method:'POST',signal:AbortSignal.timeout(20000),

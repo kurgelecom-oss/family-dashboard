@@ -222,6 +222,8 @@ export default function PresentWheel() {
       if (res.kind === 'wild') gong(); else if (res.kind === 'shock') shock(); else fanfare();
       setTimeout(() => setFx(null), res.kind === 'topic' ? 900 : 2200);
       setTimeout(() => setResult({ topic: res.topic, kind: res.kind, person, fresh: true }), res.kind === 'topic' ? 700 : 1500);
+      // Email the week plan once the wheel has landed (server sends at most once per spin).
+      void fetch('/api/present/email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ person: person.id }) }).catch(() => {});
       void load();
     };
     requestAnimationFrame(frame);
@@ -306,7 +308,7 @@ export default function PresentWheel() {
             </header>
             <div className="pw-card-emoji">{slice.e}</div>
             <h2 id="pw-topic">{result.kind === 'wild' ? 'The family chooses your topic' : result.topic}</h2>
-            <p className="pw-card-sub">{result.kind === 'wild' ? `${PEOPLE.filter(p => p.id !== result.person.id).map(p => p.name).join(' and ')} pick it tonight. No vetoes.` : result.kind === 'shock' ? 'You know nothing about this yet. That is the point.' : `Present it on Friday night.`}</p>
+            <p className="pw-card-sub">{result.kind === 'wild' ? `${PEOPLE.filter(p => p.id !== result.person.id).map(p => p.name).join(' and ')} pick it tonight. No vetoes.` : result.kind === 'shock' ? 'You know nothing about this yet. That is the point.' : `Present it on Friday night. The plan and Claude prompts are in your email.`}</p>
             <ol className="pw-starter">{STARTER.map(([h, d], i) => <li key={h} style={{ animationDelay: `${0.35 + i * 0.08}s` }}><b>{h}</b><span>{d}</span></li>)}</ol>
             <footer>
               <button className="pw-btn" onClick={() => setResult(null)} autoFocus>Let&rsquo;s go</button>
