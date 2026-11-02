@@ -1,0 +1,29 @@
+/* End-of-day wrap — one calm card, ~88% of the room's screen. */
+.eod{position:fixed;inset:0;z-index:4000;display:grid;place-items:center;background:rgba(8,10,10,.72);animation:eod-fade 1.6s ease both;cursor:pointer}
+.eod.out{animation:eod-fade-out .9s ease-in both}
+.eod-card{width:88vw;height:88vh;box-sizing:border-box;border-radius:28px;background:radial-gradient(120% 90% at 50% 0%,#1c2423 0%,#111615 60%,#0c100f 100%);color:#efe9dd;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:6vh 6vw;box-shadow:0 40px 120px rgba(0,0,0,.55),inset 0 0 0 1px rgba(239,233,221,.07);
+  animation:eod-rise 1.8s .15s cubic-bezier(.16,1,.3,1) both;cursor:default}
+.eod.out .eod-card{animation:eod-sink .9s ease-in both}
+.eod-moon{width:clamp(40px,4.4vw,72px);height:auto;margin-bottom:4vh}
+.eod-moon path{fill:none;stroke:#d9a441;stroke-width:2;stroke-linejoin:round;stroke-dasharray:160;stroke-dashoffset:160;animation:eod-draw 2.4s .8s ease-out forwards}
+.eod-eye{margin:0 0 2.4vh;font:600 clamp(12px,1vw,17px)/1 Inter,system-ui,sans-serif;letter-spacing:.22em;text-transform:uppercase;color:#8f9a96}
+.eod-card h1{margin:0;font:400 clamp(48px,8.4vw,150px)/.98 Fraunces,Georgia,serif;letter-spacing:-.02em;color:#f6f1e7}
+.eod-sub{margin:2.6vh 0 0;font:400 clamp(16px,1.6vw,28px)/1.4 Inter,system-ui,sans-serif;color:#b9bfbb}
+.eod-rule{display:block;width:clamp(48px,5vw,90px);height:1px;background:#d9a441;margin:5vh 0;transform-origin:center;animation:eod-line 1.4s 1.2s cubic-bezier(.16,1,.3,1) both}
+.eod-steps{list-style:none;margin:0;padding:0;display:flex;gap:clamp(24px,5vw,96px);flex-wrap:wrap;justify-content:center}
+.eod-steps li{display:flex;align-items:baseline;gap:14px;font:500 clamp(17px,1.8vw,32px)/1.3 Inter,system-ui,sans-serif;color:#efe9dd;opacity:0;animation:eod-in 1s ease-out forwards}
+.eod-steps li:nth-child(1){animation-delay:1.6s}.eod-steps li:nth-child(2){animation-delay:1.9s}
+.eod-steps span{font:400 clamp(14px,1.2vw,20px)/1 Fraunces,Georgia,serif;color:#d9a441;letter-spacing:.06em}
+.eod-foot{margin:6vh 0 0;font:italic 400 clamp(15px,1.4vw,24px)/1.4 Fraunces,Georgia,serif;color:#8f9a96;opacity:0;animation:eod-in 1.2s 2.4s ease-out forwards}
+.eod-btn{all:unset;margin-top:4vh;cursor:pointer;font:600 clamp(13px,1vw,17px)/1 Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#efe9dd;padding:14px 26px;border-radius:999px;box-shadow:inset 0 0 0 1px rgba(239,233,221,.22);transition:box-shadow .3s,background .3s;opacity:0;animation:eod-in 1s 2.8s ease-out forwards}
+.eod-btn:hover{background:rgba(239,233,221,.06);box-shadow:inset 0 0 0 1px rgba(239,233,221,.45)}
+.eod-btn:focus-visible{outline:2px solid #d9a441;outline-offset:4px}
+@keyframes eod-fade{from{opacity:0}to{opacity:1}}
+@keyframes eod-fade-out{to{opacity:0}}
+@keyframes eod-rise{from{opacity:0;transform:translateY(3vh) scale(.98)}to{opacity:1;transform:none}}
+@keyframes eod-sink{to{opacity:0;transform:scale(.985)}}
+@keyframes eod-draw{to{stroke-dashoffset:0}}
+@keyframes eod-line{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes eod-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.eod,.eod-card,.eod-steps li,.eod-foot,.eod-btn,.eod-rule,.eod-moon path{animation:none!important;opacity:1;stroke-dashoffset:0}}

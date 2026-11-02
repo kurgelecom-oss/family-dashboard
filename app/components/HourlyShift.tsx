@@ -78,7 +78,8 @@ export default function HourlyShift() {
     const tick = () => {
       if (path !== '/' || document.hidden || trip.current) return;
       const k = hourKey();
-      if (minuteNow() === 0 && fired.current !== k) { fired.current = k; void eventsLeftToday().then(any => { if (any && !trip.current) go('/board'); }); }
+      // 10 pm on is the end-of-day wrap's (EndOfDay.tsx); the calendar doesn't take the TV after it.
+      if (minuteNow() === 0 && Number(k.slice(-2)) < 22 && Number(k.slice(-2)) >= 5 && fired.current !== k) { fired.current = k; void eventsLeftToday().then(any => { if (any && !trip.current) go('/board'); }); }
     };
     if (path === '/' && new URLSearchParams(window.location.search).get('shift') === 'now') { history.replaceState(null, '', '/'); go('/board'); }
     const i = setInterval(tick, 5000);
