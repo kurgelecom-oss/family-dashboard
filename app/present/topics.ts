@@ -1,21 +1,20 @@
 /* Present — the weekly presentation wheel (tk, 2 Nov 2026). One wheel per person,
-   32 slices: 24 topics from their life, 4 🎁 gifts (a topic that serves one of the other two), 3 ⚡ shocks (things nobody here knows yet)
-   and 1 black WILD card (the other two choose the topic). Edit freely; the server
+   32 slices: 25 topics from their life, 4 🎁 gifts (a topic that serves one of the other two)
+   and 3 ⚡ shocks (things nobody here knows yet). Edit freely; the server
    reads this same list, so a slice can only be drawn once per person, ever.
    Ansar's list follows the faith filter: no magic or fantasy, no "Christmas". */
 
-export type Kind = 'topic' | 'shock' | 'wild';
+export type Kind = 'topic' | 'shock';
 export type Slice = { t: string; e: string; k: Kind };
 export type Person = { id: 'taylan' | 'nihal' | 'ansar'; name: string; hue: string; slices: Slice[] };
 
 const T = (e: string, t: string): Slice => ({ e, t, k: 'topic' });
 const S = (e: string, t: string): Slice => ({ e, t, k: 'shock' });
-const WILD: Slice = { e: '🃏', t: 'Wild card: the other two choose your topic', k: 'wild' };
 
 export const PEOPLE: Person[] = [
   {
     id: 'taylan', name: 'Taylan', hue: '#1f4a45', slices: [
-      WILD,
+      T('🐫', 'The Hijrah: building Madinah from nothing'),
       T('🎯', "How Meta's ad auction picks a winner"),
       T('🚚', 'The last mile: how a parcel reaches a door'),
       T('🕌', 'The golden age of Islamic science'),
@@ -51,7 +50,7 @@ export const PEOPLE: Person[] = [
   },
   {
     id: 'nihal', name: 'Nihal', hue: '#b8612f', slices: [
-      WILD,
+      T('🧶', 'Turkish carpets: the maths in the knots'),
       T('🎬', 'What makes an ad stop the scroll'),
       T('🎨', 'Colour psychology: why colours sell'),
       T('🔎', 'How to spot a winning product'),
@@ -87,7 +86,7 @@ export const PEOPLE: Person[] = [
   },
   {
     id: 'ansar', name: 'Ansar', hue: '#6b4a7a', slices: [
-      WILD,
+      T('🦅', 'How birds find their way when they migrate'),
       T('🌋', "Volcanoes: Earth's hot heart"),
       T('🐪', 'Camels: built for the desert'),
       T('✈️', 'How planes fly'),

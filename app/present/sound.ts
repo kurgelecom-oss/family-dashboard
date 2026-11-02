@@ -72,13 +72,6 @@ export function shock() {
   for (let i = 0; i < 9; i++) { const n = noise(c, 0.04), hg = c.createGain(), hf = c.createBiquadFilter(); hf.type = 'highpass'; hf.frequency.value = 3000; env(c, hg, t + 0.15 + Math.random() * 0.8, 0.4, 0.001, 0.03); n.connect(hf).connect(hg).connect(out); n.start(t + 0.1 + i * 0.09); }
 }
 
-/** Wild card: lights-out gong. */
-export function gong() {
-  if (muted) return; const { ctx: c, out } = audio(), t = c.currentTime;
-  [[82, 0.5], [164.8, 0.25], [221, 0.18], [302, 0.12], [391, 0.08], [557, 0.05]].forEach(([f, p]) => note(c, out, f, t, 4.5, 'sine', p));
-  const n = noise(c, 0.3), g = c.createGain(), fl = c.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = 1200; env(c, g, t, 0.3, 0.002, 0.3); n.connect(fl).connect(g).connect(out); n.start(t);
-}
-
 /** Soft chime when switching person. */
 export function chime() {
   if (muted) return; const { ctx: c, out } = audio(), t = c.currentTime;

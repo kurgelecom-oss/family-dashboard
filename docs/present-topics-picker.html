@@ -143,7 +143,7 @@ let db=null, state={};
 function render(){
  $('#nav').innerHTML=P.map(p=>`<a href="#${p.id}"><span style="color:${p.hue}">●</span> ${p.name}<span class="n" id="c-${p.id}"></span></a>`).join('');
  $('#root').innerHTML=P.map(p=>`<section id="${p.id}"><h2><i style="background:${p.hue}"></i>${p.name}</h2>
- <p class="sub">${p.rows.length} topics + 🃏 wild card (the other two choose — no alternatives needed).</p>
+ <p class="sub">${p.rows.length} slices.</p>
  <textarea class="secnote" data-k="${p.id}-section" placeholder="Anything for ${p.name}'s whole wheel (add, remove, a theme to lean into)…"></textarea>
  ${p.rows.map((r,i)=>{const k=p.id+'-'+i, kind=r[0]==='🎁'?'gift':r[0]==='⚡'?'shock':'';return `<div class="row ${kind}" id="r-${k}">
   <div class="head"><span class="num">${i+1}</span><span class="cur">${r[0]} ${esc(r[1])}</span></div>

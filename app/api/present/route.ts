@@ -41,8 +41,8 @@ export async function POST(request: Request) {
   const { week, current, history } = await state();
   if (current[person.id]) return NextResponse.json({ error: 'Already spun this week', ...current[person.id] }, { status: 409, headers: noStore });
   const drawn = new Set(history[person.id].map(h => h.topic));
-  // The wild card can come up again; a topic or shock only once per person, ever.
-  const open = person.slices.map((s, i) => ({ s, i })).filter(({ s }) => s.k === 'wild' || !drawn.has(s.t));
+  // A topic or shock comes up only once per person, ever.
+  const open = person.slices.map((s, i) => ({ s, i })).filter(({ s }) => !drawn.has(s.t));
   const pick = open[Math.floor(Math.random() * open.length)];
   const res = await familyDb()`insert into fds_present_spins (workspace, person, week_start, topic, kind) values (${familyWorkspace()}, ${person.id}, ${week}, ${pick.s.t}, ${pick.s.k}) on conflict do nothing returning topic`;
   if (!res.length) return NextResponse.json({ error: 'Already spun this week' }, { status: 409, headers: noStore });

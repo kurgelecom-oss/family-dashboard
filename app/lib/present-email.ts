@@ -5,7 +5,7 @@ import { personById, STARTER, type Kind } from '../present/topics';
    its own "stage" palette (aubergine + spotlight gold) so it never reads as a
    school report. Tables + inline styles only: Gmail, Outlook and Apple Mail. */
 
-const C = { page: '#F7F3FA', card: '#FFFFFF', line: '#E6DDEE', ink: '#24123A', muted: '#76688A', plum: '#6B3FA0', gold: '#E0A526', shock: '#FFD23F', wild: '#0D0D0D' };
+const C = { page: '#F7F3FA', card: '#FFFFFF', line: '#E6DDEE', ink: '#24123A', muted: '#76688A', plum: '#6B3FA0', gold: '#E0A526', shock: '#FFD23F' };
 const FONT = "-apple-system,'Segoe UI',Roboto,Arial,sans-serif";
 const esc = (s: unknown) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const t = (size: number, color: string, extra = '') => `font-size:${size}px;color:${color};${extra}`;
@@ -28,13 +28,11 @@ export function presentEmail(personId: string, topic: string, kind: Kind, week: 
   const mon = new Date(week + 'T00:00:00Z'), due = new Date(mon.getTime() + 7 * 86_400_000);
   const range = `Spun Mon ${mon.getUTCDate()} ${fmt(mon, { month: 'short' })} · present Monday night ${due.getUTCDate()} ${fmt(due, { month: 'short', year: 'numeric' })}`;
   const slice = p.slices.find(s => s.t === topic);
-  const T = kind === 'wild' ? '[the topic the family chose]' : topic;
-  const others = ['taylan', 'nihal', 'ansar'].filter(x => x !== p.id).map(x => personById(x)!.name).join(' and ');
+  const T = topic;
 
-  const headline = kind === 'wild' ? 'Wild card. The family chooses your topic.' : topic;
-  const pill = kind === 'wild' ? { txt: '🃏 WILD CARD', bg: C.wild, fg: C.gold } : kind === 'shock' ? { txt: '⚡ SHOCK CHALLENGE', bg: C.shock, fg: C.ink } : { txt: 'YOUR TOPIC', bg: C.plum, fg: '#FFFFFF' };
-  const why = kind === 'wild' ? `${others} pick it tonight. No vetoes. Write it at the top of your notes, then follow this plan with it.`
-    : kind === 'shock' ? 'Nobody here knows this yet, you included. Start from zero. Next Monday night you teach it to us.'
+  const headline = topic;
+  const pill = kind === 'shock' ? { txt: '⚡ SHOCK CHALLENGE', bg: C.shock, fg: C.ink } : { txt: 'YOUR TOPIC', bg: C.plum, fg: '#FFFFFF' };
+  const why = kind === 'shock' ? 'Nobody here knows this yet, you included. Start from zero. Next Monday night you teach it to us.'
     : kid ? 'You have one week to become the family expert on this. Next Monday night you teach us.'
     : 'One week to go deep enough that you could teach it to a stranger. Next Monday night, you teach us.';
 
@@ -100,7 +98,7 @@ export function presentEmail(personId: string, topic: string, kind: Kind, week: 
   const body = [header, topicCard,
     card(`${kicker('The week, day by day')}${dayRow}<div style="padding-top:18px;border-top:1px solid ${C.line};margin-top:16px;"></div>${dayList}`),
     card(`${kicker('The five slides')}${numbered(STARTER.map(([h, d]) => ({ title: h, body: d })))}`),
-    card(`${kicker('Claude prompts, copy and paste')}${promptRows}<div style="${t(12, C.muted, 'line-height:1.5;padding-top:14px;')}">Open claude.ai, paste the prompt, and fill in anything in [brackets].${kind === 'wild' ? ' Replace [the topic the family chose] with your topic.' : ''}</div>`),
+    card(`${kicker('Claude prompts, copy and paste')}${promptRows}<div style="${t(12, C.muted, 'line-height:1.5;padding-top:14px;')}">Open claude.ai, paste the prompt, and fill in anything in [brackets].</div>`),
     card(`${kicker('How to do it well')}${numbered(guide, C.gold)}`),
     note, footer].join('\n');
 
@@ -114,8 +112,7 @@ ${body}
     ...days.map(([d, h, b]) => `- ${d} · ${h}: ${b}`), '', 'THE FIVE SLIDES', ...STARTER.map(([h, d], i) => `${i + 1}. ${h}: ${d}`), '',
     'CLAUDE PROMPTS', ...prompts.map(([h, q], i) => `${i + 1}. ${h}\n${q}\n`)].join('\n');
 
-  const subject = kind === 'wild' ? `🃏 ${p.name}, wild card: the family picks your topic this week`
-    : `${kind === 'shock' ? '⚡' : '🎤'} ${p.name}, your presentation this week: ${topic}`;
+  const subject = `${kind === 'shock' ? '⚡' : '🎤'} ${p.name}, your presentation this week: ${topic}`;
   return { subject, html, text };
 }
 

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './present.css';
 import { PEOPLE, STARTER, type Person, type Slice, type Kind } from './topics';
-import { tick, whoosh, roll, fanfare, shock, gong, chime, setMuted, audio } from './sound';
+import { tick, whoosh, roll, fanfare, shock, chime, setMuted, audio } from './sound';
 import { familyWrite } from '../components/FamilyEditGate';
 
 /* The Present wheel. The server picks the slice (fair, one spin a week, no
@@ -29,8 +29,8 @@ function slicePath(i: number) {
   const a0 = i * STEP - STEP / 2, a1 = a0 + STEP, [x0, y0] = polar(a0, R), [x1, y1] = polar(a1, R);
   return `M0 0 L${x0.toFixed(2)} ${y0.toFixed(2)} A${R} ${R} 0 0 1 ${x1.toFixed(2)} ${y1.toFixed(2)} Z`;
 }
-const fill = (s: Slice, i: number) => s.k === 'wild' ? 'url(#pw-wild)' : s.k === 'shock' ? 'url(#pw-shock)' : COLORS[i % COLORS.length];
-const ink = (s: Slice, i: number) => s.k === 'wild' ? '#e8c873' : s.k === 'shock' ? '#1d2322' : INKY.has(COLORS[i % COLORS.length]) ? '#1d2322' : '#fbf8f2';
+const fill = (s: Slice, i: number) => s.k === 'shock' ? 'url(#pw-shock)' : COLORS[i % COLORS.length];
+const ink = (s: Slice, i: number) => s.k === 'shock' ? '#1d2322' : INKY.has(COLORS[i % COLORS.length]) ? '#1d2322' : '#fbf8f2';
 
 /** Presentation night: the Monday after the spin week (spin Monday night, present the next Monday night). */
 function presentNight(week: string) { const d = new Date(week + 'T00:00:00'); d.setDate(d.getDate() + 7); return d; }
@@ -40,9 +40,6 @@ function Wheel({ person, rot, drawn, flap, lit, spinning }: { person: Person; ro
   return (
     <svg className="pw-svg" viewBox="-540 -560 1080 1100" aria-hidden>
       <defs>
-        <radialGradient id="pw-wild" cx="0" cy="0" r={R} gradientUnits="userSpaceOnUse">
-          <stop offset="0.2" stopColor="#2a2a2a" /><stop offset="1" stopColor="#050505" />
-        </radialGradient>
         <pattern id="pw-shock" width="34" height="34" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
           <rect width="34" height="34" fill="#ffd23f" /><rect width="12" height="34" fill="#ffbf00" />
         </pattern>
@@ -65,16 +62,16 @@ function Wheel({ person, rot, drawn, flap, lit, spinning }: { person: Person; ro
       {/* Spinning face */}
       <g style={{ transform: `rotate(${rot}deg)` }}>
         {person.slices.map((s, i) => (
-          <g key={person.id + i} className={drawn.has(s.t) && s.k !== 'wild' ? 'pw-done' : ''}>
+          <g key={person.id + i} className={drawn.has(s.t) ? 'pw-done' : ''}>
             <path d={slicePath(i)} fill={fill(s, i)} stroke="#fbf8f2" strokeWidth="3" />
             <g transform={`rotate(${i * STEP})`}>
               <text x="0" y={-R + 52} textAnchor="middle" fontSize="38" className="pw-emoji">{s.e}</text>
-              <text transform={`translate(0 ${-R + 84}) rotate(90)`} fill={ink(s, i)} className={'pw-label k-' + s.k} style={s.k === 'wild' ? undefined : { fontSize: Math.min(19, Math.floor(560 / Math.max(...lines(s.t).map(l => l.length)))) }}>
-                {(s.k === 'wild' ? ['WILD', 'CARD'] : lines(s.t)).map((l, j, a) => (
+              <text transform={`translate(0 ${-R + 84}) rotate(90)`} fill={ink(s, i)} className={'pw-label k-' + s.k} style={{ fontSize: Math.min(19, Math.floor(560 / Math.max(...lines(s.t).map(l => l.length)))) }}>
+                {lines(s.t).map((l, j, a) => (
                   <tspan key={j} x="0" dy={j === 0 ? `${-(a.length - 1) * 0.55}em` : '1.1em'}>{l}</tspan>
                 ))}
               </text>
-              {drawn.has(s.t) && s.k !== 'wild' && <text x="0" y={-R + 250} textAnchor="middle" className="pw-stamp" transform={`rotate(90 0 ${-R + 250})`}>DONE</text>}
+              {drawn.has(s.t) && <text x="0" y={-R + 250} textAnchor="middle" className="pw-stamp" transform={`rotate(90 0 ${-R + 250})`}>DONE</text>}
             </g>
           </g>
         ))}
@@ -100,7 +97,7 @@ function Particles({ burst }: { burst: Burst | null }) {
     if (!burst || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const c = ref.current!, g = c.getContext('2d')!, dpr = Math.min(2, devicePixelRatio || 1);
     c.width = innerWidth * dpr; c.height = innerHeight * dpr; g.scale(dpr, dpr);
-    const palette = burst.kind === 'wild' ? ['#e8c873', '#f6e2b0', '#fff', '#b08a3a'] : burst.kind === 'shock' ? ['#ffd23f', '#fff', '#ffbf00', '#1d2322'] : ['#1f4a45', '#b8612f', '#d9a441', '#6b4a7a', '#c2412d', '#fbf8f2', '#2f8a57'];
+    const palette = burst.kind === 'shock' ? ['#ffd23f', '#fff', '#ffbf00', '#1d2322'] : ['#1f4a45', '#b8612f', '#d9a441', '#6b4a7a', '#c2412d', '#fbf8f2', '#2f8a57'];
     const cx = innerWidth / 2, cy = innerHeight * 0.45, n = burst.kind === 'topic' ? 260 : 180;
     const ps = Array.from({ length: n }, () => {
       const a = Math.random() * Math.PI * 2, v = 6 + Math.random() * (burst.kind === 'shock' ? 16 : 12);
@@ -111,10 +108,9 @@ function Particles({ burst }: { burst: Burst | null }) {
       g.clearRect(0, 0, innerWidth, innerHeight); let alive = 0;
       for (const p of ps) {
         if (p.life <= 0) continue; alive++;
-        p.vy += burst.kind === 'wild' ? 0.08 : 0.32; p.vx *= 0.985; p.x += p.vx; p.y += p.vy; p.s += p.w; p.life -= 0.0055;
+        p.vy += 0.32; p.vx *= 0.985; p.x += p.vx; p.y += p.vy; p.s += p.w; p.life -= 0.0055;
         g.save(); g.globalAlpha = Math.max(0, Math.min(1, p.life * 1.4)); g.translate(p.x, p.y); g.rotate(p.s); g.fillStyle = p.c;
-        if (burst.kind === 'wild') { g.beginPath(); for (let k = 0; k < 4; k++) { g.rotate(Math.PI / 2); g.lineTo(p.r, 0); g.lineTo(p.r * 0.25, p.r * 0.25); } g.fill(); }
-        else if (burst.kind === 'shock') { g.beginPath(); g.moveTo(-p.r * .4, -p.r); g.lineTo(p.r * .5, -p.r * .1); g.lineTo(0, 0); g.lineTo(p.r * .4, p.r); g.lineTo(-p.r * .5, p.r * .1); g.lineTo(0, 0); g.closePath(); g.fill(); }
+        if (burst.kind === 'shock') { g.beginPath(); g.moveTo(-p.r * .4, -p.r); g.lineTo(p.r * .5, -p.r * .1); g.lineTo(0, 0); g.lineTo(p.r * .4, p.r); g.lineTo(-p.r * .5, p.r * .1); g.lineTo(0, 0); g.closePath(); g.fill(); }
         else g.fillRect(-p.r / 2, -p.r / 4, p.r, p.r / 2 + Math.abs(Math.sin(p.s)) * p.r * 0.6);
         g.restore();
       }
@@ -139,6 +135,11 @@ export default function PresentWheel() {
   const [error, setError] = useState('');
   const [muted, setMute] = useState(false);
   const rotRef = useRef(0);
+  const anim = useRef(0); // bumping this cancels whatever animation is driving the wheel
+  const peg = useRef({ n: 0, t: 0 });
+  const wheelRef = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ a: number; samples: [number, number][] } | null>(null);
+  const [grabbing, setGrabbing] = useState(false);
 
   const load = useCallback(async () => {
     try { const r = await fetch('/api/present', { cache: 'no-store' }); if (r.ok) setData(await r.json()); else setError('Could not load this week'); }
@@ -161,8 +162,9 @@ export default function PresentWheel() {
 
   /** Ease the wheel to an angle without the full spin (switching person). */
   const glide = useCallback((target: number, ms = 900) => {
-    const from = rotRef.current, to = target + Math.round((from - target) / 360) * 360, t0 = performance.now();
+    const id = ++anim.current, from = rotRef.current, to = target + Math.round((from - target) / 360) * 360, t0 = performance.now();
     const step = (now: number) => {
+      if (anim.current !== id) return;
       const k = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - k, 3), r = from + (to - from) * e;
       rotRef.current = r; setRot(r); if (k < 1) requestAnimationFrame(step);
     };
@@ -171,6 +173,29 @@ export default function PresentWheel() {
 
   // When the data arrives or the person changes, settle on their spin (if any).
   useEffect(() => { if (data && !spinning) glide(restAngle(who, data.current[who.id])); }, [data, who]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Flapper click + tick sound each time a peg passes. speed 0..1, dir = which way the wheel turns. */
+  const pegTick = (r: number, speed: number, dir = 1) => {
+    const n = Math.floor((r + STEP / 2) / STEP);
+    if (n === peg.current.n) return;
+    peg.current.n = n; const now = performance.now();
+    if (now - peg.current.t > 28) { peg.current.t = now; tick(speed); setFlap(dir * (-22 - speed * 10)); setTimeout(() => setFlap(0), 60); }
+  };
+
+  /** After a play throw: the wheel coasts to a stop on friction, then goes back to this week's topic if there is one. */
+  function coast(v: number) {
+    const id = ++anim.current; let last = performance.now();
+    const step = (now: number) => {
+      if (anim.current !== id) return;
+      const dt = Math.min(50, now - last); last = now;
+      v *= Math.pow(0.999, dt);
+      const r = rotRef.current + v * dt; rotRef.current = r; setRot(r);
+      pegTick(r, Math.min(1, Math.abs(v) / 2), Math.sign(v) || 1);
+      if (Math.abs(v) > 0.004) requestAnimationFrame(step);
+      else if (mine) glide(restAngle(who, mine), 1200);
+    };
+    requestAnimationFrame(step);
+  }
 
   function pick(p: Person) {
     if (spinning || p.id === who.id) return;
@@ -189,16 +214,19 @@ export default function PresentWheel() {
       res = b;
     } catch { setError('No connection — spin not used'); return; }
 
+    const run = ++anim.current;
     setSpinning(true); whoosh();
     const person = who, start = rotRef.current;
     const jitter = (Math.random() - 0.5) * STEP * 0.7;
     const base = -res.index * STEP + jitter;
     const turns = reduce ? 1 : 7 + Math.floor(Math.random() * 3);
     const target = base + 360 * Math.ceil((start - base) / 360) + 360 * turns;
-    const windup = reduce ? 0 : 650, dur = reduce ? 1600 : 8200, t0 = performance.now();
-    let lastPeg = Math.floor((start + STEP / 2) / STEP), lastTick = 0, rolled = false;
+    const windup = reduce ? 0 : 650, dur = reduce ? 1600 : 8200;
+    const t0 = performance.now();
+    let rolled = false;
 
     const frame = (now: number) => {
+      if (anim.current !== run) return;
       const el = now - t0; let r: number;
       if (el < windup) { const k = el / windup; r = start - 14 * Math.sin(k * Math.PI / 2); }
       else {
@@ -208,18 +236,14 @@ export default function PresentWheel() {
         if (!rolled && k > 0.55) { rolled = true; roll(dur * 0.45 / 1000); }
       }
       rotRef.current = r; setRot(r);
-      const peg = Math.floor((r + STEP / 2) / STEP);
-      if (peg !== lastPeg) {
-        lastPeg = peg;
-        if (now - lastTick > 28) { lastTick = now; const k = Math.min(1, (el - windup) / dur); tick(Math.max(0, 1 - k)); setFlap(-22 - (1 - k) * 10); setTimeout(() => setFlap(0), 60); }
-      }
+      pegTick(r, Math.max(0, 1 - Math.min(1, (el - windup) / dur)));
       if (el < windup + dur) requestAnimationFrame(frame);
       else land();
     };
     const land = () => {
       setSpinning(false); setFlap(0);
       setFx(res.kind); setBurst({ kind: res.kind, key: Date.now() });
-      if (res.kind === 'wild') gong(); else if (res.kind === 'shock') shock(); else fanfare();
+      if (res.kind === 'shock') shock(); else fanfare();
       setTimeout(() => setFx(null), res.kind === 'topic' ? 900 : 2200);
       setTimeout(() => setResult({ topic: res.topic, kind: res.kind, person, fresh: true }), res.kind === 'topic' ? 700 : 1500);
       // Email the week plan once the wheel has landed (server sends at most once per spin).
@@ -227,6 +251,37 @@ export default function PresentWheel() {
       void load();
     };
     requestAnimationFrame(frame);
+  }
+
+  /* Grab the wheel for play: hold and drag it round, let go to throw it. Never uses the week's spin;
+     only the SPIN button (or Space) asks the server for a topic. */
+  const angleAt = (e: React.PointerEvent) => {
+    const b = wheelRef.current!.getBoundingClientRect();
+    return Math.atan2(e.clientY - (b.top + b.height * 560 / 1100), e.clientX - (b.left + b.width / 2)) * 180 / Math.PI;
+  };
+  function grab(e: React.PointerEvent<HTMLDivElement>) {
+    if (spinning || result || e.button !== 0 || (e.target as Element).closest('button')) return;
+    audio(); ++anim.current; setError('');
+    e.currentTarget.setPointerCapture(e.pointerId);
+    drag.current = { a: angleAt(e), samples: [[performance.now(), rotRef.current]] };
+    setGrabbing(true);
+  }
+  function turn(e: React.PointerEvent<HTMLDivElement>) {
+    const d = drag.current; if (!d) return;
+    const a = angleAt(e), delta = ((a - d.a + 540) % 360) - 180; d.a = a;
+    const r = rotRef.current + delta, now = performance.now();
+    rotRef.current = r; setRot(r);
+    const [t1, r1] = d.samples[d.samples.length - 1];
+    pegTick(r, Math.min(1, Math.abs(r - r1) / Math.max(1, now - t1) / 2), Math.sign(delta) || 1);
+    d.samples.push([now, r]); while (d.samples.length > 2 && now - d.samples[0][0] > 90) d.samples.shift();
+  }
+  function release() {
+    const d = drag.current; if (!d) return;
+    drag.current = null; setGrabbing(false);
+    const now = performance.now(), [t0, r0] = d.samples[0], [t1, r1] = d.samples[d.samples.length - 1];
+    // Held still before letting go = no throw.
+    const v = now - t1 > 70 || t1 - t0 < 1 ? 0 : (r1 - r0) / (t1 - t0);
+    coast(v);
   }
 
   async function respin() {
@@ -258,7 +313,7 @@ export default function PresentWheel() {
             return (
               <button key={p.id} role="tab" aria-selected={p.id === who.id} className={'pw-tab' + (p.id === who.id ? ' on' : '')} style={{ ['--hue' as string]: p.hue }} onClick={() => pick(p)} disabled={spinning}>
                 <span className="pw-av">{p.name[0]}</span>
-                <span className="pw-tab-txt"><b>{p.name}</b><small>{c ? (c.kind === 'wild' ? '🃏 Wild card' : c.topic) : 'Ready to spin'}</small></span>
+                <span className="pw-tab-txt"><b>{p.name}</b><small>{c ? c.topic : 'Ready to spin'}</small></span>
                 <kbd>{i + 1}</kbd>
               </button>
             );
@@ -266,14 +321,15 @@ export default function PresentWheel() {
         </div>
         {(data?.history[who.id]?.length ?? 0) > 0 && (
           <div className="pw-hist"><h2>{who.name}&rsquo;s past topics</h2>
-            <ul>{data!.history[who.id].map(h => <li key={h.week}><span>{h.week.slice(5).split('-').reverse().join('/')}</span>{h.kind === 'wild' ? '🃏 Wild card' : h.topic}</li>)}</ul>
+            <ul>{data!.history[who.id].map(h => <li key={h.week}><span>{h.week.slice(5).split('-').reverse().join('/')}</span>{h.topic}</li>)}</ul>
           </div>
         )}
       </aside>
 
       <section className="pw-stage">
         <div className="pw-spot" aria-hidden />
-        <div className="pw-wheel" key={who.id}>
+        <div className={'pw-wheel' + (grabbing ? ' grabbing' : '') + (spinning ? '' : ' grabbable')} key={who.id} ref={wheelRef}
+          onPointerDown={grab} onPointerMove={turn} onPointerUp={release} onPointerCancel={release}>
           <Wheel person={who} rot={rot} drawn={drawn} flap={flap} lit={lit} spinning={spinning} />
           <button className={'pw-hub' + (mine ? ' spun' : '')} onClick={spin} disabled={spinning || !data} aria-label={mine ? `See ${who.name}'s topic` : `Spin for ${who.name}`}>
             <span>{!data ? '…' : spinning ? '' : mine ? 'SEE' : 'SPIN'}</span>
@@ -288,27 +344,26 @@ export default function PresentWheel() {
         <ul>
           <li><i style={{ background: 'var(--who)' }} /><span>One spin each, every week. The wheel decides.</span></li>
           <li><i className="sw-shock" /><span><b>⚡ Shock:</b> a subject none of us knows. Start from zero.</span></li>
-          <li><i className="sw-wild" /><span><b>🃏 Wild card:</b> the other two choose your topic.</span></li>
           <li><i className="sw-done" /><span>A topic you&rsquo;ve had is stamped DONE and never comes back.</span></li>
           <li><i className="sw-day" /><span>Present <b>next Monday night</b>{due && daysTo(due) >= 0 ? <> · {daysTo(due) === 0 ? 'tonight' : `${daysTo(due)} day${daysTo(due) === 1 ? '' : 's'} to go`}</> : null}.</span></li>
         </ul>
         <button className="pw-mute" onClick={toggleMute}>{muted ? '🔇 Sound off' : '🔊 Sound on'}</button>
-        <p className="pw-keys">Space to spin · 1 2 3 to switch</p>
+        <p className="pw-keys">Space to spin · drag the wheel to play · 1 2 3 to switch</p>
       </aside>
 
       <Particles burst={burst} />
-      {fx && fx !== 'topic' && <div className={'pw-banner b-' + fx} aria-hidden>{fx === 'wild' ? <>🃏<span>WILD CARD</span></> : <>⚡<span>SHOCK CHALLENGE</span></>}</div>}
+      {fx && fx !== 'topic' && <div className={'pw-banner b-' + fx} aria-hidden><>⚡<span>SHOCK CHALLENGE</span></></div>}
 
       {result && slice && (
         <div className="pw-modal" role="dialog" aria-modal aria-labelledby="pw-topic" onClick={() => setResult(null)}>
           <article className={'pw-card k-' + result.kind} onClick={e => e.stopPropagation()} style={{ ['--hue' as string]: result.person.hue }}>
             <header>
               <span className="pw-card-who">{result.person.name}&rsquo;s presentation · week of {data && new Date(data.week + 'T00:00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</span>
-              {result.kind !== 'topic' && <span className="pw-card-tag">{result.kind === 'wild' ? '🃏 Wild card' : '⚡ Shock challenge'}</span>}
+              {result.kind === 'shock' && <span className="pw-card-tag">⚡ Shock challenge</span>}
             </header>
             <div className="pw-card-emoji">{slice.e}</div>
-            <h2 id="pw-topic">{result.kind === 'wild' ? 'The family chooses your topic' : result.topic}</h2>
-            <p className="pw-card-sub">{result.kind === 'wild' ? `${PEOPLE.filter(p => p.id !== result.person.id).map(p => p.name).join(' and ')} pick it tonight. No vetoes.` : result.kind === 'shock' ? 'You know nothing about this yet. That is the point.' : `Present it next Monday night. The plan and Claude prompts are in your email.`}</p>
+            <h2 id="pw-topic">{result.topic}</h2>
+            <p className="pw-card-sub">{result.kind === 'shock' ? 'You know nothing about this yet. That is the point.' : `Present it next Monday night. The plan and Claude prompts are in your email.`}</p>
             <ol className="pw-starter">{STARTER.map(([h, d], i) => <li key={h} style={{ animationDelay: `${0.35 + i * 0.08}s` }}><b>{h}</b><span>{d}</span></li>)}</ol>
             <footer>
               <button className="pw-btn" onClick={() => setResult(null)} autoFocus>Let&rsquo;s go</button>
