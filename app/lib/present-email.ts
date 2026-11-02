@@ -25,8 +25,8 @@ const fmt = (d: Date, o: Intl.DateTimeFormatOptions) => d.toLocaleDateString('en
 export function presentEmail(personId: string, topic: string, kind: Kind, week: string): PresentMail {
   const p = personById(personId); if (!p) throw new Error('Unknown person');
   const kid = p.id === 'ansar';
-  const mon = new Date(week + 'T00:00:00Z'), fri = new Date(mon.getTime() + 4 * 86_400_000);
-  const range = `Mon ${mon.getUTCDate()} – Fri ${fri.getUTCDate()} ${fmt(fri, { month: 'short', year: 'numeric' })}`;
+  const mon = new Date(week + 'T00:00:00Z'), due = new Date(mon.getTime() + 7 * 86_400_000);
+  const range = `Spun Mon ${mon.getUTCDate()} ${fmt(mon, { month: 'short' })} · present Monday night ${due.getUTCDate()} ${fmt(due, { month: 'short', year: 'numeric' })}`;
   const slice = p.slices.find(s => s.t === topic);
   const T = kind === 'wild' ? '[the topic the family chose]' : topic;
   const others = ['taylan', 'nihal', 'ansar'].filter(x => x !== p.id).map(x => personById(x)!.name).join(' and ');
@@ -34,34 +34,34 @@ export function presentEmail(personId: string, topic: string, kind: Kind, week: 
   const headline = kind === 'wild' ? 'Wild card. The family chooses your topic.' : topic;
   const pill = kind === 'wild' ? { txt: '🃏 WILD CARD', bg: C.wild, fg: C.gold } : kind === 'shock' ? { txt: '⚡ SHOCK CHALLENGE', bg: C.shock, fg: C.ink } : { txt: 'YOUR TOPIC', bg: C.plum, fg: '#FFFFFF' };
   const why = kind === 'wild' ? `${others} pick it tonight. No vetoes. Write it at the top of your notes, then follow this plan with it.`
-    : kind === 'shock' ? 'Nobody here knows this yet, you included. Start from zero. By Friday you teach it to us.'
-    : kid ? 'You have one week to become the family expert on this. On Friday night you teach us.'
-    : 'One week to go deep enough that you could teach it to a stranger. Friday night, you teach us.';
+    : kind === 'shock' ? 'Nobody here knows this yet, you included. Start from zero. Next Monday night you teach it to us.'
+    : kid ? 'You have one week to become the family expert on this. Next Monday night you teach us.'
+    : 'One week to go deep enough that you could teach it to a stranger. Next Monday night, you teach us.';
 
   const days = kid ? [
-    ['Mon', 'Wonder', 'Write 10 questions you have about it. Ask Claude prompt 1.'],
-    ['Tue', 'Find out', 'Read, watch one good video, and write your 3 best facts.'],
-    ['Wed', 'Build', 'Make your 5 slides. One picture and a few words on each.'],
-    ['Thu', 'Practise', 'Say it out loud twice. Ask Claude prompt 4 to test you.'],
-    ['Fri', 'Present', 'After dinner. 5 minutes. Finish with your question.'],
+    ['Tue', 'Wonder', 'Write 10 questions you have about it. Ask Claude prompt 1.'],
+    ['Wed', 'Find out', 'Read, watch one good video, and write your 3 best facts.'],
+    ['Fri', 'Build', 'Make your 5 slides. One picture and a few words on each.'],
+    ['Sun', 'Practise', 'Say it out loud twice. Ask Claude prompt 4 to test you.'],
+    ['Mon', 'Present', 'Monday night. 5 minutes. Finish with your question.'],
   ] : [
-    ['Mon', 'Map it', 'Prompt 1: get the lay of the land. Pick your angle.'],
-    ['Tue', 'Go deep', 'Prompt 2: research and three facts that surprise you.'],
-    ['Wed', 'Build', 'Prompt 3: outline, then make the 5 slides yourself.'],
-    ['Thu', 'Rehearse', 'Prompt 4: hard questions. Run it twice, timed.'],
-    ['Fri', 'Present', 'After dinner. 7 minutes, then questions.'],
+    ['Tue', 'Map it', 'Prompt 1: get the lay of the land. Pick your angle.'],
+    ['Wed', 'Go deep', 'Prompt 2: research and three facts that surprise you.'],
+    ['Fri', 'Build', 'Prompt 3: outline, then make the 5 slides yourself.'],
+    ['Sun', 'Rehearse', 'Prompt 4: hard questions. Run it twice, timed.'],
+    ['Mon', 'Present', 'Monday night. 7 minutes, then questions, then spin again.'],
   ];
 
   const prompts = kid ? [
-    ['Wonder (Mon)', `I'm Ansar and I'm doing a 5-minute presentation for my family about "${T}". Ask me 5 questions to find out what I already know, then tell me the 5 most amazing things kids usually don't know about it. Keep it simple and true, and tell me where each fact comes from.`],
-    ['Find out (Tue)', `Explain "${T}" to me like a great teacher would, in 6 short steps. After each step, give me one question to check I understood. Do not give me the answers until I try.`],
-    ['Build (Wed)', `Help me plan 5 slides about "${T}": 1 a hook question, 2 the big idea, 3 three facts, 4 why it matters to our family and our faith, 5 a question for my family. Give me ideas only. I will write the words myself.`],
-    ['Practise (Thu)', `Be my family at my presentation about "${T}". Ask me 5 questions one at a time, from easy to hard. After each answer, tell me one thing I did well and one thing to fix.`],
+    ['Wonder (Tue)', `I'm Ansar and I'm doing a 5-minute presentation for my family about "${T}". Ask me 5 questions to find out what I already know, then tell me the 5 most amazing things kids usually don't know about it. Keep it simple and true, and tell me where each fact comes from.`],
+    ['Find out (Wed)', `Explain "${T}" to me like a great teacher would, in 6 short steps. After each step, give me one question to check I understood. Do not give me the answers until I try.`],
+    ['Build (Fri)', `Help me plan 5 slides about "${T}": 1 a hook question, 2 the big idea, 3 three facts, 4 why it matters to our family and our faith, 5 a question for my family. Give me ideas only. I will write the words myself.`],
+    ['Practise (Sun)', `Be my family at my presentation about "${T}". Ask me 5 questions one at a time, from easy to hard. After each answer, tell me one thing I did well and one thing to fix.`],
   ] : [
-    ['Map it (Mon)', `I'm preparing a 7-minute talk for my family on "${T}". Give me a map of the subject: the 5 big ideas, the 3 most common misconceptions, and 3 angles I could take. For each angle, tell me why it would land with a family of three: me, my spouse, and our son who is homeschooled. Be concise.`],
-    ['Go deep (Tue)', `Research brief on "${T}". Give me: the core explanation in plain English, 5 surprising facts with the source for each (say clearly if you are unsure), one story or real example that makes it memorable, and the strongest counter-argument or open question. Flag anything that is contested.`],
-    ['Build (Wed)', `Here is my angle and notes on "${T}": [paste your notes]. Turn them into a 5-slide outline. Slide 1 is a hook, 2 the big idea in one sentence, 3 three facts, 4 why it matters to our family, our faith or our work, and 5 a question for the room. Max 12 words per slide plus speaker notes. Critique my notes before you outline them.`],
-    ['Rehearse (Thu)', `Play a sharp, curious audience for my talk on "${T}". Here is my script: [paste it]. Ask me the 5 hardest questions, one at a time, and wait for my answer each time. Then score me out of 10 on clarity, story and confidence, and tell me the single change that would make the biggest difference.`],
+    ['Map it (Tue)', `I'm preparing a 7-minute talk for my family on "${T}". Give me a map of the subject: the 5 big ideas, the 3 most common misconceptions, and 3 angles I could take. For each angle, tell me why it would land with a family of three: me, my spouse, and our son who is homeschooled. Be concise.`],
+    ['Go deep (Wed)', `Research brief on "${T}". Give me: the core explanation in plain English, 5 surprising facts with the source for each (say clearly if you are unsure), one story or real example that makes it memorable, and the strongest counter-argument or open question. Flag anything that is contested.`],
+    ['Build (Fri)', `Here is my angle and notes on "${T}": [paste your notes]. Turn them into a 5-slide outline. Slide 1 is a hook, 2 the big idea in one sentence, 3 three facts, 4 why it matters to our family, our faith or our work, and 5 a question for the room. Max 12 words per slide plus speaker notes. Critique my notes before you outline them.`],
+    ['Rehearse (Sun)', `Play a sharp, curious audience for my talk on "${T}". Here is my script: [paste it]. Ask me the 5 hardest questions, one at a time, and wait for my answer each time. Then score me out of 10 on clarity, story and confidence, and tell me the single change that would make the biggest difference.`],
   ];
 
   const guide = kid ? [
@@ -74,7 +74,7 @@ export function presentEmail(personId: string, topic: string, kind: Kind, week: 
     { title: 'Claude drafts, you decide', body: 'Use it to research and pressure-test. The words and the opinion on the slides are yours. Verify every fact you present.' },
   ];
 
-  const dayRow = table(`<tr>${days.map(([d, h]) => `${td('', 'width:20%;vertical-align:top;text-align:center;padding:0 2px;', 'width="20%" align="center"')}<div style="text-align:center;">${badge(d === 'Fri' ? '🎤' : d.slice(0, 1), d === 'Fri' ? C.gold : C.plum, d === 'Fri' ? C.ink : '#FFFFFF', 44).replace('<table', '<table align="center"')}</div>
+  const dayRow = table(`<tr>${days.map(([d, h]) => `${td('', 'width:20%;vertical-align:top;text-align:center;padding:0 2px;', 'width="20%" align="center"')}<div style="text-align:center;">${badge(h === 'Present' ? '🎤' : d.slice(0, 1), h === 'Present' ? C.gold : C.plum, h === 'Present' ? C.ink : '#FFFFFF', 44).replace('<table', '<table align="center"')}</div>
     <div style="${t(14, C.ink, 'font-weight:700;padding-top:8px;')}">${d}</div><div style="${t(12, C.muted)}">${h}</div></td>`).join('')}</tr>`);
   const dayList = numbered(days.map(([d, h, b]) => ({ title: `${d} · ${h}`, body: b })), C.plum);
 
@@ -82,9 +82,9 @@ export function presentEmail(personId: string, topic: string, kind: Kind, week: 
     ${table(`<tr>${td(C.page, `padding:12px 14px;border-radius:10px;border-left:4px solid ${C.gold};${t(13, C.ink, "line-height:1.55;font-family:Menlo,Consolas,'Courier New',monospace;")}`)}${esc(q)}</td></tr>`)}</div>`).join('');
 
   const header = `<tr>${td('', 'padding:8px 20px 18px 20px;')}
-    <div style="${t(11, C.muted, 'font-weight:700;letter-spacing:1.5px;text-transform:uppercase;')}">Present · wheel of presentation · week of ${esc(fmt(mon, { day: 'numeric', month: 'short' }))}</div>
+    <div style="${t(11, C.muted, 'font-weight:700;letter-spacing:1.5px;text-transform:uppercase;')}">Present · wheel of presentation · due Monday ${esc(fmt(due, { day: 'numeric', month: 'short' }))}</div>
     <div style="${t(28, C.ink, 'font-weight:800;letter-spacing:-0.5px;line-height:1.2;padding-top:6px;')}">${esc(p.name)}'s presentation</div>
-    <div style="${t(14, C.muted, 'padding-top:4px;')}">${esc(range)} · Present Friday night</div></td></tr>`;
+    <div style="${t(14, C.muted, 'padding-top:4px;')}">${esc(range)}</div></td></tr>`;
 
   const topicCard = card(`${kicker('The wheel landed on')}
     ${table(`<tr>${td(pill.bg, 'padding:8px 16px;border-radius:999px;', 'align="center"')}<span style="${t(15, pill.fg, 'font-weight:800;letter-spacing:1px;')}">${pill.txt}</span></td></tr>`, 'auto')}

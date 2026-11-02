@@ -32,8 +32,8 @@ function slicePath(i: number) {
 const fill = (s: Slice, i: number) => s.k === 'wild' ? 'url(#pw-wild)' : s.k === 'shock' ? 'url(#pw-shock)' : COLORS[i % COLORS.length];
 const ink = (s: Slice, i: number) => s.k === 'wild' ? '#e8c873' : s.k === 'shock' ? '#1d2322' : INKY.has(COLORS[i % COLORS.length]) ? '#1d2322' : '#fbf8f2';
 
-/** Friday (presentation night) of the given Monday week. */
-function friday(week: string) { const d = new Date(week + 'T00:00:00'); d.setDate(d.getDate() + 4); return d; }
+/** Presentation night: the Monday after the spin week (spin Monday night, present the next Monday night). */
+function presentNight(week: string) { const d = new Date(week + 'T00:00:00'); d.setDate(d.getDate() + 7); return d; }
 const daysTo = (d: Date) => Math.ceil((d.getTime() - Date.now()) / 86_400_000);
 
 function Wheel({ person, rot, drawn, flap, lit, spinning }: { person: Person; rot: number; drawn: Set<string>; flap: number; lit: number; spinning: boolean }) {
@@ -246,7 +246,7 @@ export default function PresentWheel() {
 
   const toggleMute = () => { const m = !muted; setMute(m); setMuted(m); localStorage.setItem('pw-muted', m ? '1' : '0'); };
   const slice = result ? result.person.slices.find(s => s.t === result.topic) : undefined;
-  const due = data ? friday(data.week) : null;
+  const due = data ? presentNight(data.week) : null;
 
   return (
     <main className={'pw' + (fx ? ' fx-' + fx : '') + (spinning ? ' is-spinning' : '')} style={{ ['--who' as string]: who.hue }}>
@@ -290,7 +290,7 @@ export default function PresentWheel() {
           <li><i className="sw-shock" /><span><b>⚡ Shock:</b> a subject none of us knows. Start from zero.</span></li>
           <li><i className="sw-wild" /><span><b>🃏 Wild card:</b> the other two choose your topic.</span></li>
           <li><i className="sw-done" /><span>A topic you&rsquo;ve had is stamped DONE and never comes back.</span></li>
-          <li><i className="sw-day" /><span>Present on <b>Friday night</b>{due && daysTo(due) >= 0 ? <> · {daysTo(due) === 0 ? 'tonight' : `${daysTo(due)} day${daysTo(due) === 1 ? '' : 's'} to go`}</> : null}.</span></li>
+          <li><i className="sw-day" /><span>Present <b>next Monday night</b>{due && daysTo(due) >= 0 ? <> · {daysTo(due) === 0 ? 'tonight' : `${daysTo(due)} day${daysTo(due) === 1 ? '' : 's'} to go`}</> : null}.</span></li>
         </ul>
         <button className="pw-mute" onClick={toggleMute}>{muted ? '🔇 Sound off' : '🔊 Sound on'}</button>
         <p className="pw-keys">Space to spin · 1 2 3 to switch</p>
@@ -308,7 +308,7 @@ export default function PresentWheel() {
             </header>
             <div className="pw-card-emoji">{slice.e}</div>
             <h2 id="pw-topic">{result.kind === 'wild' ? 'The family chooses your topic' : result.topic}</h2>
-            <p className="pw-card-sub">{result.kind === 'wild' ? `${PEOPLE.filter(p => p.id !== result.person.id).map(p => p.name).join(' and ')} pick it tonight. No vetoes.` : result.kind === 'shock' ? 'You know nothing about this yet. That is the point.' : `Present it on Friday night. The plan and Claude prompts are in your email.`}</p>
+            <p className="pw-card-sub">{result.kind === 'wild' ? `${PEOPLE.filter(p => p.id !== result.person.id).map(p => p.name).join(' and ')} pick it tonight. No vetoes.` : result.kind === 'shock' ? 'You know nothing about this yet. That is the point.' : `Present it next Monday night. The plan and Claude prompts are in your email.`}</p>
             <ol className="pw-starter">{STARTER.map(([h, d], i) => <li key={h} style={{ animationDelay: `${0.35 + i * 0.08}s` }}><b>{h}</b><span>{d}</span></li>)}</ol>
             <footer>
               <button className="pw-btn" onClick={() => setResult(null)} autoFocus>Let&rsquo;s go</button>
