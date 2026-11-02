@@ -1,9 +1,12 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import {familyWrite} from "./FamilyEditGate";
+import { usePathname } from "next/navigation";
 
 const LINKS: { label: string; href: string; external?: boolean }[] = [
-  { label: "Family Dashboard",      href: "https://kurgel-dashboard.netlify.app/" },
+  { label: "🏡 Family OS", href: "/" },
+  { label: "📅 Calendar",  href: "/board" },
+  { label: "🎤 Present",   href: "/present" },
 ];
 
 function normPath(p: string): string {
@@ -221,17 +224,9 @@ export function CycleTracker() {
 }
 
 export default function TopNav() {
-  const [active, setActive] = useState<string | null>(null);
-
-  useEffect(() => {
-    const host = window.location.hostname;
-    const path = normPath(window.location.pathname);
-    const match = LINKS.find((link) => {
-      const url = new URL(link.href);
-      return url.hostname === host && normPath(url.pathname) === path;
-    });
-    setActive(match ? match.href : null);
-  }, []);
+  const pathname = usePathname();
+  const path = normPath(pathname ?? "/");
+  const active = LINKS.find((link) => link.href === "/" ? path === "/" : path.startsWith(link.href))?.href ?? null;
 
   return (
     <nav className="topnav">

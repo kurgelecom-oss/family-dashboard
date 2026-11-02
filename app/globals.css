@@ -1944,3 +1944,23 @@ html, body {
    and cycle switch, so the top bar's copies step aside on that screen only. */
 html[data-family-view=daily] .topnav .incident-counter,
 html[data-family-view=daily] .topnav .cycle-wrap{display:none}
+
+/* ── TOP NAV in the Climb palette (tk 2 Nov 2026): the old navy/cyan strip is retired.
+   Cream paper, teal ink, clay underline; deep teal-ink after Maghrib. Loaded last so
+   it wins over both legacy themes above. ── */
+.topnav{background:#fbf8f2;border-bottom:1px solid #e7dfd2;gap:6px;padding:0 18px;font-family:Inter,system-ui,sans-serif}
+.topnav-link{font-size:13px;color:#7a7468;padding:0 12px;border-radius:0;transition:color .2s ease}
+.topnav-link:hover{color:#1f4a45}
+.topnav-link.active{color:#1f4a45;font-weight:700}
+.topnav-link.active::after{left:12px;right:12px;height:3px;background:#b8612f;border-radius:3px 3px 0 0}
+.topnav .incident-counter,.topnav .incident-counter .incident-link{color:#2f8a57}
+.topnav .incident-dot{background:#2f8a57;box-shadow:0 0 0 3px #2f8a5722;animation:none}
+.topnav .cycle-switch{border-color:#d8cfc0;color:#7a7468}
+.topnav .cycle-switch-knob{background:#c9bfae}
+html[data-theme=night] .topnav{background:#141c1b;border-bottom-color:#2b3633}
+html[data-theme=night] .topnav-link{color:#9c968a}
+html[data-theme=night] .topnav-link:hover,html[data-theme=night] .topnav-link.active{color:#ece6da}
+html[data-theme=night] .topnav-link.active::after{background:#d9bf8c}
+html[data-theme=night] .topnav .incident-counter,html[data-theme=night] .topnav .incident-link{color:#6fb3a6}
+html[data-theme=night] .topnav .incident-dot{background:#6fb3a6}
+html[data-theme=night] .topnav .cycle-switch{border-color:#2b3633;color:#9c968a}
