@@ -5,6 +5,7 @@ import FamilyEditGate from "./components/FamilyEditGate";
 import HourlyShift from "./components/HourlyShift";
 import NightMode from "./components/NightMode";
 import EndOfDay from "./components/EndOfDay";
+import FajrScreen from "./components/FajrScreen";
 
 export const metadata: Metadata = {
   title: "Kurgel Family Dashboard",
@@ -36,6 +37,7 @@ export default function RootLayout({
         <HourlyShift />
         <NightMode />
         <EndOfDay />
+        <FajrScreen />
       </body>
     </html>
   );

@@ -7,14 +7,14 @@ import { TZ } from '../lib/cal-time';
 /* End-of-day wrap (tk, 2 Nov 2026). At 10 pm the TV boards ("/" and the calendar)
    show one quiet full-room card: the day is done, close the dashboard, turn the
    screens off. It stays up until someone taps it, then not again that night.
-   The night runs 10 pm to 5 am, so a board opened at 11 pm still gets it.
+   The night runs 10 pm to 3 am, so a board opened at 11 pm still gets it; from 3 am the Fajr screen takes over.
    Test any time with ?wrap=now. */
 
 const KEY = 'eod-wrapped';
 const parts = (at: Date) => Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' }).formatToParts(at).map(x => [x.type, x.value]));
 /** The evening this night belongs to (1 am still counts as the evening before). */
 const nightOf = (now = new Date()) => { const p = parts(new Date(now.getTime() - 5 * 3600_000)); return `${p.year}-${p.month}-${p.day}`; };
-const isWrapTime = (now = new Date()) => { const h = Number(parts(now).hour); return h >= 22 || h < 5; };
+const isWrapTime = (now = new Date()) => { const h = Number(parts(now).hour); return h >= 22 || h < 3; };
 
 export default function EndOfDay() {
   const path = usePathname();

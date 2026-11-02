@@ -1,0 +1,35 @@
+/* Fajr screen — dim indigo night, warm lantern light, a dawn that creeps in from below. */
+.fj{--dawn:0;position:fixed;inset:0;z-index:4500;overflow:hidden;background:#07091a;color:#e6d4ad;display:grid;grid-template-rows:auto 1fr auto;justify-items:center;animation:fj-in 2.6s ease both;font-family:Inter,system-ui,sans-serif}
+.fj.out{animation:fj-out 4s ease-in both}
+.fj-sky{position:absolute;inset:0;background:
+  radial-gradient(120% 60% at 50% 112%,rgba(196,110,92,calc(.08 + var(--dawn)*.42)) 0%,rgba(92,58,96,calc(.06 + var(--dawn)*.3)) 38%,transparent 70%),
+  linear-gradient(#060817 0%,#0b1029 46%,#141633 78%,#1b1730 100%);transition:background 60s linear}
+.fj-stars{position:absolute;inset:0;opacity:calc(1 - var(--dawn)*.85)}
+.fj-stars b{position:absolute;width:2px;height:2px;border-radius:50%;background:#f4ead2;animation:fj-twinkle 6s ease-in-out infinite}
+.fj-wall{position:absolute;left:50%;bottom:4vh;width:90vh;height:70vh;transform:translateX(-50%);background:radial-gradient(closest-side,rgba(255,160,70,.16),rgba(255,140,60,.05) 60%,transparent);animation:fj-breathe 5s ease-in-out infinite;pointer-events:none}
+.fj-text{position:relative;text-align:center;padding-top:6vh}
+.fj-eye{margin:0 0 2.6vh;font-weight:600;font-size:clamp(11px,.9vw,16px);letter-spacing:.3em;text-transform:uppercase;color:#8c86a6}
+.fj-text h1{margin:0;font:300 clamp(64px,10vw,180px)/.9 Fraunces,Georgia,serif;letter-spacing:.02em;color:#f0dfb8;text-shadow:0 0 60px rgba(255,170,80,.18)}
+.fj-ar{margin:2.4vh 0 0;font:400 clamp(20px,2vw,36px)/1.4 "Amiri","Noto Naskh Arabic","Geeza Pro",serif;color:#d8b77a}
+.fj-tr{margin:.8vh 0 0;font:italic 400 clamp(14px,1.2vw,21px)/1.4 Fraunces,Georgia,serif;color:#8c86a6}
+.fj-scene{position:relative;align-self:end;display:flex;align-items:flex-end;gap:2vw;height:min(42vh,520px);margin-bottom:1vh}
+.fj-lantern{height:100%;width:auto;overflow:visible;filter:drop-shadow(0 0 30px rgba(255,150,60,.25))}
+.fj-lantern.fj-b{height:86%}
+.fj-pool{position:absolute;left:50%;bottom:-3vh;width:150%;height:12vh;transform:translateX(-50%);background:radial-gradient(closest-side,rgba(255,170,80,.32),rgba(255,140,60,.08) 60%,transparent);animation:fj-breathe 4.2s ease-in-out infinite}
+.fj-fire{animation:fj-flicker 3.1s infinite}
+.fj-b .fj-fire{animation-duration:2.6s;animation-delay:-1.2s}
+.fj-flame{transform-origin:100px 318px;animation:fj-flame 1.7s ease-in-out infinite}
+.fj-b .fj-flame{animation-duration:1.3s}
+.fj-times{position:relative;display:grid;grid-template-columns:auto minmax(120px,22vw) auto;align-items:center;gap:22px;padding:2.4vh 0 4vh;text-align:center}
+.fj-times span{font:400 clamp(18px,1.7vw,30px)/1 Fraunces,Georgia,serif;color:#e6d4ad}
+.fj-times small{display:block;margin-bottom:8px;font:600 clamp(10px,.75vw,13px)/1 Inter,system-ui,sans-serif;letter-spacing:.24em;text-transform:uppercase;color:#7d7898}
+.fj-track{display:block;height:1px;background:rgba(230,212,173,.18);position:relative}
+.fj-track b{position:absolute;left:0;top:-1px;height:3px;border-radius:2px;background:linear-gradient(90deg,#8a5a3b,#e0a160)}
+.fj-times p{grid-column:1/-1;margin:1.6vh 0 0;font-size:clamp(12px,1vw,17px);color:#8c86a6;letter-spacing:.04em}
+@keyframes fj-in{from{opacity:0}to{opacity:1}}
+@keyframes fj-out{to{opacity:0}}
+@keyframes fj-twinkle{0%,100%{transform:scale(1)}50%{transform:scale(.4);opacity:.2}}
+@keyframes fj-breathe{0%,100%{opacity:.85}50%{opacity:1}}
+@keyframes fj-flicker{0%{opacity:.92}9%{opacity:.8}17%{opacity:.97}31%{opacity:.86}44%{opacity:1}58%{opacity:.83}71%{opacity:.95}86%{opacity:.88}100%{opacity:.92}}
+@keyframes fj-flame{0%,100%{transform:scale(1,1) rotate(0)}30%{transform:scale(.92,1.08) rotate(-3deg)}60%{transform:scale(1.05,.94) rotate(2deg)}}
+@media (prefers-reduced-motion:reduce){.fj *,.fj{animation:none!important}}
