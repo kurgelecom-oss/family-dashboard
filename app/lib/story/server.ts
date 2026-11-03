@@ -3,6 +3,8 @@ import {familyDb,familyWorkspace} from '../family-db';
 import {buildWeeklyReport} from '../sunday/data';
 import {MEMBERS,civilDay,weekFor,type MemberId} from '../sunday/model';
 import {statsEmail,reminderEmail,type View} from './email';
+import {measureGoals,openGoals} from '../goal-measures';
+import {goalLine} from '../goals';
 
 export const SITE=(process.env.FAMILY_SITE_URL||'https://kurgel-dashboard.netlify.app').replace(/\/$/,'');
 const isMember=(m:unknown):m is MemberId=>MEMBERS.includes(m as MemberId);
@@ -76,7 +78,8 @@ export async function runWeeklyEmails({force,dry=false}:{force?:'reminder'|'stat
   try{out[`reminder:${member}`]=await sendOnce(week,'reminder',email,mail.subject,mail.html);}catch(e){out[`reminder:${member}`]=e instanceof Error?e.message:'failed';}
  }
  if(due.stats){
-  const mail=statsEmail(report,await readViews(week),await remindedMembers(week),`${SITE}/story`);
+  const goals=await measureGoals(await openGoals()).then(g=>g.map(goalLine)).catch(()=>[]);
+  const mail=statsEmail(report,await readViews(week),await remindedMembers(week),`${SITE}/story`,goals);
   const to=process.env.FAMILY_STATS_TO||'kurgelecom@gmail.com';
   if(dry)out.stats=mail.html;
   else try{out.stats=await sendOnce(week,'stats',to,mail.subject,mail.html);}catch(e){out.stats=e instanceof Error?e.message:'failed';}

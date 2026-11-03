@@ -6,6 +6,7 @@ import HourlyShift from "./components/HourlyShift";
 import NightMode from "./components/NightMode";
 import EndOfDay from "./components/EndOfDay";
 import FajrScreen from "./components/FajrScreen";
+import GoalBar from "./components/GoalBar";
 
 export const metadata: Metadata = {
   title: "Kurgel Family Dashboard",
@@ -28,6 +29,8 @@ export default function RootLayout({
       </head>
       <body>
         <TopNav />
+        {/* Goal bar (3 Nov 2026) lives in the old --strip-h slot under the nav; every surface already makes room for it. */}
+        <GoalBar />
         <FamilyEditGate />
         {/* The OriginsStrip banner is retired everywhere (owner, 2026-08-26):
             origins pressure exists only as the corner nudges on "/". --strip-h

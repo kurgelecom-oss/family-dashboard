@@ -8,7 +8,7 @@
   --good:#2f8a57; --warn:#c98a1b; --bad:#c2412d; --clay:#b8612f; --clay-soft:#f0dfd0; --teal:#1f4a45; --teal-2:#2b5d57; --teal-3:#557a75; --teal-soft:#dfe8e5;
   --serif:Fraunces,Georgia,serif;
   /* globals.css locks html/body scrolling (old TV panels), so the board scrolls itself. */
-  height:100dvh;overflow-y:auto;padding-top:calc(40px + 2.4vh)!important;background:var(--sky,var(--cream));transition:background-color 60s linear;color:var(--ink);font-family:Inter,system-ui,sans-serif;
+  height:100dvh;overflow-y:auto;padding-top:calc(var(--nav-h,40px) + var(--strip-h,0px) + 2.4vh)!important;background:var(--sky,var(--cream));transition:background-color 60s linear;color:var(--ink);font-family:Inter,system-ui,sans-serif;
   display:grid;grid-template-rows:repeat(5,max-content);gap:2vh;padding:0 3vw 1.6vh;box-sizing:border-box;overflow-x:hidden;align-content:start
 }
 
@@ -129,7 +129,7 @@
 .hb-nowdot{position:absolute;top:17px;width:16px;height:16px;margin-left:-8px;border-radius:50%;background:var(--clay);box-shadow:0 0 0 0 rgba(184,97,47,.5);animation:hb-pulse-clay 2s infinite;transition:left 2s linear}
 .hb-rail-lbl{position:absolute;top:34px;font-size:11px;color:var(--muted)}
 
-.hb-stale{position:fixed;left:50%;transform:translateX(-50%);top:46px;font-size:11px;color:var(--muted)}
+.hb-stale{position:fixed;left:50%;transform:translateX(-50%);top:calc(var(--nav-h,40px) + var(--strip-h,0px) + 6px);font-size:11px;color:var(--muted)}
 
 @keyframes hb-pulse{70%{box-shadow:0 0 0 10px rgba(240,176,137,0)}100%{box-shadow:0 0 0 0 rgba(240,176,137,0)}}
 @keyframes hb-pulse-clay{70%{box-shadow:0 0 0 14px rgba(184,97,47,0)}100%{box-shadow:0 0 0 0 rgba(184,97,47,0)}}
@@ -468,3 +468,17 @@
 .dt-hint{font-size:12px;color:var(--muted);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media (prefers-reduced-motion:reduce){.dt-view{overflow-y:auto}.dt-view.roll .dt-track{animation:none}.dt-circle svg{stroke-dashoffset:0}.dt-row:not(.done) .dt-circle svg{opacity:0}}
 @media (max-width:900px){.dt-view{flex:none;height:calc(var(--row) * 6)}.dt-row{grid-template-columns:30px 1fr}.dt-hint{display:none}}
+
+/* Our goals (3 Nov 2026): the ranked master list, same measures as the goal bar. Percentages, counts, days. */
+.hb-goals{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column}
+.hb-goals li{display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:center;padding:6px 0;border-top:1px solid var(--line);font-size:13px}
+.hb-goals .rk{font:600 10px Inter,system-ui,sans-serif;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--muted);color:var(--muted)}
+.hb-goals li.p1 .rk{background:var(--clay);border-color:var(--clay);color:#fff}
+.hb-goals li.hit .rk{background:var(--good);border-color:var(--good);color:#fff}
+.hb-goals b{font:600 14px var(--serif);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hb-goals li.hit b{color:var(--good)}
+.hb-goals .pg{display:block;height:4px;background:var(--line);border-radius:4px;margin-top:4px;overflow:hidden}
+.hb-goals .pg i{display:block;height:100%;background:var(--clay);border-radius:4px;transform-origin:left;animation:hb-grow 1.2s cubic-bezier(.2,.8,.2,1) both}
+.hb-goals li.hit .pg i{background:var(--good)}
+.hb-goals em{font-style:normal;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
+@keyframes hb-grow{from{transform:scaleX(0)}}

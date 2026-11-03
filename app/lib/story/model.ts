@@ -1,13 +1,13 @@
 // Weekly family story: the Sunday report in, 8 scenes out. Pure (no React, no fetch) so it is unit-tested.
 // The weekly email reads `showedUp` and `didLines` from here too, so the film and the email never disagree.
 import type {WeeklyReport,PersonReport,MemberId,Metric} from '../sunday/model.ts';
-import {SNAPSHOT} from '../goals.ts';
+import type {GoalLine} from '../goals.ts';
 
 export type Stat={label:string;v:number|null;unit?:'AUD'|'%';prev?:number|null};
 export type Card={id:string;label:string;v:number;note:string|null;good:boolean};
 type Base={label:string;hold:number;caption:string};
 export type Scene=
- |Base&{id:'goals';goals:{short:string;label:string;pct:number|null}[]}
+ |Base&{id:'goals';goals:GoalLine[]}
  |Base&{id:'quran';on:number;total:number}
  |Base&{id:'showed';bars:{label:string;sub?:string;v:number;hot?:boolean}[];of:number}
  |Base&{id:`person-${MemberId}`;name:string;stats:Stat[]}
@@ -79,12 +79,10 @@ function personScene(p:PersonReport,before?:PersonReport):Scene{
   caption:(lines.length?`${p.name}: ${lines.slice(0,3).join(', ')}.`:`Nothing from ${p.name} reached the dashboard this week.`)+study};
 }
 
-export function buildStory(r:WeeklyReport,last?:WeeklyReport|null):Scene[]{
+export function buildStory(r:WeeklyReport,last?:WeeklyReport|null,goals:GoalLine[]=[]):Scene[]{
  const days=daysSoFar(r),people=r.people,prev=last?sameSpan(last,days):null;
  // Person totals from last week are whole-week figures (not all are dated), so compare them only once this week is complete.
  const was=(id:MemberId)=>days===7?last?.people.find(p=>p.id===id):undefined;
- const goals=SNAPSHOT.goals.map(g=>({short:g.short,label:g.label,pct:g.now==null?null:Math.min(100,Math.round(g.now/g.target*100))}));
- const tracked=goals.some(g=>g.pct!==null);
  const quranPeople=people.filter(p=>p.quran.available);
  const on=quranPeople.reduce((t,p)=>t+p.quran.totalDays,0),total=quranPeople.length*days;
  const everyDay=quranPeople.filter(p=>days>0&&p.quran.totalDays===days).map(p=>p.name);
@@ -95,7 +93,7 @@ export function buildStory(r:WeeklyReport,last?:WeeklyReport|null):Scene[]{
  const lowest=low.length?low[low.length-1]:null;
  return [
   {id:'goals',label:'Our goals',hold:5,goals,
-   caption:`Our goals: ${goals.map(g=>`${g.short} ${g.label}`).join(', then ')}.${tracked?'':' Progress isn’t tracked yet, so this week is about the habits that get us there.'}`},
+   caption:goals.length?`Our goals, in order: ${goals.map(g=>g.short+(g.val?` (${g.val})`:'')).join(', ')}.`:'Our goals didn’t load this week.'},
   {id:'quran',label:'Quran',hold:6,on,total,
    caption:!quranPeople.length?'Quran OS didn’t connect this week, so these days are unknown.':
     on===0?`No finished Quran sessions this week${prevOn?`, after ${s(prevOn,'day')} last week`:''}. Next week starts with one each.`:

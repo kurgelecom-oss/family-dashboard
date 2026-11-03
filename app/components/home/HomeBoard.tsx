@@ -39,7 +39,7 @@ export type NowFeed = {
 };
 export type Money = {
   unlocked: boolean; asOf: string;
-  goals: { label: string; short: string; target: number; pct: number; now?: number }[];
+  goals: { id: string; rank: number; label: string; short: string; range: string; priority: number | null; due: string | null; pct: number | null; txt: string | null; hit: boolean; now?: number }[];
   cash?: { bank: number; cardDebt: number; net: number };
   week_income?: { business: number; wages: number; businessSpend: number; takeHome: number };
   headline?: string | null; bills?: { date: string; title: string; amount: number }[];
@@ -214,11 +214,13 @@ export default function HomeBoard() {
     // A goal step reached is celebrated once per device: the weekly goal once per CLEO week, the bank goals once ever.
     let seen: string[] = [];
     try { seen = JSON.parse(localStorage.getItem('hb-goals-seen') || '[]'); } catch { /* private window */ }
-    m.goals.forEach((g, i) => {
-      const key = i === 2 ? `${g.short}-${m.asOf.slice(0, 10)}` : g.short;
-      if (g.pct >= 100 && (demo || !seen.includes(key))) {
+    // Weekly goals celebrate once per Monday-week; dated goals once ever.
+    const wk = new Date(); wk.setDate(wk.getDate() - ((wk.getDay() + 6) % 7));
+    m.goals.forEach(g => {
+      const key = g.range === 'wk' ? `${g.id}-${wk.toDateString()}` : g.id;
+      if (g.hit && (demo || !seen.includes(key))) {
         seen.push(key);
-        push({ kind: 'goal', short: g.short, label: i === 2 ? 'weekly business take-home' : 'in the bank, net of card debt', now: g.now !== undefined ? `${money(g.now)} this week` : null });
+        push({ kind: 'goal', short: g.short, label: g.range === 'wk' ? 'hit this week' : 'reached', now: g.now !== undefined ? money(g.now) : null });
       }
     });
     try { localStorage.setItem('hb-goals-seen', JSON.stringify(seen.slice(-40))); } catch { /* private window */ }
@@ -382,7 +384,6 @@ export default function HomeBoard() {
   const ordersRag = st?.today ? paceRag(st.today.orders, st.avgOrders * st.dayFraction) : null;
   const revenueRag = st?.today ? paceRag(st.today.revenue, st.avgRevenue * st.dayFraction) : null;
   const convRag = conversionRag(st?.today?.conversion ?? null);
-  const nextGoal = cash?.goals.findIndex(g => g.pct < 100) ?? -1;
   const ago = gotAt ? Math.max(0, Math.round((now.getTime() - gotAt) / 1000)) : null;
 
   const ticker: string[] = [
@@ -478,14 +479,13 @@ export default function HomeBoard() {
         <section className="hb-tile">
           <header><h3>Our goals</h3>{cash && !cash.unlocked ? <button className="hb-unlock" onClick={unlock}>🔒 Show numbers</button> : <small>{cash ? `CLEO · ${fmtDay(cash.asOf)}` : ''}</small>}</header>
           {cash?.unlocked && cash.headline && <p className="hb-headline">{cash.headline}</p>}
-          <div className="hb-stairs">{(cash?.goals ?? []).map((g, i) => (
-            <div className={'hb-step' + ragCls(goalRag(g.pct))} key={i}>
-              {i === nextGoal && <span className="hb-flag" aria-hidden="true">⚑</span>}
-              <i className="fill" style={{ height: `${g.pct}%` }} />
-              <span className="hb-num">{g.short}</span><small>{i === 2 ? 'weekly business take-home' : 'net of card debt'}</small>
-              <em><i className="dot" />{g.now !== undefined ? `${money(g.now)} · ` : ''}{g.pct}%</em>
-            </div>
-          ))}</div>
+          <ol className="hb-goals">{(cash?.goals ?? []).map(g => (
+            <li key={g.id} className={(g.hit ? 'hit' : '') + (g.priority === 1 ? ' p1' : '')} title={g.label}>
+              <span className="rk">{g.hit ? '✓' : g.rank}</span>
+              <div><b>{g.short}</b><span className="pg"><i style={{ width: `${g.hit ? 100 : g.pct ?? 0}%` }} /></span></div>
+              <em>{g.now !== undefined ? `${money(g.now)} · ` : ''}{g.txt ?? (g.pct !== null ? `${g.pct}%` : g.range === 'wk' ? 'this week' : g.due ? `${Math.max(0, Math.ceil((new Date(g.due + 'T23:59:59').getTime() - now.getTime()) / 864e5))}d` : '—')}</em>
+            </li>
+          ))}</ol>
           {cash?.unlocked && cash.cash && cash.week_income ? <div className="hb-money">
             <span>Bank <b>{money(cash.cash.bank)}</b></span><span className="neg">Cards <b>{money(-cash.cash.cardDebt)}</b></span><span className={cash.cash.net < 0 ? 'neg' : ''}>Net <b>{money(cash.cash.net)}</b></span><span>Wages <b>{money(cash.week_income.wages)}</b>/wk</span>
           </div> : cash && <p className="hb-locked">Balances stay hidden until this screen is unlocked with the family PIN.</p>}

@@ -1,6 +1,6 @@
 // Weekly family emails in the kdgm kit (Outlook-safe: tables, inline styles, ten tokens only). Pure, so tested.
 import type {WeeklyReport,MemberId} from '../sunday/model.ts';
-import {SNAPSHOT} from '../goals.ts';
+import type {GoalLine} from '../goals.ts';
 import {daysSoFar,didLines,showedUp} from './model.ts';
 
 export type View={member:MemberId;opened_at:string;finished_at:string|null};
@@ -28,7 +28,7 @@ ${body}
 const card=(heading:string,inner:string)=>`<tr><td style="padding:26px 8px 0 8px"><table ${T} width="100%" style="background:${C.panel};border:1px solid ${C.line};border-radius:12px"><tr><td style="padding:20px 22px"><table ${T} width="100%"><tr><td style="padding-bottom:14px;${txt(16,C.ink,'font-weight:500;letter-spacing:-0.02em')}">${esc(heading)}</td></tr>${inner}</table></td></tr></table></td></tr>`;
 const para=(html:string)=>`<tr><td style="padding-bottom:10px;${txt(14,C.dim,'line-height:1.6')}">${html}</td></tr>`;
 
-export function statsEmail(r:WeeklyReport,views:View[],reminded:MemberId[],storyUrl:string){
+export function statsEmail(r:WeeklyReport,views:View[],reminded:MemberId[],storyUrl:string,goalList:GoalLine[]=[]){
  const days=daysSoFar(r),seen=(m:MemberId)=>views.find(v=>v.member===m);
  const th=(x:string,align='left')=>`<td align="${align}" style="padding-bottom:8px;${txt(11,C.quiet,'font-weight:500;letter-spacing:0.06em;text-transform:uppercase')}">${x}</td>`;
  const td=(x:string,color=C.ink,align='left')=>`<td align="${align}" style="padding-top:9px;border-top:1px solid ${C.line};${txt(13,color)}">${x}</td>`;
@@ -42,7 +42,7 @@ export function statsEmail(r:WeeklyReport,views:View[],reminded:MemberId[],story
   const lines=didLines(p);
   return card(p.name,(lines.length?lines.map(l=>para(esc(l[0].toUpperCase()+l.slice(1))+'.')).join(''):para('Nothing reached the dashboard this week.'))+(p.win?para(`Their note: ${esc(p.win)}`):''));
  }).join('');
- const goals=card('Goals',SNAPSHOT.goals.map((g,i)=>para(`${i+1}. ${g.full} ${g.label}: ${g.now==null?'— (progress not tracked yet)':`${Math.min(100,Math.round(g.now/g.target*100))}%`}`)).join(''));
+ const goals=card('Goals',goalList.length?goalList.map((g,i)=>para(`${i+1}. ${esc(g.label)}: ${g.val?esc(g.val):'—'}`)).join(''):para('The goal list didn’t load for this email.'));
  const unavailable=r.sources.filter(s=>s.state==='unavailable').map(s=>s.label);
  const watched=views.filter(v=>v.finished_at).length;
  const intro=`Monday ${short(r.week.start)} to ${day(r.through)}. ${watched} of ${r.people.length} watched the story. <a href="${esc(storyUrl)}" style="color:${C.link};text-decoration:none;${txt(15,C.link)}">Open the story</a>`;

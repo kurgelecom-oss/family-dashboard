@@ -1906,6 +1906,9 @@ html, body {
    rule matches any more. WeekProgressStrip on /board is a different,
    in-grid component and reads no part of this. */
 :root { --strip-h: 0px; }
+/* GOAL BAR (3 Nov 2026): the family goal bar (components/GoalBar.tsx) takes the slot back at 30px.
+   Surfaces that only subtracted --nav-h (home, /board, /present, /sunday, story) now add --strip-h too. */
+:root { --strip-h: 30px; }
 
 /* ── ANSAR STRIP SURPLUS (2026-08-26, Prompt 7 fix) ──────────────────────────
    The /board Ansar strip band auto-sized to its content, leaving 1px between

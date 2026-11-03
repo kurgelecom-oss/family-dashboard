@@ -54,7 +54,11 @@ export function demoNow(prev: NowFeed | null): NowFeed {
 
 export const demoMoney: Money = {
   unlocked: true, asOf: new Date().toISOString(),
-  goals: [{ label: 'in the bank', short: '$5k', target: 5000, pct: 0, now: -1497 }, { label: 'in the bank', short: '$10k', target: 10000, pct: 0, now: -1497 }, { label: 'weekly income', short: '$3k', target: 3000, pct: 100, now: 3015 }],
+  goals: [
+    { id: 'd1', rank: 1, label: '3k weekly income', short: '$3k income', range: 'wk', priority: 1, due: null, pct: 100, txt: null, hit: true, now: 3015 },
+    { id: 'd2', rank: 2, label: 'OmegaXL', short: 'OmegaXL scaling', range: 'wk', priority: 2, due: null, pct: null, txt: '▲ 12%', hit: true },
+    { id: 'd4', rank: 3, label: '5k bank', short: '$5k bank', range: '1m', priority: 2, due: '2026-11-30', pct: 0, txt: null, hit: false, now: -1497 },
+  ],
   cash: { bank: 1399, cardDebt: 2896, net: -1497 },
   week_income: { business: 3954, wages: 1600, businessSpend: 939, takeHome: 3015 },
   headline: 'Cash runs $1,639 short by Sat 7 Nov.',

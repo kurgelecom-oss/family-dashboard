@@ -36,7 +36,7 @@ export default function Strip() {
   const current = day.find(s => new Date(s.start) <= now && now < new Date(s.end));
   const next = day.find(s => new Date(s.start) > now && !/break/i.test(s.title));
   const st = feed?.store;
-  const goal = money?.goals.find(g => g.pct < 100) ?? money?.goals[money.goals.length - 1];
+  const goal = money?.goals.find(g => !g.hit) ?? money?.goals[money.goals.length - 1];
   const list = (t: NowFeed['nihal'] | undefined) => t ? `${t.done}/${t.total}` : '—';
 
   return (
@@ -57,7 +57,7 @@ export default function Strip() {
       <Cell rag={feed?.ads ? (feed.ads.live ? 'good' : 'bad') : feed ? 'warn' : null} eye="Ads">
         {feed?.ads ? (feed.ads.live ? `Live · ${feed.ads.activeAds}` : 'Stopped') : feed ? 'Unknown' : '…'}
       </Cell>
-      <Cell rag={goal ? goalRag(goal.pct) : null} eye="Next goal" sub={goal ? goal.label : undefined}>{goal ? `${goal.short} · ${goal.pct}%` : '…'}</Cell>
+      <Cell rag={goal ? goalRag(goal.hit ? 100 : goal.pct ?? 0) : null} eye="Next goal" sub={goal ? goal.label : undefined}>{goal ? `${goal.short} · ${goal.txt ?? (goal.pct !== null ? `${goal.pct}%` : '—')}` : '…'}</Cell>
       <span className="st-go">Dashboard ›</span>
     </Link>
   );

@@ -1,20 +1,19 @@
 import { NextResponse } from 'next/server';
 import { canEditFamily } from '../../lib/family-auth';
-import { SNAPSHOT } from '../../lib/goals';
+import { measureGoals, openGoals } from '../../lib/goal-measures';
 
-/* /api/money-board — the family goals, measured from CLEO's daily money
-   snapshot (Mission Control row id "money", refreshed 07:15 every day).
+/* /api/money-board — the family goals (master list fds_goals, measured in
+   lib/goal-measures.ts) plus CLEO's daily money snapshot (Mission Control row
+   id "money", refreshed 07:15 every day).
 
    PIN-gated: this site is readable by anyone with the URL and the repo is
    public, so balances only reach a device unlocked with the family PIN.
    Locked devices get goal percentages and nothing else.
 
-   Goal measures (tk's goals, read honestly):
-     · $5k / $10k "in the bank" = bank minus card debt. A bank balance with
-       more owed on the cards is not money in the bank.
-     · $3k weekly income = business take-home for the last full week:
-       Moonstar + Shopify payouts minus business spend. custm wages are shown
-       beside it, not counted — the goal is about the business. */
+   Goal measures live in lib/goal-measures.ts (one definition for the bar,
+   this card, /sunday and the story). Unlocked devices also get the dollar
+   figure behind the bank goals (net = bank minus card debt) and the weekly
+   income goal (custm + Moonstar). */
 
 export const dynamic = 'force-dynamic';
 const noStore = { 'Cache-Control': 'no-store' };
@@ -46,17 +45,21 @@ export async function GET(request: Request) {
   const business = snap.income.streams.filter(s => s.key !== 'custm').reduce((a, s) => a + s.amount, 0);
   const wages = snap.income.streams.filter(s => s.key === 'custm').reduce((a, s) => a + s.amount, 0);
   const takeHome = business - (snap.spend.business ?? 0);
-  const nows = [net, net, takeHome];
-  const goals = SNAPSHOT.goals.map((g, i) => ({
-    label: g.label, short: g.short, target: g.target,
-    pct: Math.max(0, Math.min(100, Math.round(nows[i] / g.target * 100))),
+  const wageIncome = snap.income.streams.filter(s => s.key === 'custm' || s.key === 'moonstar').reduce((a, s) => a + s.amount, 0);
+  let measured: Awaited<ReturnType<typeof measureGoals>> = [];
+  try { measured = await measureGoals(await openGoals()); } catch { /* goals table unreachable: money still shows */ }
+  const goals = measured.map(g => ({
+    id: g.id, rank: g.rank, label: g.goal, short: g.short, range: g.range, priority: g.priority, due: g.due,
+    pct: g.measure?.pct ?? null, txt: g.measure?.txt ?? null, hit: !!g.measure?.hit,
+    dollars: g.metric === 'net' ? net : g.metric === 'income_wk' ? wageIncome : null,
   }));
+  const stripped = goals.map(({ dollars, ...g }) => { void dollars; return g; });
 
-  if (!(await canEditFamily(request))) return NextResponse.json({ unlocked: false, asOf: snap.generated_at, goals }, { headers: noStore });
+  if (!(await canEditFamily(request))) return NextResponse.json({ unlocked: false, asOf: snap.generated_at, goals: stripped }, { headers: noStore });
 
   return NextResponse.json({
     unlocked: true, asOf: snap.generated_at, week: snap.week,
-    goals: goals.map((g, i) => ({ ...g, now: Math.round(nows[i]) })),
+    goals: goals.map(({ dollars, ...g }) => (dollars === null ? g : { ...g, now: Math.round(dollars) })),
     cash: { bank: snap.cash.bank, cardDebt: snap.cash.card_debt, net },
     week_income: { business, wages, businessSpend: snap.spend.business, takeHome },
     headline: snap.focus?.headline ?? null,

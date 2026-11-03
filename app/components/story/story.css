@@ -58,7 +58,7 @@
 .sty-goals div{border:1px solid var(--sty-border);border-radius:.8cqw;padding:2cqw;display:grid;gap:.8cqw}
 .sty-goals small{font-size:1.2cqw;font-weight:700;color:var(--sty-muted);text-transform:uppercase;letter-spacing:.1cqw}
 .sty-goals b{font-size:7cqw;line-height:1;color:var(--sty-ink)} .sty-goals span{font-size:1.5cqw;color:var(--sty-muted)}
-.sty-page{padding:calc(var(--nav-h) + 16px) 16px 24px;max-width:1400px;margin:0 auto}
+.sty-page{padding:calc(var(--nav-h) + var(--strip-h,0px) + 16px) 16px 24px;max-width:1400px;margin:0 auto}
 .sty-home{padding-top:16px}
 .sty-page .sty-stage{max-height:calc(100dvh - 250px)} .sty-home .sty-stage{max-height:calc(100dvh - 300px)}
 .sty-stat small.sty-prev{font-size:1.2cqw;font-weight:600;color:var(--sty-faint)}
