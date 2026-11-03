@@ -21,8 +21,9 @@ const endOfMonthAfter = (n: number) => { const t = new Date(); const d = new Dat
 const DUE_FOR: Record<string, number> = { '1m': 1, '3m': 3, '6m': 6, '12m': 12 };
 
 function Fuse({ f, wide }: { f: number; wide?: boolean }) {
-  const p = `${Math.round(Math.min(1, Math.max(0, f)) * 1000) / 10}%`;
-  return <span className={'gb-fuse' + (wide ? ' wide' : '')} aria-hidden="true"><u style={{ width: p }} /><i style={{ left: p }} /><b style={{ left: p }} /></span>;
+  const c = Math.min(1, Math.max(0, f)), p = `${Math.round(c * 1000) / 10}%`;
+  // The ember only shows once the fuse has visibly burnt, so a fresh goal is a clean line, not a dot on the edge.
+  return <span className={'gb-fuse' + (wide ? ' wide' : '')} aria-hidden="true"><u style={{ width: p }} />{c > 0.04 && c < 1 && <b style={{ left: p }} />}</span>;
 }
 
 function val(m: Measure | null) {
@@ -55,19 +56,19 @@ export default function GoalBar() {
     const v = val(g.measure), hit = !!g.measure?.hit;
     return <span key={g.id} className={'gb-c' + (g.priority === 1 ? ' p1' : '') + (hit ? ' hit' : '') + (ask ? ' ask' : '')} title={g.goal}>
       <span className="gb-rk">{hit ? '✓' : g.rank}</span><em>{g.short}</em>
-      <span className="gb-mx">{ask ? 'Due · done or missed?' : <>{v && <b>{v}</b>}{v && extra ? ' · ' : ''}{extra}{!v && !extra ? '—' : ''}</>}</span>{fuse}
+      <span className="gb-mx">{ask ? 'Due · done or missed?' : <>{v && <b>{v}</b>}{extra && <span className="gb-d">{v ? ' · ' : ''}{extra}</span>}{!v && !extra ? '—' : ''}</>}</span>{fuse}
     </span>;
   };
 
   return <>
     <button type="button" className="gb" onClick={() => setOpen(true)} aria-label="Family goals — open the list">
       {wk.length > 0 && <span className="gb-z wk">
-        <span className="gb-zl">This week<b>{7 - dow}d left</b></span>
+        <span className="gb-zl">This week<b>· {7 - dow}d left</b></span>
         {wk.map(g => cell(g, null))}
         <Fuse f={wkFrac} wide />
       </span>}
       <span className="gb-z hz">
-        <span className="gb-zl">Ahead<b>by date</b></span>
+        <span className="gb-zl">Ahead</span>
         {hz.map(g => {
           if (!g.due) return cell(g, null);
           const due = dueAt(g.due), left = Math.ceil((due.getTime() - now.getTime()) / DAY), f = (now.getTime() - SET_FROM.getTime()) / (due.getTime() - SET_FROM.getTime());

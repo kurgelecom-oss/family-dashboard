@@ -142,7 +142,7 @@
 
 @media (prefers-reduced-motion:reduce){.hb *{animation:none!important;transition:none!important}}
 @media (max-width:900px){
-  .hb{grid-template-rows:none;padding:56px 16px 16px!important}
+  .hb{grid-template-rows:none;padding:calc(var(--nav-h,40px) + var(--strip-h,0px) + 16px) 16px 16px!important}
   .hb-chip{display:none}
   .hb-people,.hb-band{grid-template-columns:1fr}
   .hb-bar{flex-wrap:wrap}.hb-clock{order:-1;width:100%;text-align:left}
@@ -401,7 +401,7 @@
 @media (prefers-reduced-motion:reduce){.pp-rain{display:none}}
 
 /* ── Fit a 1080p TV without clipping or scrolling ── */
-.hb{gap:1.4vh;padding-top:calc(40px + 1.6vh)!important}
+.hb{gap:1.4vh;padding-top:calc(var(--nav-h,40px) + var(--strip-h,0px) + 1.6vh)!important}
 .hb-bar{min-height:0}
 .hb-clock{display:flex;align-items:center;gap:14px}
 .hb-clock-meta{display:grid;gap:2px;justify-items:end;font-size:13px;color:var(--muted)}
