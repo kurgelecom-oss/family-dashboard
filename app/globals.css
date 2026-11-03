@@ -1908,7 +1908,7 @@ html, body {
 :root { --strip-h: 0px; }
 /* GOAL BAR (3 Nov 2026): the family goal bar (components/GoalBar.tsx) takes the slot back at 30px.
    Surfaces that only subtracted --nav-h (home, /board, /present, /sunday, story) now add --strip-h too. */
-:root { --strip-h: 30px; }
+:root { --strip-h: 52px; } /* goal bar: 8px gap + 36px floating panel + 8px gap (tk 3 Nov) */
 
 /* ── ANSAR STRIP SURPLUS (2026-08-26, Prompt 7 fix) ──────────────────────────
    The /board Ansar strip band auto-sized to its content, leaving 1px between

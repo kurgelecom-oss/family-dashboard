@@ -1,37 +1,40 @@
-/* Goal bar — Climb palette (cream/teal/clay), night palette after Maghrib via html[data-theme=night].
+/* Goal bar — its own identity, distinct from every board: a floating midnight-indigo panel with brass accents,
+   the same day and night (tk 3 Nov: "unique colour palette by itself"). Distinction comes from value + shape, not a new
+   loud hue, so the board's RAG colours keep the eye. Slot = --strip-h (52px) = 8px gap + 36px panel + 8px gap.
    Motion is transform/opacity only and stops under prefers-reduced-motion. */
-.gb{--gb-paper:#fbf8f2;--gb-line:#e7dfd2;--gb-ink:#1f4a45;--gb-mute:#7a7468;--gb-clay:#b8612f;--gb-gold:#d9bf8c;--gb-good:#2f8a57;
- all:unset;box-sizing:border-box;position:fixed;top:var(--nav-h);left:0;right:0;height:var(--strip-h);z-index:890;display:flex;align-items:stretch;
- background:var(--gb-paper);border-bottom:1px solid var(--gb-line);color:var(--gb-ink);font:12px/1 Inter,system-ui,sans-serif;cursor:pointer;overflow:hidden;
+.gb{--gb-paper:#1f2547;--gb-raise:#283058;--gb-line:#3a4270;--gb-ink:#f4ecd9;--gb-mute:#aab0d0;--gb-clay:#d9b26a;--gb-gold:#e9cd8e;--gb-good:#7fd6a0;--gb-ask:#f2a65a;
+ all:unset;box-sizing:border-box;position:fixed;top:calc(var(--nav-h) + 8px);left:16px;right:16px;height:calc(var(--strip-h) - 16px);z-index:890;display:flex;align-items:stretch;
+ background:var(--gb-paper);border:1px solid color-mix(in srgb,var(--gb-clay) 40%,var(--gb-paper));border-radius:12px;
+ box-shadow:0 6px 18px #12163126;color:var(--gb-ink);font:12px/1 Inter,system-ui,sans-serif;cursor:pointer;overflow:hidden;
  animation:gb-in .8s ease both}
-html[data-theme=night] .gb{--gb-paper:#141c1b;--gb-line:#2b3633;--gb-ink:#ece6da;--gb-mute:#9c968a;--gb-clay:#e08a52}
-.gb:focus-visible{outline:2px solid var(--gb-clay);outline-offset:-2px}
+html[data-theme=night] .gb{--gb-paper:#1a1f3d;border-color:color-mix(in srgb,var(--gb-clay) 55%,#1a1f3d);box-shadow:0 0 0 1px #0006,0 6px 22px #0008}
+.gb:focus-visible{outline:2px solid var(--gb-gold);outline-offset:2px}
 @keyframes gb-in{from{opacity:0}}
 .gb-z{display:flex;align-items:stretch;position:relative;min-width:0}
-.gb-z.wk{flex:0 0 auto;background:color-mix(in srgb,var(--gb-gold) 14%,var(--gb-paper))}
+.gb-z.wk{flex:0 0 auto;background:var(--gb-raise)}
 .gb-z.hz{flex:1;border-left:1px solid var(--gb-line)}
 /* zone label: one line, same baseline as the cells */
-.gb-zl{display:flex;align-items:center;gap:6px;padding:0 14px 0 16px;font:700 9.5px/1 Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--gb-clay);white-space:nowrap}
+.gb-zl{display:flex;align-items:center;gap:6px;padding:0 16px 0 22px;font:700 9.5px/1 Inter,system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--gb-gold);white-space:nowrap}
 .gb-zl b{font:500 11px/1 Inter,system-ui,sans-serif;letter-spacing:0;text-transform:none;color:var(--gb-mute)}
 /* cells: name and value sit together; hairline dividers inset so they never touch the fuse */
-.gb-c{position:relative;display:flex;align-items:center;gap:8px;padding:0 16px;white-space:nowrap;min-width:0}
-.gb-c+.gb-c::before,.gb-zl+.gb-c::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:1px;background:var(--gb-line)}
+.gb-c{position:relative;display:flex;align-items:center;gap:9px;padding:0 20px;white-space:nowrap;min-width:0}
+.gb-c+.gb-c::before,.gb-zl+.gb-c::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:1px;background:var(--gb-line)}
 .gb-z.hz .gb-c{flex:1 1 auto}
-.gb-rk{font:600 9.5px/1 Inter,system-ui,sans-serif;width:15px;height:15px;border-radius:50%;display:grid;place-items:center;border:1px solid color-mix(in srgb,var(--gb-mute) 60%,transparent);color:var(--gb-mute);flex:0 0 auto}
-.gb-c.p1 .gb-rk{background:var(--gb-clay);border-color:var(--gb-clay);color:#fff}
-.gb-c em{font:600 13px/1 Fraunces,Georgia,serif;font-style:normal;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto}
-.gb-mx{font:500 11.5px/1 Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums;color:var(--gb-mute);flex:0 0 auto}
+.gb-rk{font:600 10px/1 Inter,system-ui,sans-serif;width:17px;height:17px;border-radius:50%;display:grid;place-items:center;border:1px solid color-mix(in srgb,var(--gb-mute) 60%,transparent);color:var(--gb-mute);flex:0 0 auto}
+.gb-c.p1 .gb-rk{background:var(--gb-gold);border-color:var(--gb-gold);color:#1f2547}
+.gb-c em{font:600 14px/1 Fraunces,Georgia,serif;font-style:normal;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto}
+.gb-mx{font:500 12px/1 Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums;color:var(--gb-mute);flex:0 0 auto}
 .gb-mx b{color:var(--gb-ink);font-weight:700}
 .gb-c.hit em{color:var(--gb-good)}
-.gb-c.hit .gb-rk{background:var(--gb-good);border-color:var(--gb-good);color:#fff}
-.gb-c.hit::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,#f2d48a44 50%,transparent 70%);transform:translateX(-100%);animation:gb-sweep 6s ease-in-out infinite;pointer-events:none}
+.gb-c.hit .gb-rk{background:var(--gb-good);border-color:var(--gb-good);color:#12301f}
+.gb-c.hit::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,#e9cd8e2e 50%,transparent 70%);transform:translateX(-100%);animation:gb-sweep 6s ease-in-out infinite;pointer-events:none}
 @keyframes gb-sweep{60%,100%{transform:translateX(100%)}}
-.gb-c.ask{background:color-mix(in srgb,var(--gb-clay) 12%,var(--gb-paper))}
-.gb-c.ask .gb-mx{color:var(--gb-clay);font-weight:700;animation:gb-blink 2.4s ease-in-out infinite}
+.gb-c.ask{background:color-mix(in srgb,var(--gb-ask) 16%,var(--gb-paper))}
+.gb-c.ask .gb-mx{color:var(--gb-ask);font-weight:700;animation:gb-blink 2.4s ease-in-out infinite}
 @keyframes gb-blink{50%{opacity:.4}}
 /* fuse: faint track, elapsed time burnt in clay, one small ember at the tip */
-.gb-fuse{position:absolute;left:16px;right:16px;bottom:3px;height:2px;border-radius:2px;background:color-mix(in srgb,var(--gb-line) 80%,transparent);pointer-events:none}
-.gb-fuse.wide{left:16px;right:16px}
+.gb-fuse{position:absolute;left:20px;right:20px;bottom:4px;height:2px;border-radius:2px;background:#ffffff1a;pointer-events:none}
+.gb-fuse.wide{left:22px;right:20px}
 .gb-fuse u{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:linear-gradient(90deg,color-mix(in srgb,var(--gb-clay) 35%,transparent),var(--gb-clay))}
 .gb-fuse b{position:absolute;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:#ffd88a;box-shadow:0 0 5px 1px #ff9d4a,0 0 12px 3px #ff7a1a55;animation:gb-glow 1.2s ease-in-out infinite alternate}
 .gb-fuse b::after{content:"";position:absolute;left:2px;top:0;width:2px;height:2px;border-radius:50%;background:#ffd88a;animation:gb-spark 1.8s ease-out infinite}
@@ -39,9 +42,12 @@ html[data-theme=night] .gb{--gb-paper:#141c1b;--gb-line:#2b3633;--gb-ink:#ece6da
 @keyframes gb-spark{from{transform:translate(0,0);opacity:1}to{transform:translate(4px,-9px);opacity:0}}
 @media (prefers-reduced-motion:reduce){.gb,.gb *,.gb *::after{animation:none!important}}
 /* narrower screens: tighter cells, then drop the days (the fuse still shows time left) */
-@media (max-width:1600px){.gb-c{padding:0 10px;gap:6px}.gb-zl{padding:0 10px 0 12px}.gb-fuse,.gb-fuse.wide{left:10px;right:10px}}
-@media (max-width:1500px){.gb-z.hz .gb-d{display:none}.gb-zl b{display:none}}
-@media (max-width:760px){.gb-z.hz .gb-c:not(:nth-child(2)),.gb-z.wk .gb-c em{display:none}}
+@media (max-width:1800px){.gb-c{padding:0 14px;gap:7px}.gb-zl{padding:0 12px 0 18px}.gb-fuse,.gb-fuse.wide{left:14px;right:14px}.gb-z.hz .gb-c:last-child{padding-right:18px}}
+@media (max-width:1600px){.gb-c{padding:0 12px}.gb-z.hz .gb-d{display:none}.gb-fuse,.gb-fuse.wide{left:12px;right:12px}}
+@media (max-width:1500px){.gb-zl b{display:none}.gb-c em{font-size:13px}}
+@media (max-width:1400px){.gb{left:12px;right:12px}.gb-c{padding:0 9px;gap:6px}.gb-zl{padding:0 10px 0 14px;letter-spacing:.1em}.gb-c em{font-size:12.5px}.gb-rk{width:15px;height:15px}.gb-fuse,.gb-fuse.wide{left:9px;right:9px}.gb-z.hz .gb-c:last-child{padding-right:14px}}
+.gb-z.hz .gb-c:last-child{padding-right:22px}
+@media (max-width:760px){.gb{left:8px;right:8px}.gb-z.hz .gb-c:not(:nth-child(2)),.gb-z.wk .gb-c em{display:none}}
 
 /* editor */
 .gb-ed{position:fixed;inset:0;margin:auto;height:fit-content;padding:0;width:min(1100px,calc(100vw - 32px));max-height:calc(100dvh - 40px);border:1px solid #e7dfd2;border-radius:16px;background:#fbf8f2;color:#1f4a45;font:14px Inter,system-ui,sans-serif;box-shadow:0 20px 80px #1f4a4533}
