@@ -55,10 +55,10 @@ function tzMidnight(year: number, month: number, day: number, tz: string): numbe
     timeZone: tz,
     year: "numeric", month: "2-digit", day: "2-digit",
     hour: "2-digit", minute: "2-digit", second: "2-digit",
-    hour12: false,
+    hourCycle: "h23", // 0–23; the old "24"→"0" replace also zeroed day 24
   }).formatToParts(new Date(noonUTC));
   const n = (t: string) =>
-    parseInt(parts.find((p) => p.type === t)!.value.replace(/^24$/, "0"));
+    parseInt(parts.find((p) => p.type === t)!.value);
   const localSecs = n("hour") * 3600 + n("minute") * 60 + n("second");
   const dayDiff   = Math.round(
     (Date.UTC(n("year"), n("month") - 1, n("day")) - Date.UTC(year, month - 1, day))
