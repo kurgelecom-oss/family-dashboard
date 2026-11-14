@@ -6,7 +6,7 @@
 .cal{
   --cream:#f6f1e8; --paper:#fbf8f2; --ink:#1d2322; --muted:#7a7468; --line:#e7dfd2; --line-2:#efe8dc; --shade:#f3ede2;
   --good:#2f8a57; --warn:#c98a1b; --bad:#c2412d; --clay:#b8612f; --teal:#1f4a45; --teal-soft:#dfe8e5;
-  --c-family:#b8612f; --c-taylan:#1f4a45; --c-nihal:#a8456b; --c-ansar:#c98a1b; --c-kurgel:#6b4f9e; --c-routine:#7a7468;
+  --c-family:#b8612f; --c-taylan:#1f4a45; --c-nihal:#a8456b; --c-ansar:#c98a1b; --c-kurgel:#6b4f9e; --c-routine:#7a7468; --c-kitchen:#c78a38;
   --serif:Fraunces,Georgia,serif; --gutter:84px;
   position:fixed;inset:calc(var(--nav-h,40px) + var(--strip-h,0px)) 0 0 0;display:grid;grid-template-rows:auto auto auto minmax(0,1fr);
   background:var(--paper);color:var(--ink);font-family:Inter,system-ui,sans-serif;overflow:hidden;-webkit-tap-highlight-color:transparent;user-select:none

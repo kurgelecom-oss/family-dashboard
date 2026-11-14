@@ -15,7 +15,7 @@ import { addDays, range, weekdayShort, zonedToISO } from '../../lib/cal-time';
 
 export const dynamic = 'force-dynamic';
 
-export type ExtEvent = { id: string; key: string; cal: string; title: string; startISO: string; endISO: string; allDay: boolean; source: 'outlook' | 'google' | 'routine'; link?: string };
+export type ExtEvent = { id: string; key: string; cal: string; title: string; startISO: string; endISO: string; allDay: boolean; source: 'outlook' | 'google' | 'routine' | 'kitchen'; link?: string };
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -55,7 +55,15 @@ export async function GET(request: Request) {
     }
   })();
 
-  (await Promise.allSettled([...outlook, ...feeds, routines])).forEach(r => { if (r.status === 'rejected') errors.push(String(r.reason).slice(0, 200)); });
+  // Nihal OS's Family Table: dinner, cook, 8 pm snack, treat shop/out, Ansar's fuel — one series key each, so they pop like any event.
+  const kitchen = (async () => {
+    const res = await fetch(`https://nihal-os-control-room.netlify.app/api/family-table?from=${from}&to=${to}`, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error(`family table ${res.status}`);
+    const { events: rows } = await res.json() as { events: { id: string; key: string; title: string; startISO: string; endISO: string }[] };
+    for (const e of rows) if (e.startISO >= fromISO && e.startISO < toISO_) events.push({ id: e.id, key: e.key, cal: 'kitchen', title: e.title, startISO: e.startISO, endISO: e.endISO, allDay: false, source: 'kitchen', link: 'https://nihal-os-control-room.netlify.app/' });
+  })();
+
+  (await Promise.allSettled([...outlook, ...feeds, routines, kitchen])).forEach(r => { if (r.status === 'rejected') errors.push(String(r.reason).slice(0, 200)); });
 
   // A shared invitation shows once: same title and start = same event.
   const seen = new Set<string>();

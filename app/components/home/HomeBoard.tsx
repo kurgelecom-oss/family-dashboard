@@ -32,7 +32,8 @@ export type NowFeed = {
   week?: { people: { id: string; days: { date: string; pct: number | null }[] }[]; pace: { key: string; label: string; value: string; of: string | null; pct: number | null; state: 'good' | 'warn' | null; stateLabel: string; note: string }[] } | null;
   prayer: { next: { name: string; at: string; leaderName: string; suras: string[] }; today: { prayer: string; name: string; at: string; leaderName: string }[] } | null;
   calendar: { id: string; subject: string; startISO: string; isAllDay: boolean; who: string }[] | null;
-  store: { currency: string; today: { label: string; orders: number; revenue: number; sessions: number | null; conversion: number | null } | null; week: { date: string; revenue: number; orders: number }[]; weekRevenue: number; weekOrders: number; avgOrders: number; avgRevenue: number; dayFraction: number } | null;
+  store: { currency: string; today: { label: string; orders: number; revenue: number; sessions: number | null; conversion: number | null } | null; week: { date: string; revenue: number; orders: number }[]; weekRevenue: number; weekOrders: number; avgOrders: number; avgRevenue: number; dayFraction: number; products?: { name: string; orders: number; revenue: number; stopped: boolean }[]; live?: string | null } | null;
+  dinner?: { title: string; note: string | null; week: number } | null;
   ads?: { live: boolean; activeAds: number; reason: string | null } | null;
   order?: Order; june?: June;
   agents?: { june: { date: string; steps: (Pick<JuneStep, 'id' | 'label' | 'due'> & { state: string | null; at: string | null })[] } | null; actions: AgentAction[] } | null;
@@ -337,6 +338,7 @@ export default function HomeBoard() {
     const n = nextTask(feed?.nihal), k = nextTask(feed?.taylan);
     if (n || k) out.push({ key: 'next', tag: 'Up next', node: <>{n && <><b>Nihal</b>{n.title}</>}{n && k && <i>·</i>}{k && <><b>TK</b>{k.title}</>}</> });
     if (nextEvent && eventMs < 7 * 864e5) out.push({ key: 'cal', tag: 'Coming up', node: <><b>{nextEvent.subject.trim()}</b><i>·</i>{fmtDay(nextEvent.startISO)}, {fmtTime(nextEvent.startISO)}<i>·</i>in {until(eventMs)}</> });
+    if (feed?.dinner) out.push({ key: 'dinner', tag: 'Dinner', node: <><b>{feed.dinner.title}</b>{feed.dinner.note && <><i>·</i>{feed.dinner.note}</>}<i>·</i>4 pm · week {feed.dinner.week}</> });
     const s = feed?.store;
     if (s?.today) out.push({ key: 'store', tag: 'Store', node: <><b>{s.today.orders} orders · US${Math.round(s.today.revenue).toLocaleString('en-AU')}</b><i>·</i>{s.today.orders >= s.avgOrders * s.dayFraction ? 'ahead of' : 'behind'} the 7-day pace</> });
     if (cash?.unlocked && cash.headline) out.push({ key: 'money', tag: 'Money', node: <b>{cash.headline}</b> });
@@ -391,7 +393,8 @@ export default function HomeBoard() {
     ...(feed ? ([['Ansar', feed.ansar.habits], ['Nihal', feed.nihal], ['TK', feed.taylan]] as const).flatMap(([who, t]) => (t?.items ?? []).filter(i => i.done).map(i => `✓ ${who} · ${i.title}`)) : []),
     ...doneBlocks.map(s => `${s.emoji} Ansar finished ${s.title}`),
     ...(feed?.calendar ?? []).slice(0, 3).map(e => `📅 ${e.subject.trim()} · ${fmtDay(e.startISO)}`),
-    ...(st ? [`🛍 7 days · US$${Math.round(st.weekRevenue).toLocaleString('en-AU')} · ${st.weekOrders} orders`] : []),
+    ...(st ? [(() => { const p = st.products?.find(x => x.name === st.live); return p ? `🛍 ${p.name} 7 days · US$${Math.round(p.revenue).toLocaleString('en-AU')} · ${p.orders} order${p.orders === 1 ? '' : 's'}` : `🛍 7 days · US$${Math.round(st.weekRevenue).toLocaleString('en-AU')} · ${st.weekOrders} orders`; })()] : []),
+    ...(feed?.dinner ? [`🍽️ Dinner 4 pm · ${feed.dinner.title}`] : []),
   ];
 
   return (
@@ -463,16 +466,16 @@ export default function HomeBoard() {
 
       <div className="hb-band">
         <section className="hb-tile">
-          <header><h3>Store</h3><small>{st?.today ? `${st.today.label} · US$, store time` : ''}</small></header>
+          <header><h3>Store</h3><small>{st?.today ? `${st.live ? `${st.live} · ` : ''}store day ${st.today.label} (New York) · US$` : ''}</small></header>
           {!st ? <p className="hb-empty">{feed ? 'Shopify not available right now.' : 'Loading…'}</p> : <>
             <div className="hb-stats">
-              <div className={ragCls(ordersRag)}><span><i className="dot" />Orders</span><b className="hb-num"><Count value={st.today?.orders ?? 0} /></b><small>pace {Math.round(st.avgOrders * st.dayFraction)}</small></div>
-              <div className={ragCls(revenueRag)}><span><i className="dot" />Revenue</span><b className="hb-num"><Count value={st.today?.revenue ?? 0} prefix="$" /></b><small>pace ${Math.round(st.avgRevenue * st.dayFraction)}</small></div>
+              <div className={ragCls(ordersRag)}><span><i className="dot" />Orders</span><b className="hb-num"><Count value={st.today?.orders ?? 0} /></b><small>{st.live ? `${st.live} pace` : 'pace'} {Math.round(st.avgOrders * st.dayFraction)}</small></div>
+              <div className={ragCls(revenueRag)}><span><i className="dot" />Revenue</span><b className="hb-num"><Count value={st.today?.revenue ?? 0} prefix="$" /></b><small>{st.live ? `${st.live} pace` : 'pace'} ${Math.round(st.avgRevenue * st.dayFraction)}</small></div>
               <div className={ragCls(convRag)}><span><i className="dot" />Conversion</span><b className="hb-num">{st.today?.conversion != null ? <Count value={st.today.conversion} decimals={1} suffix="%" /> : '—'}</b><small>target 3%</small></div>
             </div>
             {feed && <div className={'hb-pulse-row' + (ads?.live ? '' : ' down')} role="status"><Heartbeat live={!!ads?.live} spike={now.getTime() - spikeAt < 4000} /><small>{ads?.live ? <><b>Ads live</b> · {ads.activeAds} running</> : <b>{ads ? `Ads stopped · ${ads.reason}` : 'Ads unknown · Meta not answering'}</b>}</small></div>}
             <div className="hb-bars" aria-label="Revenue, last seven days">{(() => { const max = Math.max(1, ...st.week.map(w => w.revenue)); return st.week.map((w, i) => <div key={w.date} className={i === st.week.length - 1 ? 'today' : ''}><i style={{ height: `${Math.max(4, w.revenue / max * 100)}%` }} title={`US$${Math.round(w.revenue)}`} /><span>{new Intl.DateTimeFormat('en-AU', { weekday: 'narrow', timeZone: 'UTC' }).format(new Date(w.date + 'T12:00:00Z'))}</span></div>); })()}</div>
-            <div className="hb-money"><span>7 days</span><b>US${Math.round(st.weekRevenue).toLocaleString('en-AU')} · {st.weekOrders} orders</b></div>
+            <div className="hb-money"><span>7 days</span>{st.products?.length ? <span className="hb-products">{st.products.map(p => <b key={p.name} className={p.stopped ? 'stopped' : ''}>{p.name}{p.stopped ? ' (ads off)' : ''} US${Math.round(p.revenue).toLocaleString('en-AU')} · {p.orders} order{p.orders === 1 ? '' : 's'}</b>)}</span> : <b>US${Math.round(st.weekRevenue).toLocaleString('en-AU')} · {st.weekOrders} orders</b>}</div>
           </>}
         </section>
 

@@ -48,6 +48,8 @@ export interface DailyRow {
   reachedCheckout: number | null;
   /** orders ÷ sessions, percent; null when sessions unknown or zero. */
   conversion: number | null;
+  /** Orders and revenue per product (short name from the first non-protection line item). */
+  products: Record<string, { orders: number; revenue: number }>;
 }
 
 export interface DailyPayload {
@@ -186,6 +188,13 @@ interface OrderNode {
   test: boolean;
   cancelledAt: string | null;
   totalPriceSet: { shopMoney: { amount: string } };
+  lineItems?: { nodes: { title: string }[] };
+}
+
+/** Short product name for an order: "GLM", "Omega", else the first item title. */
+export function productOf(o: OrderNode): string {
+  const title = o.lineItems?.nodes.map(l => l.title).find(t => !/protection|priority/i.test(t)) ?? "Other";
+  return /green.?lipped/i.test(title) ? "GLM" : /omega/i.test(title) ? "Omega" : title.split(/[—–-]/)[0].trim().slice(0, 24);
 }
 interface CheckoutNode {
   createdAt: string;
@@ -315,7 +324,7 @@ export async function GET() {
         token,
         "orders",
         sinceInstant,
-        "createdAt test cancelledAt totalPriceSet { shopMoney { amount } }",
+        "createdAt test cancelledAt totalPriceSet { shopMoney { amount } } lineItems(first: 5) { nodes { title } }",
       ),
       fetchAll<CheckoutNode>(token, "abandonedCheckouts", sinceInstant, "createdAt"),
       fetchSessions(token),
@@ -356,6 +365,7 @@ export async function GET() {
         addToCart: null,
         reachedCheckout: null,
         conversion: null,
+        products: {},
       });
     }
 
@@ -364,8 +374,12 @@ export async function GET() {
       const row = byDay.get(dateInZone(new Date(o.createdAt), tz));
       if (!row) continue;
       row.orders += 1;
-      row.revenue += parseFloat(o.totalPriceSet.shopMoney.amount || "0");
+      const amount = parseFloat(o.totalPriceSet.shopMoney.amount || "0");
+      row.revenue += amount;
       row.checkouts += 1;
+      const p = (row.products[productOf(o)] ??= { orders: 0, revenue: 0 });
+      p.orders += 1;
+      p.revenue = Math.round((p.revenue + amount) * 100) / 100;
     }
     for (const c of checkouts) {
       const row = byDay.get(dateInZone(new Date(c.createdAt), tz));

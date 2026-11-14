@@ -17,7 +17,7 @@ import EventAlerts, { previewAlert, type AlertMode } from '../components/EventAl
    (bottom edge = resize); swipe sideways → previous / next. */
 
 type View = 'day' | 'week' | 'month' | 'year';
-type Source = 'board' | 'outlook' | 'google' | 'routine';
+type Source = 'board' | 'outlook' | 'google' | 'routine' | 'kitchen';
 type Raw = { id: string; key?: string; cal: string; title: string; startISO: string; endISO: string; allDay: boolean; source?: Source; link?: string; notes?: string };
 type Ev = Raw & { key: string; source: Source; s: number; e: number; sd: string; ed: string; band: boolean };
 type Draft = { id?: string; cal: string; title: string; day: string; startMin: number; endMin: number; allDay: boolean; notes: string; alert: AlertMode | 'off' };
@@ -29,8 +29,9 @@ export const CALS: { id: string; label: string; writable: boolean }[] = [
   { id: 'ansar', label: 'Ansar', writable: true },
   { id: 'kurgel', label: 'Kurgel (Google)', writable: false },
   { id: 'routine', label: 'Routines (Notion)', writable: false },
+  { id: 'kitchen', label: 'Kitchen (Nihal OS)', writable: false },
 ];
-const SOURCE_NAME: Record<Source, string> = { board: 'Family calendar', outlook: 'Outlook', google: 'Google Calendar', routine: 'Notion routine' };
+const SOURCE_NAME: Record<Source, string> = { board: 'Family calendar', outlook: 'Outlook', google: 'Google Calendar', routine: 'Notion routine', kitchen: 'Nihal OS · Family Table' };
 const HOUR = 64, SNAP = 15, HOLD_MS = 350;
 const VIEWS: View[] = ['day', 'week', 'month', 'year'];
 /* Each event gets its own colour and finish so a busy day is easy to tell apart.

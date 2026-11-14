@@ -482,3 +482,6 @@
 .hb-goals li.hit .pg i{background:var(--good)}
 .hb-goals em{font-style:normal;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
 @keyframes hb-grow{from{transform:scaleX(0)}}
+/* Store tile: 7-day totals per product; a product whose ads are off reads muted (tk 14 Nov). */
+.hb-products { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.hb-products b.stopped { opacity: .5; font-weight: 500; }

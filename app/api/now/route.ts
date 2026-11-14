@@ -93,7 +93,7 @@ export async function GET() {
   const [daily, calendar, shop, schedule, school, board, adsRes, orderRes, juneRes, agentsRes] = await Promise.allSettled([
     json<DailyPayload>(dailyGET()),
     json<{ events: { id: string; subject: string; startISO: string; isAllDay: boolean; account: string }[] }>(calendarGET()),
-    json<{ timezone: string; days: { date: string; label: string; isToday: boolean; orders: number; revenue: number; sessions: number | null; conversion: number | null }[] }>(shopifyGET()),
+    json<{ timezone: string; days: { date: string; label: string; isToday: boolean; orders: number; revenue: number; sessions: number | null; conversion: number | null; products: Record<string, { orders: number; revenue: number }> }[] }>(shopifyGET()),
     json<ScheduleRow[]>(scheduleGET()),
     fetch(`${ANSAR}/api/school-block`, { cache: 'no-store', signal: AbortSignal.timeout(10000) }).then(r => r.json() as Promise<SchoolBlocks>),
     readBoard(),
@@ -102,6 +102,7 @@ export async function GET() {
     juneEmail(),
     agentFeed(now),
   ]);
+  const tableRes = await fetch('https://nihal-os-control-room.netlify.app/api/family-table', { cache: 'no-store', signal: AbortSignal.timeout(6000) }).then(r => r.ok ? r.json() as Promise<{ today: { dinner: string; addOn: string | null; week: number } }> : null).catch(() => null);
   const ok = <T,>(r: PromiseSettledResult<T>) => r.status === 'fulfilled' ? r.value : null;
 
   const d = ok(daily), sb = ok(school), b = ok(board), cal = ok(calendar), s = ok(shop), sch = ok(schedule);
@@ -137,7 +138,15 @@ export async function GET() {
     const week = s.days.slice(0, 7);
     // Pace: the six full days before today, and how far through the store's day we are.
     const prior = s.days.filter(x => !x.isToday).slice(0, 6);
-    const avg = (k: 'orders' | 'revenue') => prior.length ? prior.reduce((a, x) => a + x[k], 0) / prior.length : 0;
+    // Per product over the 7 days. Omega's ads are off (tk 14 Nov), so the live product is the best non-Omega seller;
+    // pace follows the live product only, so a dead product's history can't set today's bar.
+    const products = Object.entries(week.reduce<Record<string, { orders: number; revenue: number }>>((acc, x) => {
+      for (const [k, v] of Object.entries(x.products ?? {})) { const p = (acc[k] ??= { orders: 0, revenue: 0 }); p.orders += v.orders; p.revenue += v.revenue; }
+      return acc;
+    }, {})).map(([name, v]) => ({ name, orders: v.orders, revenue: Math.round(v.revenue * 100) / 100, stopped: name === 'Omega' })).sort((a, b) => Number(a.stopped) - Number(b.stopped) || b.revenue - a.revenue);
+    const live = products.find(p => !p.stopped)?.name ?? null;
+    const pick = (x: typeof prior[number], k: 'orders' | 'revenue') => live ? x.products?.[live]?.[k] ?? 0 : x[k];
+    const avg = (k: 'orders' | 'revenue') => prior.length ? prior.reduce((a, x) => a + pick(x, k), 0) / prior.length : 0;
     const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: s.timezone || 'America/New_York', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(now).map(x => [x.type, x.value]));
     return {
       currency: 'USD',
@@ -146,6 +155,7 @@ export async function GET() {
       weekRevenue: week.reduce((a, x) => a + x.revenue, 0),
       weekOrders: week.reduce((a, x) => a + x.orders, 0),
       avgOrders: avg('orders'), avgRevenue: avg('revenue'),
+      products, live,
       dayFraction: (+p.hour + +p.minute / 60) / 24,
     };
   })() : null;
@@ -165,6 +175,8 @@ export async function GET() {
     calendar: cal ? cal.events.filter(e => new Date(e.startISO).getTime() > now.getTime() - 3600e3).sort((x, y) => x.startISO.localeCompare(y.startISO)).slice(0, 5)
       .map(e => ({ id: e.id, subject: e.subject, startISO: e.startISO, isAllDay: e.isAllDay, who: e.account })) : null,
     store,
+    // Tonight from Nihal OS's Family Table (her 4-week rotation). null = Nihal OS not answering.
+    dinner: tableRes ? { title: tableRes.today.dinner, note: tableRes.today.addOn, week: tableRes.today.week } : null,
     // null = Meta could not be read; the board treats that as not confirmed live.
     ads: ok(adsRes),
     // Nihal's daily order of priority (Launchpad, shared with Nihal OS) and JUNE's talk points for the ticker.

@@ -6,8 +6,8 @@ export type AlertEvent = { key: string; title: string; startISO: string; endISO:
 type Live = AlertEvent & { mode: AlertMode; preview?: boolean };
 
 export const LEAD_MS = 10 * 60_000;
-export const CAL_LABEL: Record<string, string> = { family: 'Family', taylan: 'TK', nihal: 'Nihal', ansar: 'Ansar', kurgel: 'Kurgel', routine: 'Routine' };
-export const CAL_HUE: Record<string, string> = { family: '#b8612f', taylan: '#1f4a45', nihal: '#a8456b', ansar: '#c98a1b', kurgel: '#6b4f9e', routine: '#7a7468' };
+export const CAL_LABEL: Record<string, string> = { family: 'Family', taylan: 'TK', nihal: 'Nihal', ansar: 'Ansar', kurgel: 'Kurgel', routine: 'Routine', kitchen: 'Kitchen' };
+export const CAL_HUE: Record<string, string> = { family: '#b8612f', taylan: '#1f4a45', nihal: '#a8456b', ansar: '#c98a1b', kurgel: '#6b4f9e', routine: '#7a7468', kitchen: '#c78a38' };
 export const ACCENTS = ['#f0b089', '#7fd1c2', '#ffd36e', '#c9b6ff', '#ff9aa8', '#9fd47e'];
 export const SCENES = ['orbit', 'burst', 'waves', 'tiles', 'aurora'] as const;
 export type Scene = typeof SCENES[number];
