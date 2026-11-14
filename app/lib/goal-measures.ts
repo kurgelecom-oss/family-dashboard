@@ -78,6 +78,9 @@ export async function measureGoals(rows: GoalRow[], now = new Date()): Promise<G
         const sum = (from: string, to: string) => omega.reduce((a, { t, e }) => a + e.filter(x => x.entry_date >= from && x.entry_date < to).reduce((b, x) => b + entryProfit(x, t), 0), 0);
         const days = (from: string, to: string) => new Set(omega.flatMap(({ e }) => e.filter(x => x.entry_date >= from && x.entry_date < to).map(x => x.entry_date))).size;
         const thisP = sum(mon, '9999'), thisD = days(mon, '9999'), lastP = sum(lastMon, mon), lastD = days(lastMon, mon);
+        // No ad spend this week = Omega is not running; a stray reorder must not read as "in profit" (tk 14 Nov).
+        const spend = omega.reduce((a, { e }) => a + e.filter(x => x.entry_date >= mon).reduce((b, x) => b + (x.meta_spend ?? 0), 0), 0);
+        if (spend <= 0) return { txt: 'not running', hit: false };
         if (!thisD) return { txt: 'new wk' };
         const pace = thisP / thisD, lastPace = lastD ? lastP / lastD : 0;
         const trend = lastPace > 0 ? Math.round((pace - lastPace) / lastPace * 100) : null;

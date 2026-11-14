@@ -171,7 +171,8 @@ export async function GET() {
     order: ok(orderRes),
     // June's steps and the agents' actions: the board pops a card for each new one.
     agents: ok(agentsRes),
-    june: juneRes.status === 'fulfilled' ? (({ date, headline, worked, lessons, next }) => ({ date, headline: headline ?? null, worked: (worked ?? []).slice(0, 3), lessons: (lessons ?? []).slice(0, 4), next: (next ?? []).slice(0, 4) }))(juneRes.value) : null,
+    // JUNE's report only while it is current (≤ 2 days old): a paused JUNE must not leave an old talk point on the list.
+    june: juneRes.status === 'fulfilled' && now.getTime() - Date.parse(juneRes.value.date + 'T00:00:00Z') <= 3 * 864e5 ? (({ date, headline, worked, lessons, next }) => ({ date, headline: headline ?? null, worked: (worked ?? []).slice(0, 3), lessons: (lessons ?? []).slice(0, 4), next: (next ?? []).slice(0, 4) }))(juneRes.value) : null,
   };
   if (agentsRes.status === 'rejected') console.error('agent feed', agentsRes.reason);
   if (orderRes.status === 'rejected') console.error('daily order', orderRes.reason);
