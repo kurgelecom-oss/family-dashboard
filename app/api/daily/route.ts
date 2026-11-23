@@ -3,7 +3,7 @@ import { canEditFamily } from '../../lib/family-auth';
 import { familyDb, familyWorkspace } from '../../lib/family-db';
 import { fetchSource, type NotionPage } from '../../lib/notion';
 import { supabase } from '../../lib/supabase';
-import { buildWeeklyReport } from '../../lib/sunday/data';
+import { buildWeeklyReport, FAMILY_TASKS_SOURCE as TASKS_SOURCE } from '../../lib/sunday/data';
 import { civilDay, weekFor, type WeeklyReport } from '../../lib/sunday/model';
 import {
   AUTO_KINDS, ansarGroups, appliesOn, configTasks, dayLong, dayOfWeek, paceTiles, person, share,
@@ -17,8 +17,6 @@ import {
 
 export const dynamic = 'force-dynamic';
 const headers = { 'Cache-Control': 'no-store' };
-/** 📋 8 · Family Daily Tasks, under the ANSAR OS Control Room. */
-const TASKS_SOURCE = 'e3c5fa8d-3666-4f6f-b2b9-59940b415ffe';
 const FAMILY = 'https://kurgel-dashboard.netlify.app';
 const NAMES: Record<string, string> = { taylan: 'Taylan', nihal: 'Nihal', ansar: 'Ansar', ayah: 'Ayah' };
 

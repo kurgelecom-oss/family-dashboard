@@ -21,10 +21,10 @@ test('showed up unions Quran and dated activity, never future days',()=>{
  assert.deepEqual(get('showed').bars.map((b:any)=>[b.label,b.v,!!b.hot]),[['Nihal',3,false],['Taylan',2,false],['Ansar',1,false],['Ayah',0,true]]);
 });
 test('unknown values are left out, never zero',()=>{
- assert.deepEqual(didLines(report.people[0]),['1 Quran day (1 session, 10 min)','1 product validated','0 products launched']);
+ assert.deepEqual(didLines(report.people[0]),['1 Quran day','1 product validated','0 products launched']);
  assert.equal(get('person-taylan').stats[2].v,null);
 });
-test('every caption carries text; empty person has a fallback',()=>{for(const s of sc)assert.ok(s.caption.length>10,s.id);assert.match(get('person-ayah').caption,/^Ayah: 0 Quran days \(0 sessions, 0 min\), 0 new ayahs\.$/);});
+test('every caption carries text; empty person has a fallback',()=>{for(const s of sc)assert.ok(s.caption.length>10,s.id);assert.match(get('person-ayah').caption,/^Ayah: 0 Quran days\.$/);});
 const lastWeek:WeeklyReport={...report,week:weekFor('2026-10-07'),through:'2026-10-11',people:[
  {...person('taylan',[],[m('validated',3),m('launched',0),m('ad_leads',null),m('ad_spend',null)]),quran:quranWeek(['2026-10-05','2026-10-06','2026-10-10'].map(date=>({date,finished:true})),weekFor('2026-10-07').days,'2026-10-11')},
  {...person('nihal',[],[m('discoveries',5),m('mentorship',1),m('os_opens',4)]),quran:quranWeek(['2026-10-05'].map(date=>({date,finished:true})),weekFor('2026-10-07').days,'2026-10-11')},

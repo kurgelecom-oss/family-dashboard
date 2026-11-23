@@ -7,7 +7,10 @@ import {readOsActivity} from '../os-activity';
 import {PRODUCT_SURFACE_SOURCE,PRODUCT_SURFACE_URL,surfaceLogWeek} from './surface-log';
 import { MEMBERS, civilDay, dateOf, inWeek, weekFor, quranWeek, mergeCount, type WeeklyReport, type MemberId, type Metric, type MetricKey, type ManualEntry, type QuranSession } from './model';
 const FAMILY='https://kurgel-dashboard.netlify.app';
-const QURAN='https://quran-os.netlify.app';
+/** 📋 8 · Family Daily Tasks (Notion). The daily screen reads it too. */
+export const FAMILY_TASKS_SOURCE='e3c5fa8d-3666-4f6f-b2b9-59940b415ffe';
+/** Quran OS was decommissioned on 24 Nov 2026. A Quran day is now a hand tick: the Quran task on the daily screen, or Ansar's `quran` habit. */
+const isQuranTask=(r:NotionPage)=>prop(r,'Auto').select?.name==='quran'||/qur.?an/i.test(label(r,'Task'));
 const CREATIVE='https://kurgel-mission-control.netlify.app';
 const ENGINE='https://ecom-launchpad-mentor.netlify.app'; // ONE OS: proxy adds the Launchpad key server-side
 const NIHAL='https://nihal-os-control-room.netlify.app/#homeschool';
@@ -43,7 +46,7 @@ async function completions(start:string,through:string) {
 export async function buildWeeklyReport(day=civilDay()):Promise<WeeklyReport> {
  const today=civilDay(),week=weekFor(day),through=week.end<today?week.end:today,db=familyDb();
  const jobs=await Promise.allSettled([
-  json<{members:{id:string;sessions:QuranSession[]}[]}>(`${QURAN}/api/snapshot?days=30`,{'x-qos-token':process.env.QURAN_OS_TOKEN||''}),
+  fetchSource(FAMILY_TASKS_SOURCE,'Family Daily Tasks'),
   fetchSource(PRODUCT_SURFACE_SOURCE,'Nihal product surface log'),
   fetchSource('3a3a6e65-2cb3-40ba-810a-b19406e8b085','Origins'),
   fetchSource('3f93b40d-6cdc-44dc-9197-779758f9150c','Homeschool work log'),
@@ -52,8 +55,9 @@ export async function buildWeeklyReport(day=civilDay()):Promise<WeeklyReport> {
   json<{id:string;block:string;days:string[]}[]>(`${FAMILY}/api/habits`),
   db`select member,metric,value,note,version,updated_at,mode from fds_weekly_manual where workspace=${familyWorkspace()} and week_start=${week.start}`,
   readOsActivity(day),
+  db`select day::text as day, task_id from fds_daily_ticks where workspace=${familyWorkspace()} and day between ${week.start} and ${through}`,
  ] as const);
- const [q,products,origins,school,tests,verdicts,ad,habits,roster,manualResult,osActivity]=jobs;
+ const [tasks,products,origins,school,tests,verdicts,ad,habits,roster,manualResult,osActivity,ticks]=jobs;
  const sources:WeeklyReport['sources']=[];
  const addSource=(id:string,label:string,ok:boolean,detail:string,href:string,partial=false)=>sources.push({id,label,state:ok?(partial?'partial':'connected'):'unavailable',detail:ok?detail:'Connection unavailable. Refresh to retry; manual entries remain available.',href});
  const manual:ManualEntry[]=manualResult.status==='fulfilled'?manualResult.value.map(r=>({mode:r.mode as ManualEntry['mode'],member:r.member as MemberId,metric:r.metric as MetricKey,value:r.value===null?null:Number(r.value),note:r.note,version:r.version,updated_at:new Date(r.updated_at).toISOString()})):[];
@@ -95,7 +99,14 @@ export async function buildWeeklyReport(day=civilDay()):Promise<WeeklyReport> {
   }if(perfect===5)points+=3;schoolScore=Math.round(points/WEEKLY_MAX*100);
  }
  addSource('habits','Ansar OS score',schoolScore!==null,'Canonical weekday score out of 55, including the perfect-week bonus. Weekend stretch points are excluded.', 'https://ansar-habits-tracker.netlify.app');
- addSource('quran','Quran OS',q.status==='fulfilled','Finished sessions only; daily attendance is counted once per person. Refreshes every minute.',QURAN);
+ const quranTaskIds=tasks.status==='fulfilled'?new Set(tasks.value.filter(r=>prop(r,'Active').checkbox===true&&isQuranTask(r)).map(r=>(r.id??'').replace(/-/g,''))):null;
+ const tickRows=ticks.status==='fulfilled'?ticks.value as unknown as {day:string;task_id:string}[]:null;
+ const quranTicks=(id:MemberId):QuranSession[]|undefined=>{
+  if(id==='ansar')return habits.status==='fulfilled'?habits.value.filter(r=>r.habit_id==='quran').map(r=>({date:r.completed_date,finished:true})):undefined;
+  if(!quranTaskIds||!tickRows)return undefined;
+  return [...new Set(tickRows.filter(t=>quranTaskIds.has(t.task_id)&&tasks.status==='fulfilled'&&tasks.value.some(r=>(r.id??'').replace(/-/g,'')===t.task_id&&label(r,'Person').toLowerCase()===id)).map(t=>t.day))].map(date=>({date,finished:true}));
+ };
+ addSource('quran','Quran days',quranTaskIds!==null&&tickRows!==null&&habits.status==='fulfilled','Days each person ticked their Quran task on the daily screen; Ansar’s come from his Quran habit. One per person per day.',FAMILY);
  addSource('ads','custm Meta ads',ad.status==='fulfilled','Account leads and spend for these exact dates. Leads are enquiries, not confirmed customers; today is still updating.',`${CREATIVE}/mission-control`);
  function metric(member:MemberId,key:MetricKey,labelText:string,auto:number|null,detail:string,href?:string,unit?:string):Metric {
   const m=manual.find(r=>r.member===member&&r.metric===key);const manualValue=m?.value??null;
@@ -105,7 +116,7 @@ export async function buildWeeklyReport(day=civilDay()):Promise<WeeklyReport> {
   return {key,label:labelText,...mergeCount(auto,m),unit,detail,manualValue,manualMode:mode,canEdit:editable||!!m,href};
  }
  const people=MEMBERS.map(id=>{
-  const ss=q.status==='fulfilled'?q.value.members.find(m=>m.id===id)?.sessions:undefined;
+  const ss=quranTicks(id);
   const metrics:Metric[]=[];
   if(id==='taylan')metrics.push(metric(id,'ad_leads','custm ad leads',ad.status==='fulfilled'?ad.value.leads:null,ad.status==='fulfilled'&&ad.value.leads?`$${(ad.value.spend/ad.value.leads).toFixed(2)} per lead`:'Enquiries from Meta ads',`${CREATIVE}/mission-control`),metric(id,'ad_spend','Ad spend',ad.status==='fulfilled'?Math.round(ad.value.spend*100)/100:null,'AUD · selected week',`${CREATIVE}/mission-control`,'AUD'),{...metric(id,'validated','Products validated',validated,'Shared pipeline · dated reviews, including passes and kills',`${FAMILY}/business`),perDay:validatedByDay},metric(id,'launched','Products launched',launched,'Shared pipeline · first launch in the test log','https://ecom-launchpad-mentor.netlify.app'));
   if(id==='nihal')metrics.push({...metric(id,'discoveries','Products found',discovered,surfaceLog?'Nihal’s Notion surface log · Melbourne time':'Notion surface log unavailable · refresh to retry',PRODUCT_SURFACE_URL),daily:surfaceLog?.daily,entries:surfaceLog?.entries},{...metric(id,'mentorship','Mentorship watched',watched,'Completed Origins training sessions',`${FAMILY}/origins`),perDay:watchedByDay});

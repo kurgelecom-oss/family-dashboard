@@ -1,6 +1,6 @@
 -- Hand-ticked daily tasks on the family dashboard ("Today, together.").
 -- One row = that task was done that Melbourne day. Unticking deletes the row.
--- Auto-ticked tasks (Quran OS, surface log, Origins, Nihal OS, pipeline) and
+-- Auto-ticked tasks (surface log, Origins, Nihal OS, pipeline) and
 -- Ansar's habits are never stored here; they are read from their own sources.
 create table if not exists fds_daily_ticks (
  workspace text not null,

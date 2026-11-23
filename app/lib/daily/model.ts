@@ -13,7 +13,7 @@
    ══════════════════════════════════════════════════════════════════════════ */
 import type { MemberId, WeeklyReport } from '../sunday/model';
 
-export const AUTO_KINDS = ['quran', 'discoveries', 'os_opens', 'mentorship', 'validated'] as const;
+export const AUTO_KINDS = ['discoveries', 'os_opens', 'mentorship', 'validated'] as const;
 export type AutoKind = typeof AUTO_KINDS[number];
 export type TaskMember = Exclude<MemberId, 'ansar'>;
 
@@ -41,9 +41,9 @@ const HOME: Record<MemberId, string> = {
   taylan: 'https://kurgel-mission-control.netlify.app/mission-control',
   nihal: 'https://nihal-os-control-room.netlify.app/#homeschool',
   ansar: 'https://ansar-habits-tracker.netlify.app/',
-  ayah: 'https://quran-os.netlify.app/m/ayah',
+  ayah: 'https://kurgel-dashboard.netlify.app/',
 };
-const AUTO_SOURCE: Record<AutoKind, string> = { quran: 'Quran OS', discoveries: 'surface log', os_opens: 'Nihal OS', mentorship: 'Origins', validated: 'pipeline' };
+const AUTO_SOURCE: Record<AutoKind, string> = { discoveries: 'surface log', os_opens: 'Nihal OS', mentorship: 'Origins', validated: 'pipeline' };
 const ANSAR_TRACKER = 'https://ansar-habits-tracker.netlify.app/';
 const BLOCKS: { id: string; name: string }[] = [
   { id: 'pre', name: 'Morning' }, { id: 'school', name: 'Homeschool' },
@@ -59,20 +59,15 @@ export function dayOfWeek(iso: string) { const d = new Date(iso + 'T12:00:00Z').
 export function appliesOn(days: string[], iso: string) { return days.length === 0 || days.includes(dayShort(iso)); }
 
 /** Has the named app recorded this task for that date? */
-export function autoDone(kind: AutoKind, member: MemberId, date: string, report: WeeklyReport | null): boolean {
+export function autoDone(kind: AutoKind, date: string, report: WeeklyReport | null): boolean {
   if (!report) return false;
-  if (kind === 'quran') {
-    const p = report.people.find(x => x.id === member);
-    return !!p?.quran.available && (p.quran.days.find(d => d.date === date)?.sessions ?? 0) > 0;
-  }
   const metric = report.people.flatMap(p => p.metrics).find(m => m.key === kind);
   if (!metric) return false;
   if (metric.daily) return (metric.daily.find(d => d.date === date)?.count ?? 0) > 0;
   return (metric.perDay?.[date] ?? 0) > 0;
 }
 
-function defaultLink(kind: AutoKind | null, member: MemberId, report: WeeklyReport | null): string | null {
-  if (kind === 'quran') return `https://quran-os.netlify.app/m/${member}`;
+function defaultLink(kind: AutoKind | null, report: WeeklyReport | null): string | null {
   if (!kind) return null;
   return report?.people.flatMap(p => p.metrics).find(m => m.key === kind)?.href ?? null;
 }
@@ -83,8 +78,8 @@ export function configTasks(member: TaskMember, date: string, rows: TaskRow[], r
     id: r.id, title: r.title, feeds: r.feeds,
     source: r.auto ? `auto · ${AUTO_SOURCE[r.auto]}` : 'tap',
     auto: r.auto !== null,
-    done: r.auto ? autoDone(r.auto, member, date, report) : ticked.has(r.id),
-    href: r.link ?? defaultLink(r.auto, member, report),
+    done: r.auto ? autoDone(r.auto, date, report) : ticked.has(r.id),
+    href: r.link?.includes('quran-os.netlify.app') ? null : r.link ?? defaultLink(r.auto, report),
   }));
 }
 
@@ -142,7 +137,7 @@ export function paceTiles(report: WeeklyReport | null, today: string): PaceTile[
     ({ key, label: labelText, value: value === null ? '—' : String(value), of: `/ ${target}`, pct: pct(value, target), state: judge(value, target), stateLabel: label(value, target), note, href });
 
   return [
-    tile('quran', 'Quran days · family', quranDays, quranMax, report.people.map(p => `${p.name} ${p.quran.available ? p.quran.totalDays : '—'}`).join(' · '), 'https://quran-os.netlify.app/'),
+    tile('quran', 'Quran days · family', quranDays, quranMax, report.people.map(p => `${p.name} ${p.quran.available ? p.quran.totalDays : '—'}`).join(' · '), 'https://kurgel-dashboard.netlify.app/'),
     tile('discoveries', 'Products found', discoveries, WEEK_TARGETS.discoveries, 'Nihal’s surface log', metric('nihal', 'discoveries')?.href ?? 'https://kurgel-dashboard.netlify.app/'),
     tile('validated', 'Products validated', validations, WEEK_TARGETS.validations, 'shared pipeline', 'https://kurgel-dashboard.netlify.app/business'),
     tile('launched', 'Products launched', launched, WEEK_TARGETS.launched, 'first launch in the test log', 'https://ecom-launchpad-mentor.netlify.app/'),

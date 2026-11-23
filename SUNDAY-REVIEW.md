@@ -8,7 +8,7 @@ The period switch is explicit persisted on/off state. No elapsed-day rule turns 
 
 ## Source map
 
-- Quran OS `/api/snapshot`: dated finished sessions for Taylan, Nihal, Ansar, Ayah. Days counted distinctly; sessions, minutes, new ayahs and pages summed only within Monday–Sunday and through today.
+- Quran days (Quran OS was decommissioned on 24 Nov 2026): days each person ticked their Quran task on the daily screen (`fds_daily_ticks`), and Ansar's `quran` habit from `habit_completions`. Days counted distinctly per person within Monday–Sunday.
 - Product Validation Notion database: Submission Date and Validated On. Validation totals are shared pipeline reviews, including both passes and kills. Older rows do not identify the finder.
 - Creative OS `cos_radar_products`: only dated manual intake attributed to Nihal; automated nightly discovery is excluded. Products are deduplicated by name against attributed Notion rows.
 - Origins: Done training rows, Completed On, Completed By. If Completed By is absent, a module assigned exclusively to Nihal is used. Shared modules without ownership and Action Items are excluded.
@@ -24,7 +24,7 @@ Manual extras are distinct from fallback totals. A recovered connection never ad
 
 `db/001-family-review.sql` creates three private `fds_` tables in the existing shared Quran/Creative database, leaving existing source tables unchanged. `FAMILY_WORKSPACE` separates preview and production rows. The old `cycle_starts` data is copied into cycle history; the current on/off state is copied once during migration, never recalculated from duration.
 
-Server variables: FAMILY_DATABASE_URL, FAMILY_WORKSPACE, QURAN_OS_TOKEN, FAMILY_META_TOKEN, FAMILY_EDIT_PIN, FAMILY_SESSION_SECRET, FAMILY_EDIT_KEY, NOTION_TOKEN. Nihal OS needs FAMILY_CYCLE_BASE_URL (Family URL) and FAMILY_EDIT_KEY in addition to its existing auth settings.
+Server variables: FAMILY_DATABASE_URL, FAMILY_WORKSPACE, FAMILY_META_TOKEN, FAMILY_EDIT_PIN, FAMILY_SESSION_SECRET, FAMILY_EDIT_KEY, NOTION_TOKEN. Nihal OS needs FAMILY_CYCLE_BASE_URL (Family URL) and FAMILY_EDIT_KEY in addition to its existing auth settings.
 
 Preview initialization: `node --env-file=.env.local scripts/prepare-sunday-preview.mjs`. This refuses the production workspace. Production initialization: `node --env-file=.env.local scripts/prepare-family-production.mjs --initialise-production`. It copies a fresh live snapshot before the cycle endpoint changes and never overwrites an existing production state. No test records are copied to production.
 

@@ -13,7 +13,7 @@ function Dots({person,labels=false}:{person:PersonReport;labels?:boolean}){
  return <div className="su-days" aria-label={`${person.name} Quran attendance`}>
   {person.quran.days.map((d,i)=><div className="su-day" key={d.date}>
    {labels&&<span className="su-day-label">{DAYS[i]}</span>}
-   <span tabIndex={0} className={'su-dot '+(!person.quran.available?'unknown':d.future?'future':d.sessions?'done':'empty')} aria-label={`${DAY_NAMES[i]} ${dateLabel(d.date)}: ${!person.quran.available?'source unavailable':d.future?'upcoming':d.sessions?`${d.sessions} finished session${d.sessions===1?'':'s'}`:'no finished session logged'}`} title={`${dateLabel(d.date)} · ${d.sessions} sessions · ${d.minutes} minutes`}>
+   <span tabIndex={0} className={'su-dot '+(!person.quran.available?'unknown':d.future?'future':d.sessions?'done':'empty')} aria-label={`${DAY_NAMES[i]} ${dateLabel(d.date)}: ${!person.quran.available?'not loaded':d.future?'upcoming':d.sessions?'Quran ticked':'not ticked'}`} title={dateLabel(d.date)}>
     {!person.quran.available?'?':d.future?'·':d.sessions?'✓':'–'}
    </span>
   </div>)}
@@ -21,11 +21,11 @@ function Dots({person,labels=false}:{person:PersonReport;labels?:boolean}){
 }
 function QuranTable({report}:{report:WeeklyReport}){
  return <section className="su-quran" aria-labelledby="quran-heading">
-  <div className="su-section-heading"><h2 id="quran-heading">Our week with Quran</h2><a href="https://quran-os.netlify.app/" target="_blank" rel="noreferrer">Open Quran OS ↗</a></div>
-  <div className="su-quran-head"><span>Finished sessions</span><div className="su-days">{DAY_NAMES.map((d,i)=><span key={d}>{d.slice(0,3)} <small>{report.week.days[i].slice(-2)}</small></span>)}</div><span>Days</span><span>Sessions</span><span>Minutes</span></div>
+  <div className="su-section-heading"><h2 id="quran-heading">Our week with Quran</h2></div>
+  <div className="su-quran-head"><span>Ticked on the daily list</span><div className="su-days">{DAY_NAMES.map((d,i)=><span key={d}>{d.slice(0,3)} <small>{report.week.days[i].slice(-2)}</small></span>)}</div><span>Days</span></div>
   {report.people.map(p=><div className="su-quran-row" key={p.id} data-person={p.id}>
-   <a className="su-person-name" href={`https://quran-os.netlify.app/m/${p.id}`} target="_blank" rel="noreferrer"><span className="su-initial">{p.name[0]}</span>{p.name}</a><Dots person={p} labels={p.id==='taylan'}/>
-   <strong>{p.quran.available?`${p.quran.totalDays} / 7`:'—'}</strong><span>{p.quran.available?p.quran.sessions:'—'}</span><span>{p.quran.available?p.quran.minutes:'—'}</span>
+   <div className="su-person-name"><span className="su-initial">{p.name[0]}</span>{p.name}</div><Dots person={p} labels={p.id==='taylan'}/>
+   <strong>{p.quran.available?`${p.quran.totalDays} / 7`:'—'}</strong>
   </div>)}
  </section>;
 }
@@ -41,9 +41,9 @@ function MetricRow({metric:m,onEdit}:{metric:Metric;onEdit:()=>void}){
 function PersonCard({person:p,onEdit,compact=false}:{person:PersonReport;onEdit:(key:MetricKey)=>void;compact?:boolean}){
  return <article className="su-person" data-person={p.id}>
   <div className="su-person-heading"><div><span className="su-initial">{p.name[0]}</span><h2>{p.name}</h2></div><span className="su-person-focus">{p.id==='taylan'?'Build & launch':p.id==='nihal'?'Find & learn':p.id==='ansar'?'Learn & grow':'Little steps'}</span></div>
-  {compact&&<div className="su-person-quran"><Dots person={p} labels/><p><b>{p.quran.available?p.quran.totalDays:'—'}/7</b> Quran days <span>{p.quran.available?p.quran.sessions:'—'} sessions</span></p></div>}
+  {compact&&<div className="su-person-quran"><Dots person={p} labels/><p><b>{p.quran.available?p.quran.totalDays:'—'}/7</b> Quran days</p></div>}
   <div className="su-metrics">{p.metrics.map(m=><MetricRow key={m.key} metric={m} onEdit={()=>{if(m.key!=='os_opens')onEdit(m.key);}}/>)}</div>
-  {p.id==='ayah'&&<div className="su-ayah"><div className="su-petal" aria-hidden="true"><span/><span/><span/><span/><i/></div><div><strong>{p.quran.available?p.quran.totalDays:'—'} little steps</strong><p>Days with Quran this week.</p><small>{p.quran.available?`${p.quran.newAyahs} new ayahs · ${p.quran.minutes} minutes together`:'Quran connection unavailable'}</small></div></div>}
+  {p.id==='ayah'&&<div className="su-ayah"><div className="su-petal" aria-hidden="true"><span/><span/><span/><span/><i/></div><div><strong>{p.quran.available?p.quran.totalDays:'—'} little steps</strong><p>Days with Quran this week.</p><small>Ticked on the daily list</small></div></div>}
   <div className="su-win"><div><span>{p.win?'This week’s note':'One win. One next step.'}</span><p>{p.win||'Keep the next week simple.'}</p></div><button type="button" onClick={()=>onEdit('win')} aria-label={`Edit ${p.name} week note`}>{p.win?'Edit':'+ Note'}</button></div>
  </article>;
 }
@@ -76,15 +76,15 @@ export default function SundayReport({theme='gather',preview=false}:{theme?:Them
  const refresh=useCallback(async()=>{if(pending.current)return;pending.current=true;setLoading(true);try{const r=await fetch('/api/sunday',{cache:'no-store'});if(!r.ok)throw new Error('Report unavailable. Try refresh.');setReport(await r.json());setError('');}catch(e){setError(e instanceof Error?e.message:'Report unavailable');}finally{setLoading(false);pending.current=false;}},[]);
  useEffect(()=>{void refresh();const id=setInterval(()=>void refresh(),60000);window.addEventListener('focus',refresh);return()=>{clearInterval(id);window.removeEventListener('focus',refresh);};},[refresh]);
  if(!report)return <main className={`su-root su-${theme} su-loading`}><h1>The family week</h1><p role="status">{error||'Bringing the week together…'}</p>{error&&<button onClick={refresh}>Retry</button>}</main>;
- const totalSessions=report.people.reduce((n,p)=>n+p.quran.sessions,0);const totalDays=report.people.reduce((n,p)=>n+p.quran.totalDays,0);const allQuran=report.people.every(p=>p.quran.available);const connected=report.sources.filter(s=>s.state!=='unavailable').length;
+ const totalDays=report.people.reduce((n,p)=>n+p.quran.totalDays,0);const allQuran=report.people.every(p=>p.quran.available);const connected=report.sources.filter(s=>s.state!=='unavailable').length;
  return <main className={`su-root su-${theme}`}>
-  <header className="su-hero"><div><div className="su-edition">Kurgel family <span/> Sunday review</div><h1>{theme==='gather'?'This week, together.':theme==='scorecard'?'The week. In focus.':'Small steps. Shared wins.'}</h1><p>{dateLabel(report.week.start)} — {dateLabel(report.week.end)} <span>Monday to Sunday · Melbourne time</span></p></div><div className="su-hero-total"><strong>{allQuran?totalSessions:'—'}</strong><span>Quran sessions<br/>across our family</span><div className="su-family-dots" aria-hidden="true">{report.people.map(p=><i key={p.id} data-person={p.id}>{p.name[0]}</i>)}</div></div></header>
+  <header className="su-hero"><div><div className="su-edition">Kurgel family <span/> Sunday review</div><h1>{theme==='gather'?'This week, together.':theme==='scorecard'?'The week. In focus.':'Small steps. Shared wins.'}</h1><p>{dateLabel(report.week.start)} — {dateLabel(report.week.end)} <span>Monday to Sunday · Melbourne time</span></p></div><div className="su-hero-total"><strong>{allQuran?totalDays:'—'}</strong><span>Quran days<br/>across our family</span><div className="su-family-dots" aria-hidden="true">{report.people.map(p=><i key={p.id} data-person={p.id}>{p.name[0]}</i>)}</div></div></header>
   {error&&<div className="su-error" role="alert">Refresh failed. Showing the last report from {timeLabel(report.generatedAt)}. <button onClick={refresh}>Retry</button></div>}
   <div className="su-content">
    {theme!=='scorecard'&&<QuranTable report={report}/>}
    <section className="su-people" aria-label="Each person's week">{report.people.map(p=><PersonCard key={p.id} person={p} compact={theme==='scorecard'} onEdit={key=>setEdit({person:p.id,key})}/>)}</section>
   </div>
-  <footer className="su-footer"><p><span className="su-live-dot"/> {error?'Last loaded':'Updated'} {timeLabel(report.generatedAt)} <span className="su-footer-divider"/> {allQuran?`${totalDays} Quran days between us`:'Quran feed needs a refresh'} <span className="su-footer-divider"/> <a href={report.sources.find(s=>s.id==='products')?.href} target="_blank" rel="noreferrer">{report.shared.discoveries??'—'} products surfaced in Nihal’s Notion log ↗</a></p><div><button type="button" onClick={()=>setSources(!sources)} aria-expanded={sources}>{connected}/{report.sources.length} sources</button><button type="button" onClick={refresh} disabled={loading}>{loading?'Refreshing…':'Refresh data'}</button></div></footer>
+  <footer className="su-footer"><p><span className="su-live-dot"/> {error?'Last loaded':'Updated'} {timeLabel(report.generatedAt)} <span className="su-footer-divider"/> {allQuran?`${totalDays} Quran days between us`:'Quran days still loading'} <span className="su-footer-divider"/> <a href={report.sources.find(s=>s.id==='products')?.href} target="_blank" rel="noreferrer">{report.shared.discoveries??'—'} products surfaced in Nihal’s Notion log ↗</a></p><div><button type="button" onClick={()=>setSources(!sources)} aria-expanded={sources}>{connected}/{report.sources.length} sources</button><button type="button" onClick={refresh} disabled={loading}>{loading?'Refreshing…':'Refresh data'}</button></div></footer>
   {notice&&<p className="su-notice" role="status">{notice}</p>}
   {sources&&<section className="su-sources"><div className="su-section-heading"><h2>Where the numbers come from</h2><button onClick={()=>setSources(false)}>Close</button></div>{report.sources.map(s=><a href={s.href} target="_blank" rel="noreferrer" key={s.id}><strong>{s.label}</strong><span data-state={s.state}>{s.state==='connected'?'Connected':s.state==='partial'?'Connected · some manual entries':'Unavailable'}</span><p>{s.detail}</p></a>)}</section>}
   {edit&&<EntryDialog report={{...report,preview:preview||report.preview}} person={edit.person} keyName={edit.key} onClose={()=>setEdit(null)} onSaved={()=>{setNotice('Week saved.');void refresh();}}/>}

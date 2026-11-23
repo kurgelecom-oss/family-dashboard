@@ -46,7 +46,7 @@ export function versus(now:number|null,before:number|null|undefined,unit=''){
 /** One plain line per thing the person did, for captions and the email. Unknown values are left out, never shown as zero. */
 export function didLines(p:PersonReport):string[]{
  const out:string[]=[],n=(k:Metric['key'])=>val(p,k);
- if(p.quran.available)out.push(`${s(p.quran.totalDays,'Quran day')} (${s(p.quran.sessions,'session')}, ${p.quran.minutes} min)`);
+ if(p.quran.available)out.push(s(p.quran.totalDays,'Quran day'));
  if(p.id==='taylan'){
   if(n('validated')!==null)out.push(`${s(n('validated')!,'product')} validated`);
   if(n('launched')!==null)out.push(`${s(n('launched')!,'product')} launched`);
@@ -61,7 +61,6 @@ export function didLines(p:PersonReport):string[]{
   if(n('school_score')!==null)out.push(`${n('school_score')}% Ansar OS score`);
   if(n('school_work')!==null)out.push(`${s(n('school_work')!,'piece')} of homeschool work`);
  }
- if(p.id==='ayah'&&p.quran.available)out.push(`${s(p.quran.days.reduce((t,d)=>t+d.newAyahs,0),'new ayah')}`);
  return out;
 }
 
@@ -70,7 +69,7 @@ function personScene(p:PersonReport,before?:PersonReport):Scene{
  const stats:Stat[]=p.id==='taylan'?[{label:'Validated',v:n('validated')},{label:'Launched',v:n('launched')},{label:'custm leads',v:n('ad_leads')},{label:'Ad spend',v:n('ad_spend'),unit:'AUD'}]
   :p.id==='nihal'?[{label:'Products found',v:n('discoveries')},{label:'Lessons watched',v:n('mentorship')},{label:'OS opens',v:n('os_opens')}]
   :p.id==='ansar'?[{label:'Ansar OS score',v:n('school_score'),unit:'%'},{label:'Homeschool work',v:n('school_work')},{label:'Quran days',v:q}]
-  :[{label:'Quran days',v:q},{label:'New ayahs',v:p.quran.available?p.quran.newAyahs:null},{label:'Minutes',v:p.quran.available?p.quran.minutes:null}];
+  :[{label:'Quran days',v:q}];
  const lines=didLines(p).filter(l=>!l.includes('Quran day')||p.id==='ayah'||p.id==='ansar');
  if(before){const b=personScene(before) as Extract<Scene,{stats:Stat[]}>;stats.forEach((x,i)=>{x.prev=b.stats[i]?.v??null;});}
  const moved=before?stats.filter(x=>x.v!==null&&x.prev!==null&&x.prev!==undefined&&x.v!==x.prev).sort((a,b)=>Math.abs(b.v!-b.prev!)/Math.max(1,b.prev!)-Math.abs(a.v!-a.prev!)/Math.max(1,a.prev!))[0]:undefined;
@@ -95,8 +94,8 @@ export function buildStory(r:WeeklyReport,last?:WeeklyReport|null,goals:GoalLine
   {id:'goals',label:'Our goals',hold:5,goals,
    caption:goals.length?`Our goals, in order: ${goals.map(g=>g.short+(g.val?` (${g.val})`:'')).join(', ')}.`:'Our goals didn’t load this week.'},
   {id:'quran',label:'Quran',hold:6,on,total,
-   caption:!quranPeople.length?'Quran OS didn’t connect this week, so these days are unknown.':
-    on===0?`No finished Quran sessions this week${prevOn?`, after ${s(prevOn,'day')} last week`:''}. Next week starts with one each.`:
+   caption:!quranPeople.length?'The Quran ticks didn’t load this week, so these days are unknown.':
+    on===0?`No Quran days ticked this week${prevOn?`, after ${s(prevOn,'day')} last week`:''}. Next week starts with one each.`:
     `Together we read on ${on} of ${total} days${versus(on,prevOn)}.${everyDay.length?` ${everyDay.join(' and ')} read every day.`:` Nobody managed every day yet.`}`},
   {id:'showed',label:'Showed up',hold:6,of:days,bars:shows.map(x=>({label:x.p.name,sub:`of ${days} days`,v:x.v,hot:!!lowest&&x.v===lowest.v})),
    caption:(!low.length?`All four of us showed up every day. ${days} out of ${days}.`:

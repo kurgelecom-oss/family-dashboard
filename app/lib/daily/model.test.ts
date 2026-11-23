@@ -24,12 +24,10 @@ test('days and weekdays',()=>{
 });
 
 test('auto ticks read the right app for the right date',()=>{
- assert.equal(autoDone('quran','taylan',SAT,report),true);
- assert.equal(autoDone('quran','nihal',SAT,report),false);
- assert.equal(autoDone('discoveries','nihal',SAT,report),true);
- assert.equal(autoDone('validated','taylan',FRI,report),true);
- assert.equal(autoDone('validated','taylan',SAT,report),false);
- assert.equal(autoDone('quran','taylan',SAT,null),false);
+ assert.equal(autoDone('discoveries',SAT,report),true);
+ assert.equal(autoDone('validated',FRI,report),true);
+ assert.equal(autoDone('validated',SAT,report),false);
+ assert.equal(autoDone('discoveries',SAT,null),false);
 });
 
 test('config tasks: day filter, order, hand ticks, default links',()=>{
@@ -38,7 +36,9 @@ test('config tasks: day filter, order, hand ticks, default links',()=>{
   {id:'a',member:'nihal',title:'Find one product',order:1,days:[],feeds:'Products found',auto:'discoveries',link:null},
   {id:'c',member:'nihal',title:'Weekday only',order:3,days:['Mon'],feeds:'',auto:null,link:null},
   {id:'d',member:'taylan',title:'Not hers',order:1,days:[],feeds:'',auto:null,link:null},
+  {id:'q',member:'taylan',title:'Quran session',order:2,days:[],feeds:'Quran days',auto:null,link:'https://quran-os.netlify.app/m/taylan'},
  ];
+ assert.equal(configTasks('taylan',SAT,rows,report,new Set(['q'])).find(t=>t.id==='q')?.href,null,'decommissioned Quran OS links are dropped');
  const list=configTasks('nihal',SAT,rows,report,new Set(['b']));
  assert.deepEqual(list.map(t=>t.id),['a','b']);
  assert.equal(list[0].done,true);assert.equal(list[0].auto,true);assert.equal(list[0].href,'https://notion.so/log');
